@@ -1,7 +1,7 @@
 # ai_hot
 
 个人向 **AI 垂直热点定时巡检**：HN + 官方/镜像 RSS → SQLite 去重 → `out/digest.md`。  
-静态站 **AI Hot Digest**（中文副标题「AI 热点摘要」）经 Cloudflare Pages 发布。
+静态站 **AI Hot Digest**（中文副标题「AI 热点摘要」）经 Cloudflare Workers（静态 Assets）发布。
 
 ## 快速开始
 
@@ -11,17 +11,18 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
 
-# 手动跑一次（v1 验收，模式 A：RSS 原生简介）
+# 手动跑一次（v1 验收，模式 A：RSS 原生简介；含中文的 title/summary 会经 Ollama 译成英文再写入 digest.md）
 python -m src.main
-# 模式 B：入选条目用本地 Ollama（qwen）生成简介
+# 模式 B：入选条目用本地 Ollama（qwen）生成简介（中文条目仍会再做英文化）
 python -m src.main --llm qwen
 # 查看：out/digest.md ，库：data/ai_hot.db
 
-# 本地 Ollama（默认 qwen3:4b-instruct）译成中文
+# 本地 Ollama（默认 qwen3:4b-instruct）把英文 digest 译成中文
 python -m src.translate
 # 查看：out/digest.zh.md
 ```
 
+> 依赖：本机 Ollama 可用。中文源（如量子位）英文化失败时保留原文并打 warning。
 落地到 24h 机器后用 cron（每小时）：
 
 ```bash
@@ -49,12 +50,22 @@ git push
 
 ### Cloudflare 一次性配置
 
-1. Cloudflare Dashboard → Workers & Pages → Create → 项目名 `ai-hot-digest`
-2. GitHub repo secrets：
-   - `CLOUDFLARE_API_TOKEN`（Pages 编辑权限）
-   - `CLOUDFLARE_ACCOUNT_ID`
-3. Workflow：`.github/workflows/deploy-cloudflare.yml`（`content/**` 或站点代码变更时构建并部署）
-4. 先用 `*.pages.dev`；自定义域后绑
+仓库根目录有 `wrangler.toml`（项目名 `ai-hot`，静态目录 `public/`）。Dashboard 里的 `ai-hot` 是 **Worker**，不是经典 Pages——Deploy 用 `wrangler deploy`，不要用 `wrangler pages deploy`。
+
+**方式 A：Cloudflare 直连 Git（当前用法）**
+
+1. Workers & Pages → 项目 `ai-hot` → Settings → Builds  
+2. Build command：`pip install -e . && python -m src.site_build`  
+3. Deploy command：`npx wrangler deploy`  
+4. Root directory：留空（不要填 `/`）  
+5. Variables：`CLOUDFLARE_API_TOKEN`（Edit Cloudflare Workers 模板即可）
+
+**方式 B：GitHub Actions**
+
+1. Repo secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`  
+2. Workflow：`.github/workflows/deploy-cloudflare.yml`（`content/**` 或站点代码变更时构建并部署）
+
+自定义域在项目 Settings → Domains 绑定。
 
 **不做：** GitHub Pages 主站、自动 `git push`（后续再上）。
 

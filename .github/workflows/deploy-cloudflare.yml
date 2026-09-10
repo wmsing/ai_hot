@@ -1,4 +1,4 @@
-name: Deploy Cloudflare Pages
+name: Deploy Cloudflare Worker
 
 on:
   push:
@@ -11,6 +11,7 @@ on:
       - "src/models.py"
       - "src/config.py"
       - "config.yaml"
+      - "wrangler.toml"
       - ".github/workflows/deploy-cloudflare.yml"
   workflow_dispatch:
 
@@ -33,9 +34,9 @@ jobs:
       - name: Build static site
         run: python -m src.site_build
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy public --project-name=ai-hot-digest
+          command: deploy
