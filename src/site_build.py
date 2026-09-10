@@ -707,13 +707,13 @@ def _render_item(
         {
             "summary": "Summary",
             "affiliate": "Affiliate offer",
-            "published": "Published (UTC)",
+            "published": "Published",
         }
         if lang == "en"
         else {
             "summary": "摘要",
             "affiliate": "联盟推荐",
-            "published": "发布时间（UTC）",
+            "published": "发布时间",
         }
     )
     title = escape(item.title)

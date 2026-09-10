@@ -150,7 +150,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "hn score>=100" not in home
     assert "score=n/a" not in home
     assert "2026-09-10 01:00 UTC" in home
-    assert "Published (UTC)" in home
+    assert "Published:" in home
+    assert "Published (UTC)" not in home
     assert 'class="item-thumb"' in home
     assert "https://cdn.example/cover.webp" in home
     assert 'class="day-nav"' in home
@@ -161,7 +162,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "Next day" in older
     assert 'href="../../index.html"' in older
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
-    assert "发布时间（UTC）" in zh_home
+    assert "发布时间:" in zh_home or "发布时间：" in zh_home
+    assert "发布时间（UTC）" not in zh_home
     assert "前一天" in zh_home
     assert "后一天" in zh_home
     assert "AI 热点摘要" in zh_home
