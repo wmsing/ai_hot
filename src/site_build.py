@@ -1257,13 +1257,21 @@ a:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   gap: 0.75rem;
   margin-top: 0.85rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--line);
   font-size: 0.92rem;
 }
-.day-nav-gap { flex: 1; }
+.day-nav-gap {
+  flex: 1 1 auto;
+  min-width: 0.5rem;
+}
+.day-nav > :last-child {
+  margin-left: auto;
+  text-align: right;
+}
 .day-nav-link {
   color: var(--accent);
   text-decoration: none;
