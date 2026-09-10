@@ -196,12 +196,12 @@ def test_build_site_arena_tab_not_home(tmp_path: Path) -> None:
 
     home = (out / "index.html").read_text(encoding="utf-8")
     assert 'href="arena.html"' in home
-    assert ">Leaderboard<" in home
+    assert ">AI Models<" in home
     assert "img-model" not in home
     assert 'class="arena"' not in home
 
     arena = (out / "arena.html").read_text(encoding="utf-8")
-    assert ">Leaderboard<" in arena or "— Leaderboard" in arena
+    assert ">AI Models<" in arena or "— AI Models" in arena
     assert "Text to Image" in arena
     assert "as of 2026-9-7" in arena
     assert "img-model" in arena
@@ -212,7 +212,7 @@ def test_build_site_arena_tab_not_home(tmp_path: Path) -> None:
     assert "Net Improvement" in arena
 
     zh_arena = (out / "zh" / "arena.html").read_text(encoding="utf-8")
-    assert "排行榜" in zh_arena
+    assert "AI 模型榜" in zh_arena
     assert "文生图" in zh_arena
     assert "截至 2026-9-7" in zh_arena
     assert "评分" in zh_arena
