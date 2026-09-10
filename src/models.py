@@ -54,6 +54,14 @@ class PathsConfig(BaseModel):
     site_output_dir: str = "public"
 
 
+class SiteConfig(BaseModel):
+    """静态站展示与联盟开关（非密钥）。"""
+
+    affiliate_enabled: bool = False
+    owner_name: str = ""
+    contact_email: str = ""
+
+
 class DigestItem(BaseModel):
     """站点用的一条 digest 条目（从 md 解析）。"""
 
@@ -65,6 +73,7 @@ class DigestItem(BaseModel):
     score_line: str = ""
     summary: str = ""
     reason: str = ""
+    affiliate_url: str = ""
 
 
 class DigestDocument(BaseModel):
@@ -89,6 +98,7 @@ class OllamaConfig(BaseModel):
 
 class AppConfig(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
+    site: SiteConfig = Field(default_factory=SiteConfig)
     hn: HnConfig = Field(default_factory=HnConfig)
     rss: RssConfig = Field(default_factory=RssConfig)
     filter: FilterConfig = Field(default_factory=FilterConfig)

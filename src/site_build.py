@@ -11,13 +11,15 @@ from html import escape
 from pathlib import Path
 
 from src.config import load_app_config
-from src.models import DigestDocument, DigestItem
+from src.models import DigestDocument, DigestItem, SiteConfig
 from src.site_parse import parse_digest_markdown
 
 _DIGEST_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(en|zh)\.md$")
 
 SITE_NAME_EN = "AI Hot Digest"
+SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
 SITE_TAGLINE_ZH = "AI 热点摘要"
+_REPO_ISSUES = "https://github.com/wmsing/ai_hot/issues"
 
 
 @dataclass(frozen=True)
@@ -33,30 +35,46 @@ class PageLinks:
     home: str
     archive: str
     disclosure: str
+    about: str
+    privacy: str
     lang_other: str
     brand_home: str
 
 
-def build_site(*, content_dir: Path, output_dir: Path) -> None:
+def build_site(
+    *,
+    content_dir: Path,
+    output_dir: Path,
+    site: SiteConfig | None = None,
+) -> None:
     """扫描 content_dir，写出完整静态站到 output_dir。"""
+    cfg = site if site is not None else SiteConfig()
     days = _scan_days(content_dir)
     if output_dir.exists():
         _clear_dir(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "styles.css").write_text(_stylesheet(), encoding="utf-8")
+    (output_dir / "favicon.svg").write_text(_favicon_svg(), encoding="utf-8")
 
-    _write(output_dir / "archive" / "index.html", _render_archive_index(days, "en"))
+    _write(
+        output_dir / "archive" / "index.html",
+        _render_archive_index(days, "en", cfg),
+    )
     _write(
         output_dir / "zh" / "archive" / "index.html",
-        _render_archive_index(days, "zh"),
+        _render_archive_index(days, "zh", cfg),
     )
-    _write(output_dir / "disclosure.html", _render_disclosure("en"))
-    _write(output_dir / "zh" / "disclosure.html", _render_disclosure("zh"))
+    _write(output_dir / "disclosure.html", _render_disclosure("en", cfg))
+    _write(output_dir / "zh" / "disclosure.html", _render_disclosure("zh", cfg))
+    _write(output_dir / "about.html", _render_about("en", cfg))
+    _write(output_dir / "zh" / "about.html", _render_about("zh", cfg))
+    _write(output_dir / "privacy.html", _render_privacy("en", cfg))
+    _write(output_dir / "zh" / "privacy.html", _render_privacy("zh", cfg))
 
     latest = days[0] if days else None
     if latest is None:
-        _write(output_dir / "index.html", _render_empty_home("en"))
-        _write(output_dir / "zh" / "index.html", _render_empty_home("zh"))
+        _write(output_dir / "index.html", _render_empty_home("en", cfg))
+        _write(output_dir / "zh" / "index.html", _render_empty_home("zh", cfg))
         return
 
     for day_files in days:
@@ -73,6 +91,7 @@ def build_site(*, content_dir: Path, output_dir: Path) -> None:
                 lang="en",
                 has_other_lang=has_zh,
                 links=_links_digest_archive("en", day_s, has_zh),
+                site=cfg,
             )
             _write(output_dir / "archive" / day_s / "index.html", archive_page)
             if day_files.day == latest.day:
@@ -82,10 +101,14 @@ def build_site(*, content_dir: Path, output_dir: Path) -> None:
                     lang="en",
                     has_other_lang=has_zh,
                     links=_links_digest_home("en", day_s, has_zh),
+                    site=cfg,
                 )
                 _write(output_dir / "index.html", home_page)
         elif day_files.day == latest.day:
-            _write(output_dir / "index.html", _render_missing_home("en", day_files.day))
+            _write(
+                output_dir / "index.html",
+                _render_missing_home("en", day_files.day, cfg),
+            )
 
         if zh_doc is not None:
             archive_page = _render_digest(
@@ -94,6 +117,7 @@ def build_site(*, content_dir: Path, output_dir: Path) -> None:
                 lang="zh",
                 has_other_lang=has_en,
                 links=_links_digest_archive("zh", day_s, has_en),
+                site=cfg,
             )
             _write(
                 output_dir / "zh" / "archive" / day_s / "index.html",
@@ -106,20 +130,42 @@ def build_site(*, content_dir: Path, output_dir: Path) -> None:
                     lang="zh",
                     has_other_lang=has_en,
                     links=_links_digest_home("zh", day_s, has_en),
+                    site=cfg,
                 )
                 _write(output_dir / "zh" / "index.html", home_page)
         elif day_files.day == latest.day:
             _write(
                 output_dir / "zh" / "index.html",
-                _render_missing_home("zh", day_files.day),
+                _render_missing_home("zh", day_files.day, cfg),
             )
+
+
+def _make_links(
+    *,
+    css: str,
+    home: str,
+    archive: str,
+    disclosure: str,
+    lang_other: str,
+    brand_home: str,
+) -> PageLinks:
+    return PageLinks(
+        css=css,
+        home=home,
+        archive=archive,
+        disclosure=disclosure,
+        about=disclosure.replace("disclosure.html", "about.html"),
+        privacy=disclosure.replace("disclosure.html", "privacy.html"),
+        lang_other=lang_other,
+        brand_home=brand_home,
+    )
 
 
 def _links_digest_home(lang: str, day_s: str, has_other: bool) -> PageLinks:
     _ = day_s
     if lang == "en":
         other = "zh/index.html" if has_other else ""
-        return PageLinks(
+        return _make_links(
             css="styles.css",
             home="index.html",
             archive="archive/index.html",
@@ -128,7 +174,7 @@ def _links_digest_home(lang: str, day_s: str, has_other: bool) -> PageLinks:
             brand_home="index.html",
         )
     other = "../index.html" if has_other else ""
-    return PageLinks(
+    return _make_links(
         css="../styles.css",
         home="index.html",
         archive="archive/index.html",
@@ -141,7 +187,7 @@ def _links_digest_home(lang: str, day_s: str, has_other: bool) -> PageLinks:
 def _links_digest_archive(lang: str, day_s: str, has_other: bool) -> PageLinks:
     if lang == "en":
         other = f"../../zh/archive/{day_s}/index.html" if has_other else ""
-        return PageLinks(
+        return _make_links(
             css="../../styles.css",
             home="../../index.html",
             archive="../index.html",
@@ -150,13 +196,33 @@ def _links_digest_archive(lang: str, day_s: str, has_other: bool) -> PageLinks:
             brand_home="../../index.html",
         )
     other = f"../../../archive/{day_s}/index.html" if has_other else ""
-    return PageLinks(
+    return _make_links(
         css="../../../styles.css",
         home="../../index.html",
         archive="../index.html",
         disclosure="../../disclosure.html",
         lang_other=other,
         brand_home="../../index.html",
+    )
+
+
+def _links_root(lang: str, *, lang_other: str) -> PageLinks:
+    if lang == "en":
+        return _make_links(
+            css="styles.css",
+            home="index.html",
+            archive="archive/index.html",
+            disclosure="disclosure.html",
+            lang_other=lang_other,
+            brand_home="index.html",
+        )
+    return _make_links(
+        css="../styles.css",
+        home="index.html",
+        archive="archive/index.html",
+        disclosure="disclosure.html",
+        lang_other=lang_other,
+        brand_home="index.html",
     )
 
 
@@ -209,21 +275,76 @@ def _lang_nav(lang: str, other_href: str) -> str:
     return '<span class="muted">EN N/A</span> | 中文'
 
 
-def _footer(lang: str, disclosure_href: str) -> str:
-    label = "disclosure" if lang == "en" else "披露说明"
-    lead = (
-        "Affiliate disclosures will appear here."
-        if lang == "en"
-        else "联盟披露将显示于此。"
+def _main_nav(lang: str, links: PageLinks, *, include_archive: bool = True) -> str:
+    if lang == "en":
+        home_l, archive_l = "Home", "Archive"
+        about_l, privacy_l = "About", "Privacy"
+    else:
+        home_l, archive_l = "首页", "归档"
+        about_l, privacy_l = "关于", "隐私"
+    parts = [f'<a href="{escape(links.home)}">{home_l}</a>']
+    if include_archive:
+        parts.append(f'<a href="{escape(links.archive)}">{archive_l}</a>')
+    parts.append(f'<a href="{escape(links.about)}">{about_l}</a>')
+    parts.append(f'<a href="{escape(links.privacy)}">{privacy_l}</a>')
+    parts.append(_lang_nav(lang, links.lang_other))
+    return f"<nav>{''.join(parts)}</nav>"
+
+
+def _footer(lang: str, links: PageLinks, site: SiteConfig) -> str:
+    if site.affiliate_enabled:
+        lead = (
+            "This page may contain affiliate links."
+            if lang == "en"
+            else "本页可能包含联盟推广链接。"
+        )
+    else:
+        lead = (
+            "Affiliate links are not enabled."
+            if lang == "en"
+            else "当前未启用联盟链接。"
+        )
+    if lang == "en":
+        about_l, privacy_l, disc_l = "About", "Privacy", "Disclosure"
+    else:
+        about_l, privacy_l, disc_l = "关于", "隐私", "披露说明"
+    return (
+        f"{lead} "
+        f'<a href="{escape(links.about)}">{about_l}</a> · '
+        f'<a href="{escape(links.privacy)}">{privacy_l}</a> · '
+        f'<a href="{escape(links.disclosure)}">{disc_l}</a>.'
     )
-    see = "See" if lang == "en" else "详见"
-    return f'{lead} {see} <a href="{escape(disclosure_href)}">{label}</a>.'
 
 
 def _brand_sub(lang: str) -> str:
-    if lang != "zh":
-        return ""
-    return f'<p class="tagline">{escape(SITE_TAGLINE_ZH)}</p>'
+    tagline = SITE_TAGLINE_ZH if lang == "zh" else SITE_TAGLINE_EN
+    return f'<p class="tagline">{escape(tagline)}</p>'
+
+
+def _page_description(lang: str) -> str:
+    return SITE_TAGLINE_ZH if lang == "zh" else SITE_TAGLINE_EN
+
+
+def _favicon_href(css_href: str) -> str:
+    return css_href.replace("styles.css", "favicon.svg")
+
+
+def _contact_blurb(lang: str, site: SiteConfig) -> str:
+    email = site.contact_email.strip()
+    if email:
+        safe = escape(email)
+        return f'<a href="mailto:{safe}">{safe}</a>'
+    issues = escape(_REPO_ISSUES)
+    if lang == "en":
+        return f'open an issue on the <a href="{issues}">project repository</a>'
+    return f'通过 <a href="{issues}">项目仓库 Issues</a> 联系'
+
+
+def _owner_blurb(lang: str, site: SiteConfig) -> str:
+    name = site.owner_name.strip()
+    if name:
+        return escape(name)
+    return "a personally maintained project" if lang == "en" else "个人维护的项目"
 
 
 def _render_digest(
@@ -233,6 +354,7 @@ def _render_digest(
     lang: str,
     has_other_lang: bool,
     links: PageLinks,
+    site: SiteConfig,
 ) -> str:
     del has_other_lang  # encoded in links.lang_other
     day_s = day.isoformat()
@@ -240,12 +362,13 @@ def _render_digest(
     selected = doc.selected if doc.selected is not None else len(doc.items)
     if lang == "en":
         meta = f"Generated (UTC): {gen} · Selected: {selected}"
-        home_l, archive_l = "Home", "Archive"
     else:
         meta = f"生成时间（UTC）：{gen} · 精选：{selected}"
-        home_l, archive_l = "首页", "归档"
 
-    items_html = "".join(_render_item(item, lang) for item in doc.items)
+    items_html = "".join(
+        _render_item(item, lang, affiliate_enabled=site.affiliate_enabled)
+        for item in doc.items
+    )
     if not items_html:
         items_html = (
             '<p class="muted">No items.</p>'
@@ -253,46 +376,39 @@ def _render_digest(
             else '<p class="muted">暂无条目。</p>'
         )
 
-    nav = (
-        f'<nav><a href="{escape(links.home)}">{home_l}</a> · '
-        f'<a href="{escape(links.archive)}">{archive_l}</a> · '
-        f"{_lang_nav(lang, links.lang_other)}</nav>"
-    )
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
         lang=lang,
+        description=_page_description(lang),
         body=f"""
 <header>
   <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
   {_brand_sub(lang)}
-  {nav}
-  <h1>{escape(day_s)}</h1>
-  <p class="meta">{meta}</p>
+  {_main_nav(lang, links)}
+  <div class="day-bar">
+    <h1>{escape(day_s)}</h1>
+    <p class="meta">{meta}</p>
+  </div>
 </header>
 <main>
   {items_html}
 </main>
-<footer><p>{_footer(lang, links.disclosure)}</p></footer>
+<footer><p>{_footer(lang, links, site)}</p></footer>
 """,
     )
 
 
-def _render_item(item: DigestItem, lang: str) -> str:
+def _render_item(
+    item: DigestItem,
+    lang: str,
+    *,
+    affiliate_enabled: bool,
+) -> str:
     labels = (
-        {
-            "source": "source",
-            "published": "published",
-            "summary": "summary",
-            "why": "why",
-        }
+        {"summary": "Summary", "why": "Why", "affiliate": "Affiliate offer"}
         if lang == "en"
-        else {
-            "source": "来源",
-            "published": "发布时间",
-            "summary": "摘要",
-            "why": "原因",
-        }
+        else {"summary": "摘要", "why": "原因", "affiliate": "联盟推荐"}
     )
     title = escape(item.title)
     if item.url.strip():
@@ -302,24 +418,45 @@ def _render_item(item: DigestItem, lang: str) -> str:
         )
     else:
         title_html = title
-    bits = ["<article>", f"<h2>{item.index}. {title_html}</h2>", "<ul>"]
+
+    meta_bits: list[str] = []
     if item.source:
-        bits.append(f"<li>{labels['source']}: <code>{escape(item.source)}</code></li>")
+        meta_bits.append(f'<span class="badge">{escape(item.source)}</span>')
     if item.published:
-        bits.append(f"<li>{labels['published']}: {escape(item.published)}</li>")
+        meta_bits.append(f"<span>{escape(item.published)}</span>")
     if item.score_line:
-        bits.append(f"<li>{escape(item.score_line)}</li>")
+        meta_bits.append(f"<span>{escape(item.score_line)}</span>")
+
+    bits = [
+        '<article class="item">',
+        f"<h2>{item.index}. {title_html}</h2>",
+    ]
+    if meta_bits:
+        bits.append(f'<p class="item-meta">{" · ".join(meta_bits)}</p>')
     if item.summary:
-        bits.append(f"<li>{labels['summary']}: {escape(item.summary)}</li>")
+        bits.append(
+            f'<p class="summary"><span class="label">{labels["summary"]}</span> '
+            f"{escape(item.summary)}</p>"
+        )
     if item.reason:
-        bits.append(f"<li>{labels['why']}: {escape(item.reason)}</li>")
-    bits.extend(["</ul>", "</article>"])
+        bits.append(
+            f'<p class="why"><span class="label">{labels["why"]}</span> '
+            f"{escape(item.reason)}</p>"
+        )
+    aff = item.affiliate_url.strip()
+    if affiliate_enabled and aff:
+        bits.append(
+            f'<p class="affiliate"><span class="label">{labels["affiliate"]}</span> '
+            f'<a href="{escape(aff, quote=True)}" target="_blank" '
+            f'rel="sponsored noopener noreferrer">{escape(aff)}</a></p>'
+        )
+    bits.append("</article>")
     return "\n".join(bits)
 
 
-def _render_archive_index(days: list[DayFiles], lang: str) -> str:
+def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> str:
     if lang == "en":
-        links = PageLinks(
+        links = _make_links(
             css="../styles.css",
             home="../index.html",
             archive="index.html",
@@ -329,7 +466,7 @@ def _render_archive_index(days: list[DayFiles], lang: str) -> str:
         )
         heading, empty = "Archive", "No digests yet."
     else:
-        links = PageLinks(
+        links = _make_links(
             css="../../styles.css",
             home="../index.html",
             archive="index.html",
@@ -342,7 +479,7 @@ def _render_archive_index(days: list[DayFiles], lang: str) -> str:
     if not days:
         lis = f'<p class="muted">{escape(empty)}</p>'
     else:
-        rows = ["<ul class='archive-list'>"]
+        rows = ['<ul class="archive-list">']
         for day_files in days:
             day_s = day_files.day.isoformat()
             missing = ""
@@ -356,160 +493,233 @@ def _render_archive_index(days: list[DayFiles], lang: str) -> str:
         rows.append("</ul>")
         lis = "\n".join(rows)
 
-    home_l = "Home" if lang == "en" else "首页"
     return _shell(
         title=f"{SITE_NAME_EN} — {heading}",
         css_href=links.css,
         lang=lang,
+        description=_page_description(lang),
         body=f"""
 <header>
   <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
   {_brand_sub(lang)}
-  <nav>
-    <a href="{escape(links.home)}">{home_l}</a> ·
-    {_lang_nav(lang, links.lang_other)}
-  </nav>
+  {_main_nav(lang, links, include_archive=False)}
   <h1>{heading}</h1>
 </header>
 <main>{lis}</main>
-<footer><p>{_footer(lang, links.disclosure)}</p></footer>
+<footer><p>{_footer(lang, links, site)}</p></footer>
 """,
     )
 
 
-def _render_disclosure(lang: str) -> str:
-    if lang == "en":
-        links = PageLinks(
-            css="styles.css",
-            home="index.html",
-            archive="archive/index.html",
-            disclosure="disclosure.html",
-            lang_other="zh/disclosure.html",
-            brand_home="index.html",
-        )
-        heading = "Disclosure"
-        body_text = (
-            "<p>This site may include affiliate links in the future. "
-            "When that happens, we will disclose them here and in the page footer.</p>"
-            "<p>No affiliate links are active in v1.</p>"
-        )
-    else:
-        links = PageLinks(
-            css="../styles.css",
-            home="index.html",
-            archive="archive/index.html",
-            disclosure="disclosure.html",
-            lang_other="../disclosure.html",
-            brand_home="index.html",
-        )
-        heading = "披露说明"
-        body_text = (
-            "<p>本站未来可能包含联盟推广链接。届时将在本页与页脚披露。</p>"
-            "<p>v1 尚未启用任何联盟链接。</p>"
-        )
-    home_l = "Home" if lang == "en" else "首页"
+def _static_page_shell(
+    *,
+    lang: str,
+    links: PageLinks,
+    site: SiteConfig,
+    heading: str,
+    body_text: str,
+) -> str:
     return _shell(
         title=f"{SITE_NAME_EN} — {heading}",
         css_href=links.css,
         lang=lang,
+        description=_page_description(lang),
         body=f"""
 <header>
   <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
   {_brand_sub(lang)}
-  <nav>
-    <a href="{escape(links.home)}">{home_l}</a> ·
-    {_lang_nav(lang, links.lang_other)}
-  </nav>
+  {_main_nav(lang, links)}
   <h1>{heading}</h1>
 </header>
-<main>{body_text}</main>
-<footer><p>{_footer(lang, links.disclosure)}</p></footer>
+<main class="prose">{body_text}</main>
+<footer><p>{_footer(lang, links, site)}</p></footer>
 """,
     )
 
 
-def _render_empty_home(lang: str) -> str:
+def _render_disclosure(lang: str, site: SiteConfig) -> str:
     if lang == "en":
-        links = PageLinks(
-            css="styles.css",
-            home="index.html",
-            archive="archive/index.html",
-            disclosure="disclosure.html",
-            lang_other="zh/index.html",
-            brand_home="index.html",
+        links = _links_root("en", lang_other="zh/disclosure.html")
+        heading = "Disclosure"
+        if site.affiliate_enabled:
+            body_text = (
+                "<p>This site may include affiliate links. If you buy through "
+                "those links, we may earn a commission at no extra cost to you."
+                "</p>"
+                "<p>Affiliate offers are marked on individual digest items "
+                "when present.</p>"
+            )
+        else:
+            body_text = (
+                "<p>Affiliate links are configured but currently disabled "
+                "(<code>site.affiliate_enabled: false</code>).</p>"
+                "<p>When enabled, sponsored links will appear on items and "
+                "will be disclosed here and in the footer.</p>"
+            )
+    else:
+        links = _links_root("zh", lang_other="../disclosure.html")
+        heading = "披露说明"
+        if site.affiliate_enabled:
+            body_text = (
+                "<p>本站可能包含联盟推广链接。经由这些链接购买时，"
+                "我们可能获得佣金，你无需额外付费。</p>"
+                "<p>若某条摘要含联盟推荐，会在该条目中标注。</p>"
+            )
+        else:
+            body_text = (
+                "<p>联盟链接功能已预留，当前关闭"
+                "（<code>site.affiliate_enabled: false</code>）。</p>"
+                "<p>启用后，相关链接会显示在条目中，并在本页与页脚披露。</p>"
+            )
+    return _static_page_shell(
+        lang=lang,
+        links=links,
+        site=site,
+        heading=heading,
+        body_text=body_text,
+    )
+
+
+def _render_about(lang: str, site: SiteConfig) -> str:
+    owner = _owner_blurb(lang, site)
+    contact = _contact_blurb(lang, site)
+    if lang == "en":
+        links = _links_root("en", lang_other="zh/about.html")
+        heading = "About"
+        body_text = (
+            f"<p><strong>{escape(SITE_NAME_EN)}</strong> is {owner} that "
+            "curates AI-related highlights from Hacker News and selected "
+            "official or mirrored RSS feeds.</p>"
+            "<p>Each day is archived as a short digest with source links. "
+            "Content is for personal monitoring and public reading—not "
+            "investment or professional advice.</p>"
+            f"<p>Contact: {contact}.</p>"
         )
+    else:
+        links = _links_root("zh", lang_other="../about.html")
+        heading = "关于"
+        body_text = (
+            f"<p><strong>{escape(SITE_NAME_EN)}</strong>（{escape(SITE_TAGLINE_ZH)}）"
+            f"是{owner}：汇总 Hacker News 与精选官方/镜像 RSS 中的 AI 相关热点。</p>"
+            "<p>按日归档为短摘要并附上来源链接。内容仅供个人巡检与公开阅读，"
+            "不构成投资或专业建议。</p>"
+            f"<p>联系：{contact}。</p>"
+        )
+    return _static_page_shell(
+        lang=lang,
+        links=links,
+        site=site,
+        heading=heading,
+        body_text=body_text,
+    )
+
+
+def _render_privacy(lang: str, site: SiteConfig) -> str:
+    contact = _contact_blurb(lang, site)
+    if lang == "en":
+        links = _links_root("en", lang_other="zh/privacy.html")
+        heading = "Privacy"
+        body_text = (
+            "<p>This is a static site. We do not run accounts, comments, or "
+            "server-side analytics on these pages.</p>"
+            "<p>Hosting and CDN providers (for example Cloudflare) may "
+            "process standard request logs such as IP address, user agent, "
+            "and timestamps as part of delivering the site.</p>"
+            "<p>We do not sell personal data. Third-party pages you open via "
+            "outbound links have their own privacy practices.</p>"
+            "<p>If affiliate links are enabled later, those partners may set "
+            "cookies or measure referrals according to their policies; "
+            "see the Disclosure page.</p>"
+            f"<p>Questions: {contact}.</p>"
+        )
+    else:
+        links = _links_root("zh", lang_other="../privacy.html")
+        heading = "隐私"
+        body_text = (
+            "<p>本站为静态站点，不提供账号、评论或页面侧服务端统计。</p>"
+            "<p>托管与 CDN（例如 Cloudflare）在交付页面时可能处理常规请求日志，"
+            "例如 IP、User-Agent 与时间戳。</p>"
+            "<p>我们不出售个人数据。你点击的外链站点遵循其各自隐私政策。</p>"
+            "<p>若日后启用联盟链接，合作方可能按其政策设置 Cookie 或统计引荐；"
+            "详见披露说明页。</p>"
+            f"<p>疑问请联系：{contact}。</p>"
+        )
+    return _static_page_shell(
+        lang=lang,
+        links=links,
+        site=site,
+        heading=heading,
+        body_text=body_text,
+    )
+
+
+def _render_empty_home(lang: str, site: SiteConfig) -> str:
+    if lang == "en":
+        links = _links_root("en", lang_other="zh/index.html")
         msg = "No digests published yet. Run publish then build."
     else:
-        links = PageLinks(
-            css="../styles.css",
-            home="index.html",
-            archive="archive/index.html",
-            disclosure="disclosure.html",
-            lang_other="../index.html",
-            brand_home="index.html",
-        )
+        links = _links_root("zh", lang_other="../index.html")
         msg = "尚无已发布摘要。请先 publish 再 build。"
     return _shell(
         title=SITE_NAME_EN,
         css_href=links.css,
         lang=lang,
+        description=_page_description(lang),
         body=f"""
 <header>
   <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
   {_brand_sub(lang)}
-  <nav>{_lang_nav(lang, links.lang_other)}</nav>
+  {_main_nav(lang, links)}
 </header>
 <main><p class="muted">{escape(msg)}</p></main>
-<footer><p>{_footer(lang, links.disclosure)}</p></footer>
+<footer><p>{_footer(lang, links, site)}</p></footer>
 """,
     )
 
 
-def _render_missing_home(lang: str, day: date) -> str:
+def _render_missing_home(lang: str, day: date, site: SiteConfig) -> str:
     day_s = day.isoformat()
     if lang == "en":
-        links = PageLinks(
-            css="styles.css",
-            home="index.html",
-            archive="archive/index.html",
-            disclosure="disclosure.html",
-            lang_other="zh/index.html",
-            brand_home="index.html",
-        )
+        links = _links_root("en", lang_other="zh/index.html")
         msg = f"English digest for {day_s} is missing."
     else:
-        links = PageLinks(
-            css="../styles.css",
-            home="index.html",
-            archive="archive/index.html",
-            disclosure="disclosure.html",
-            lang_other="../index.html",
-            brand_home="index.html",
-        )
+        links = _links_root("zh", lang_other="../index.html")
         msg = f"{day_s} 的中文摘要缺失。"
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
         lang=lang,
+        description=_page_description(lang),
         body=f"""
 <header>
   <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
   {_brand_sub(lang)}
-  <nav>{_lang_nav(lang, links.lang_other)}</nav>
-  <h1>{escape(day_s)}</h1>
+  {_main_nav(lang, links)}
+  <div class="day-bar">
+    <h1>{escape(day_s)}</h1>
+  </div>
 </header>
 <main><p class="muted">{escape(msg)}</p></main>
-<footer><p>{_footer(lang, links.disclosure)}</p></footer>
+<footer><p>{_footer(lang, links, site)}</p></footer>
 """,
     )
 
 
-def _shell(*, title: str, css_href: str, lang: str, body: str) -> str:
+def _shell(
+    *,
+    title: str,
+    css_href: str,
+    lang: str,
+    body: str,
+    description: str | None = None,
+) -> str:
     html_lang = "zh-Hans" if lang == "zh" else "en"
+    desc = description if description is not None else _page_description(lang)
+    favicon = _favicon_href(css_href)
     fonts = (
         "https://fonts.googleapis.com/css2?"
-        "family=Fraunces:opsz,wght@9..144,600&amp;"
-        "family=IBM+Plex+Sans:wght@400;600&amp;display=swap"
+        "family=Fraunces:opsz,wght@9..144,600;700&amp;"
+        "family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap"
     )
     return f"""<!DOCTYPE html>
 <html lang="{html_lang}">
@@ -517,6 +727,11 @@ def _shell(*, title: str, css_href: str, lang: str, body: str) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(title)}</title>
+  <meta name="description" content="{escape(desc)}">
+  <meta property="og:title" content="{escape(title)}">
+  <meta property="og:description" content="{escape(desc)}">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="{escape(favicon)}" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="{fonts}" rel="stylesheet">
@@ -529,69 +744,212 @@ def _shell(*, title: str, css_href: str, lang: str, body: str) -> str:
 """
 
 
+def _favicon_svg() -> str:
+    return """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#0b6e4f"/>
+  <circle cx="16" cy="16" r="7" stroke="#f7faf8" stroke-width="3"/>
+  <circle cx="16" cy="16" r="2.5" fill="#f7faf8"/>
+</svg>
+""".strip()
+
+
 def _stylesheet() -> str:
     return """
 :root {
-  --bg: #f3f6f4;
-  --ink: #14231c;
-  --muted: #5c6b63;
+  --bg: #eef3f0;
+  --ink: #12201a;
+  --muted: #5a6a62;
   --accent: #0b6e4f;
-  --line: #cfd8d2;
-  --card: #fbfcfb;
+  --accent-soft: #d7ebe2;
+  --line: #c5d2cb;
+  --card: #f7faf8;
+  --shadow: 0 1px 2px rgba(18, 32, 26, 0.04), 0 8px 24px rgba(18, 32, 26, 0.06);
+  --radius: 12px;
+  --focus: #0b6e4f;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0 auto;
-  max-width: 42rem;
-  padding: 1.5rem 1.25rem 3rem;
+  max-width: 44rem;
+  padding: 1.75rem 1.25rem 3.5rem;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   background:
-    linear-gradient(160deg, #e7f0ea 0%, transparent 42%),
-    var(--bg);
+    radial-gradient(ellipse 80% 50% at 10% -10%, #d5e8de 0%, transparent 55%),
+    linear-gradient(180deg, #f4f8f6 0%, var(--bg) 40%);
   color: var(--ink);
   line-height: 1.55;
 }
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+a:hover { color: #085a40; }
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .brand {
   font-family: "Fraunces", "Times New Roman", serif;
-  font-size: 1.75rem;
-  font-weight: 600;
-  margin: 0 0 0.25rem;
+  font-size: clamp(1.85rem, 4vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.35rem;
+  line-height: 1.15;
 }
-.brand a { color: inherit; text-decoration: none; }
-.tagline { margin: 0 0 0.75rem; color: var(--muted); }
-nav { margin: 0 0 1.25rem; color: var(--muted); font-size: 0.95rem; }
-nav a { color: var(--accent); }
-h1 { font-size: 1.35rem; margin: 0 0 0.35rem; }
-.meta { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.9rem; }
-article {
-  background: var(--card);
-  border-top: 1px solid var(--line);
-  padding: 1rem 0 1.1rem;
+.brand a {
+  color: inherit;
+  text-decoration: none;
 }
-article h2 {
-  font-size: 1.05rem;
-  margin: 0 0 0.5rem;
-  font-weight: 600;
+.brand a:hover { color: var(--accent); }
+.tagline {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.98rem;
+  font-weight: 500;
 }
-article h2 a { color: var(--ink); }
-article ul {
-  margin: 0;
-  padding-left: 1.1rem;
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.1rem;
+  align-items: center;
+  margin: 0 0 1.35rem;
   color: var(--muted);
   font-size: 0.92rem;
+  font-weight: 500;
+}
+nav a {
+  color: var(--accent);
+  text-decoration: none;
+}
+nav a:hover { text-decoration: underline; }
+.day-bar {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0.9rem 1.1rem;
+  margin: 0 0 1.5rem;
+}
+.day-bar h1 {
+  font-size: 1.2rem;
+  margin: 0 0 0.2rem;
+  font-weight: 600;
+}
+.day-bar .meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+h1 { font-size: 1.3rem; margin: 0 0 1rem; }
+.meta { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.9rem; }
+main { display: flex; flex-direction: column; gap: 0.9rem; }
+.prose p { margin: 0 0 0.85rem; }
+.item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.05rem 1.15rem 1.15rem;
+}
+.item h2 {
+  font-size: 1.08rem;
+  margin: 0 0 0.55rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.item h2 a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.item h2 a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.15rem;
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.badge {
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+.summary, .why, .affiliate {
+  margin: 0.45rem 0 0;
+  color: var(--ink);
+  font-size: 0.94rem;
+}
+.why { color: var(--muted); font-size: 0.9rem; }
+.affiliate {
+  color: var(--muted);
+  font-size: 0.88rem;
+  padding-top: 0.35rem;
+  border-top: 1px dashed var(--line);
+}
+.label {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-right: 0.35rem;
 }
 .muted { color: var(--muted); }
-.archive-list { padding-left: 1.1rem; }
-.archive-list a { color: var(--accent); }
+.archive-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.archive-list li {
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 0.85rem 1.1rem;
+  line-height: 1.4;
+}
+.archive-list li:last-child { border-bottom: none; }
+.archive-list a {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+.archive-list a:hover { text-decoration: underline; }
 footer {
-  margin-top: 2rem;
-  padding-top: 1rem;
+  margin-top: 2.25rem;
+  padding-top: 1.1rem;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.85rem;
 }
 footer a { color: var(--accent); }
-code { font-size: 0.85em; }
+code {
+  font-size: 0.85em;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (max-width: 480px) {
+  body { padding: 1.25rem 1rem 2.5rem; }
+  .item { padding: 0.95rem 1rem 1.05rem; }
+}
 """.strip()
 
 
@@ -606,6 +964,7 @@ def main(argv: list[str] | None = None) -> int:
     build_site(
         content_dir=Path(config.paths.content_digests_dir),
         output_dir=Path(config.paths.site_output_dir),
+        site=config.site,
     )
     print(f"[ai_hot] site built → {config.paths.site_output_dir}/")
     return 0

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from src.models import SiteConfig
 from src.publish import archive_digests
 from src.site_build import build_site
 from src.site_parse import parse_digest_markdown
@@ -22,6 +23,7 @@ Selected: 1
 - score=120 | comments=30
 - summary: Hello summary
 - why: hn score>=100
+- affiliate: https://partner.example/offer
 """
 
 _ZH_DIGEST = """# ai_hot 消息摘要
@@ -37,6 +39,7 @@ _ZH_DIGEST = """# ai_hot 消息摘要
 - 评分=120 | 评论数=30
 - 摘要：你好摘要
 - 原因：HN评分达标
+- 联盟链接：https://partner.example/offer-zh
 """
 
 
@@ -51,6 +54,7 @@ def test_parse_digest_en() -> None:
     assert item.url == "https://example.com/a"
     assert "Hello summary" in item.summary
     assert "score=120" in item.score_line
+    assert item.affiliate_url == "https://partner.example/offer"
 
 
 def test_parse_digest_zh() -> None:
@@ -62,6 +66,7 @@ def test_parse_digest_zh() -> None:
     assert item.source == "hn"
     assert item.summary == "你好摘要"
     assert "评分=120" in item.score_line
+    assert item.affiliate_url == "https://partner.example/offer-zh"
 
 
 def test_archive_digests(tmp_path: Path) -> None:
@@ -81,8 +86,7 @@ def test_archive_digests(tmp_path: Path) -> None:
     assert (content / "2026-09-10.zh.md").is_file()
 
 
-def test_build_site_outputs(tmp_path: Path) -> None:
-    content = tmp_path / "digests"
+def _seed_digests(content: Path) -> None:
     content.mkdir()
     (content / "2026-09-09.en.md").write_text(_EN_DIGEST, encoding="utf-8")
     (content / "2026-09-09.zh.md").write_text(_ZH_DIGEST, encoding="utf-8")
@@ -94,10 +98,16 @@ def test_build_site_outputs(tmp_path: Path) -> None:
         _ZH_DIGEST.replace("示例标题", "更新"),
         encoding="utf-8",
     )
+
+
+def test_build_site_outputs(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
     out = tmp_path / "public"
     build_site(content_dir=content, output_dir=out)
 
     assert (out / "styles.css").is_file()
+    assert (out / "favicon.svg").is_file()
     assert (out / "index.html").is_file()
     assert (out / "zh" / "index.html").is_file()
     assert (out / "archive" / "index.html").is_file()
@@ -106,12 +116,54 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert (out / "zh" / "archive" / "2026-09-10" / "index.html").is_file()
     assert (out / "disclosure.html").is_file()
     assert (out / "zh" / "disclosure.html").is_file()
+    assert (out / "about.html").is_file()
+    assert (out / "zh" / "about.html").is_file()
+    assert (out / "privacy.html").is_file()
+    assert (out / "zh" / "privacy.html").is_file()
 
     home = (out / "index.html").read_text(encoding="utf-8")
     assert "AI Hot Digest" in home
+    assert "Daily AI highlights" in home
     assert "Newer" in home
+    assert 'class="item"' in home
+    assert 'class="badge"' in home
+    assert 'class="day-bar"' in home
+    assert 'property="og:title"' in home
+    assert 'rel="icon"' in home
+    assert 'href="favicon.svg"' in home
     assert 'target="_blank"' in home
     assert 'rel="noopener noreferrer"' in home
+    assert "Affiliate links are not enabled." in home
+    assert 'rel="sponsored' not in home
+    assert "partner.example" not in home
+    assert 'href="about.html"' in home
+    assert 'href="privacy.html"' in home
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert "AI 热点摘要" in zh_home
     assert "更新" in zh_home
+    assert 'href="../favicon.svg"' in zh_home
+    assert "当前未启用联盟链接" in zh_home
+
+    about = (out / "about.html").read_text(encoding="utf-8")
+    assert "personally maintained project" in about
+    privacy = (out / "privacy.html").read_text(encoding="utf-8")
+    assert "static site" in privacy.lower() or "static" in privacy
+    disclosure = (out / "disclosure.html").read_text(encoding="utf-8")
+    assert "affiliate_enabled" in disclosure
+
+
+def test_build_site_affiliate_enabled(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    out = tmp_path / "public"
+    build_site(
+        content_dir=content,
+        output_dir=out,
+        site=SiteConfig(affiliate_enabled=True),
+    )
+    home = (out / "index.html").read_text(encoding="utf-8")
+    assert "may contain affiliate links" in home
+    assert 'rel="sponsored noopener noreferrer"' in home
+    assert "https://partner.example/offer" in home
+    disclosure = (out / "disclosure.html").read_text(encoding="utf-8")
+    assert "commission" in disclosure

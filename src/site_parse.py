@@ -17,11 +17,13 @@ _FIELD_MAP = {
     "published": "published",
     "summary": "summary",
     "why": "reason",
+    "affiliate": "affiliate_url",
     "来源": "source",
     "链接": "url",
     "发布时间": "published",
     "摘要": "summary",
     "原因": "reason",
+    "联盟链接": "affiliate_url",
 }
 
 
@@ -48,6 +50,7 @@ def parse_digest_markdown(text: str) -> DigestDocument:
                 score_line=str(current.get("score_line", "")),
                 summary=str(current.get("summary", "")),
                 reason=str(current.get("reason", "")),
+                affiliate_url=str(current.get("affiliate_url", "")).strip(),
             )
         )
         current = None

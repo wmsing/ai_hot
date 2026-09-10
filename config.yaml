@@ -6,6 +6,12 @@ paths:
   content_digests_dir: content/digests
   site_output_dir: public
 
+# 静态站：联盟默认关；owner/contact 空则 About/Privacy 用通用占位文案
+site:
+  affiliate_enabled: false
+  owner_name: ""
+  contact_email: ""
+
 hn:
   enabled: true
   top_n: 30
