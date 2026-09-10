@@ -2011,7 +2011,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     _parse_args(argv)
     config = load_app_config()
-    boards = fetch_arena_boards(config.leaderboard, config.http)
+    boards = fetch_arena_boards(
+        config.leaderboard,
+        config.http,
+        cache_dir=Path(config.paths.arena_cache_dir),
+    )
     build_site(
         content_dir=Path(config.paths.content_digests_dir),
         output_dir=Path(config.paths.site_output_dir),

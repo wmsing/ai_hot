@@ -82,10 +82,12 @@ def _cfg(**kwargs: object) -> LeaderboardConfig:
     base: dict[str, object] = {
         "enabled": True,
         "base_url": "https://api.example/leaderboard",
+        "github_raw_base": "",
         "source_base": "https://arena.ai/leaderboard",
         "boards": ["text-to-image"],
         "top_n": 10,
         "timeout_seconds": 5.0,
+        "request_gap_seconds": 0.0,
         "agent_score_name": "Net Improvement",
     }
     base.update(kwargs)
@@ -119,19 +121,118 @@ def test_fetch_disabled_returns_empty() -> None:
     assert fetch_arena_boards(_cfg(enabled=False)) == []
 
 
+def test_fetch_http_error_falls_back_to_github(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Resp:
+        def __init__(
+            self,
+            payload: dict[str, object] | None = None,
+            *,
+            status_code: int = 200,
+        ) -> None:
+            self._payload = payload
+            self.status_code = status_code
+
+        def raise_for_status(self) -> None:
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError(
+                    "err",
+                    request=httpx.Request("GET", "https://example"),
+                    response=httpx.Response(self.status_code),
+                )
+
+        def json(self) -> dict[str, object]:
+            assert self._payload is not None
+            return self._payload
+
+    def _get(url: str, **_k: object) -> _Resp:
+        if "api.example" in url:
+            return _Resp(status_code=429)
+        if url.endswith("/latest.json"):
+            return _Resp({"date": "2026-09-10", "path": "2026-09-10"})
+        if url.endswith("/text-to-image.json"):
+            return _Resp(_SAMPLE_ELO)
+        raise AssertionError(url)
+
+    mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
+    mock_client.__exit__.return_value = False
+    mock_client.get.side_effect = _get
+    monkeypatch.setattr("src.leaderboard.httpx.Client", lambda **_k: mock_client)
+    boards = fetch_arena_boards(
+        _cfg(
+            boards=["text-to-image"],
+            github_raw_base="https://raw.example/data",
+            request_gap_seconds=0,
+        ),
+        HttpConfig(),
+    )
+    assert len(boards) == 1
+    assert boards[0].models[0].model == "model-a"
+
+
+def test_fetch_uses_local_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cache = tmp_path / "arena"
+    cache.mkdir()
+    (cache / "text-to-image.json").write_text(
+        __import__("json").dumps(_SAMPLE_ELO),
+        encoding="utf-8",
+    )
+
+    class _Resp:
+        status_code = 429
+
+        def raise_for_status(self) -> None:
+            raise httpx.HTTPStatusError(
+                "err",
+                request=httpx.Request("GET", "https://example"),
+                response=httpx.Response(429),
+            )
+
+        def json(self) -> dict[str, object]:
+            raise AssertionError("should not parse")
+
+    mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
+    mock_client.__exit__.return_value = False
+    mock_client.get.return_value = _Resp()
+    monkeypatch.setattr("src.leaderboard.httpx.Client", lambda **_k: mock_client)
+    boards = fetch_arena_boards(
+        _cfg(
+            boards=["text-to-image"],
+            github_raw_base="",
+            request_gap_seconds=0,
+        ),
+        HttpConfig(),
+        cache_dir=cache,
+    )
+    assert len(boards) == 1
+    assert boards[0].board == "text-to-image"
+
+
 def test_fetch_http_error_skips_board(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_client = MagicMock()
     mock_client.__enter__.return_value = mock_client
     mock_client.__exit__.return_value = False
     mock_client.get.side_effect = httpx.ConnectError("down")
     monkeypatch.setattr("src.leaderboard.httpx.Client", lambda **_k: mock_client)
-    assert fetch_arena_boards(_cfg(), HttpConfig()) == []
-
+    assert (
+        fetch_arena_boards(
+            _cfg(github_raw_base="", request_gap_seconds=0),
+            HttpConfig(),
+        )
+        == []
+    )
 
 def test_fetch_multi_boards(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Resp:
         def __init__(self, payload: dict[str, object]) -> None:
             self._payload = payload
+            self.status_code = 200
 
         def raise_for_status(self) -> None:
             return None

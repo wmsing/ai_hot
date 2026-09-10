@@ -52,6 +52,7 @@ class PathsConfig(BaseModel):
     digest_path: str = "out/digest.md"
     digest_zh_path: str = "out/digest.zh.md"
     content_digests_dir: str = "content/digests"
+    arena_cache_dir: str = "content/arena"
     site_output_dir: str = "public"
 
 
@@ -70,6 +71,11 @@ class LeaderboardConfig(BaseModel):
 
     enabled: bool = True
     base_url: str = "https://api.wulong.dev/arena-ai-leaderboards/v1/leaderboard"
+    # API 429 时回退到 GitHub raw 快照
+    github_raw_base: str = (
+        "https://raw.githubusercontent.com/oolong-tea-2026/"
+        "arena-ai-leaderboards/main/data"
+    )
     source_base: str = "https://arena.ai/leaderboard"
     boards: list[str] = Field(
         default_factory=lambda: [
@@ -83,6 +89,7 @@ class LeaderboardConfig(BaseModel):
     )
     top_n: int = 10
     timeout_seconds: float = 20.0
+    request_gap_seconds: float = 0.4
     agent_score_name: str = "Net Improvement"
 
 

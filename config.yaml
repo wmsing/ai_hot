@@ -4,6 +4,7 @@ paths:
   digest_path: out/digest.md
   digest_zh_path: out/digest.zh.md
   content_digests_dir: content/digests
+  arena_cache_dir: content/arena
   site_output_dir: public
 
 # 静态站 / PartnerStack：开联盟后 Disclosure 写佣金说明；owner/contact 务必填真名与邮箱
@@ -17,6 +18,7 @@ site:
 leaderboard:
   enabled: true
   base_url: https://api.wulong.dev/arena-ai-leaderboards/v1/leaderboard
+  github_raw_base: https://raw.githubusercontent.com/oolong-tea-2026/arena-ai-leaderboards/main/data
   source_base: https://arena.ai/leaderboard
   boards:
     - agent
@@ -27,6 +29,7 @@ leaderboard:
     - video-edit
   top_n: 10
   timeout_seconds: 20
+  request_gap_seconds: 0.4
   agent_score_name: Net Improvement
 
 hn:
