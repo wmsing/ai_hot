@@ -128,6 +128,9 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="item"' in home
     assert 'class="badge"' in home
     assert 'class="day-bar"' in home
+    assert 'class="site-header"' in home
+    assert 'class="item-index"' in home
+    assert "Bricolage+Grotesque" in home
     assert 'property="og:title"' in home
     assert 'rel="icon"' in home
     assert 'href="favicon.svg"' in home

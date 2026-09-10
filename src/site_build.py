@@ -268,27 +268,47 @@ def _clear_dir(path: Path) -> None:
 def _lang_nav(lang: str, other_href: str) -> str:
     if lang == "en":
         if other_href:
-            return f'EN | <a href="{escape(other_href)}">中文</a>'
-        return 'EN | <span class="muted">中文 N/A</span>'
-    if other_href:
-        return f'<a href="{escape(other_href)}">EN</a> | 中文'
-    return '<span class="muted">EN N/A</span> | 中文'
+            inner = (
+                '<span class="lang-current">EN</span> · '
+                f'<a href="{escape(other_href)}">中文</a>'
+            )
+        else:
+            inner = (
+                '<span class="lang-current">EN</span> · '
+                '<span class="muted">中文 N/A</span>'
+            )
+    elif other_href:
+        inner = (
+            f'<a href="{escape(other_href)}">EN</a> · '
+            '<span class="lang-current">中文</span>'
+        )
+    else:
+        inner = (
+            '<span class="muted">EN N/A</span> · <span class="lang-current">中文</span>'
+        )
+    return f'<div class="lang-switch">{inner}</div>'
 
 
 def _main_nav(lang: str, links: PageLinks, *, include_archive: bool = True) -> str:
     if lang == "en":
         home_l, archive_l = "Home", "Archive"
         about_l, privacy_l = "About", "Privacy"
+        nav_label = "Primary"
     else:
         home_l, archive_l = "首页", "归档"
         about_l, privacy_l = "关于", "隐私"
+        nav_label = "主导航"
     parts = [f'<a href="{escape(links.home)}">{home_l}</a>']
     if include_archive:
         parts.append(f'<a href="{escape(links.archive)}">{archive_l}</a>')
     parts.append(f'<a href="{escape(links.about)}">{about_l}</a>')
     parts.append(f'<a href="{escape(links.privacy)}">{privacy_l}</a>')
-    parts.append(_lang_nav(lang, links.lang_other))
-    return f"<nav>{''.join(parts)}</nav>"
+    return (
+        f'<nav class="site-nav" aria-label="{nav_label}">'
+        f'<div class="nav-primary">{"".join(parts)}</div>'
+        f"{_lang_nav(lang, links.lang_other)}"
+        f"</nav>"
+    )
 
 
 def _footer(lang: str, links: PageLinks, site: SiteConfig) -> str:
@@ -382,19 +402,23 @@ def _render_digest(
         lang=lang,
         description=_page_description(lang),
         body=f"""
-<header>
-  <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-  {_brand_sub(lang)}
+<div class="site">
+<header class="site-header">
+  <div class="brand-block">
+    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
+    {_brand_sub(lang)}
+  </div>
   {_main_nav(lang, links)}
   <div class="day-bar">
     <h1>{escape(day_s)}</h1>
     <p class="meta">{meta}</p>
   </div>
 </header>
-<main>
+<main class="feed">
   {items_html}
 </main>
-<footer><p>{_footer(lang, links, site)}</p></footer>
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
 """,
     )
 
@@ -429,7 +453,9 @@ def _render_item(
 
     bits = [
         '<article class="item">',
-        f"<h2>{item.index}. {title_html}</h2>",
+        f'<span class="item-index" aria-hidden="true">{item.index:02d}</span>',
+        '<div class="item-body">',
+        f"<h2>{title_html}</h2>",
     ]
     if meta_bits:
         bits.append(f'<p class="item-meta">{" · ".join(meta_bits)}</p>')
@@ -450,7 +476,7 @@ def _render_item(
             f'<a href="{escape(aff, quote=True)}" target="_blank" '
             f'rel="sponsored noopener noreferrer">{escape(aff)}</a></p>'
         )
-    bits.append("</article>")
+    bits.extend(["</div>", "</article>"])
     return "\n".join(bits)
 
 
@@ -499,14 +525,18 @@ def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> 
         lang=lang,
         description=_page_description(lang),
         body=f"""
-<header>
-  <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-  {_brand_sub(lang)}
+<div class="site">
+<header class="site-header">
+  <div class="brand-block">
+    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
+    {_brand_sub(lang)}
+  </div>
   {_main_nav(lang, links, include_archive=False)}
-  <h1>{heading}</h1>
+  <h1 class="page-title">{heading}</h1>
 </header>
-<main>{lis}</main>
-<footer><p>{_footer(lang, links, site)}</p></footer>
+<main class="feed">{lis}</main>
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
 """,
     )
 
@@ -525,14 +555,18 @@ def _static_page_shell(
         lang=lang,
         description=_page_description(lang),
         body=f"""
-<header>
-  <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-  {_brand_sub(lang)}
+<div class="site">
+<header class="site-header">
+  <div class="brand-block">
+    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
+    {_brand_sub(lang)}
+  </div>
   {_main_nav(lang, links)}
-  <h1>{heading}</h1>
+  <h1 class="page-title">{heading}</h1>
 </header>
 <main class="prose">{body_text}</main>
-<footer><p>{_footer(lang, links, site)}</p></footer>
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
 """,
     )
 
@@ -666,13 +700,17 @@ def _render_empty_home(lang: str, site: SiteConfig) -> str:
         lang=lang,
         description=_page_description(lang),
         body=f"""
-<header>
-  <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-  {_brand_sub(lang)}
+<div class="site">
+<header class="site-header">
+  <div class="brand-block">
+    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
+    {_brand_sub(lang)}
+  </div>
   {_main_nav(lang, links)}
 </header>
-<main><p class="muted">{escape(msg)}</p></main>
-<footer><p>{_footer(lang, links, site)}</p></footer>
+<main class="feed"><p class="muted">{escape(msg)}</p></main>
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
 """,
     )
 
@@ -691,16 +729,20 @@ def _render_missing_home(lang: str, day: date, site: SiteConfig) -> str:
         lang=lang,
         description=_page_description(lang),
         body=f"""
-<header>
-  <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-  {_brand_sub(lang)}
+<div class="site">
+<header class="site-header">
+  <div class="brand-block">
+    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
+    {_brand_sub(lang)}
+  </div>
   {_main_nav(lang, links)}
   <div class="day-bar">
     <h1>{escape(day_s)}</h1>
   </div>
 </header>
-<main><p class="muted">{escape(msg)}</p></main>
-<footer><p>{_footer(lang, links, site)}</p></footer>
+<main class="feed"><p class="muted">{escape(msg)}</p></main>
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
 """,
     )
 
@@ -718,8 +760,9 @@ def _shell(
     favicon = _favicon_href(css_href)
     fonts = (
         "https://fonts.googleapis.com/css2?"
-        "family=Fraunces:opsz,wght@9..144,600;700&amp;"
-        "family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap"
+        "family=Bricolage+Grotesque:opsz,wght@12..96,600;700&amp;"
+        "family=Source+Serif+4:opsz,wght@8..60,400;600&amp;"
+        "family=Source+Sans+3:wght@400;500;600&amp;display=swap"
     )
     return f"""<!DOCTYPE html>
 <html lang="{html_lang}">
@@ -728,6 +771,8 @@ def _shell(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(title)}</title>
   <meta name="description" content="{escape(desc)}">
+  <meta name="theme-color" content="#eceff3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="{escape(title)}">
   <meta property="og:description" content="{escape(desc)}">
   <meta property="og:type" content="website">
@@ -747,58 +792,94 @@ def _shell(
 def _favicon_svg() -> str:
     return """
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="8" fill="#0b6e4f"/>
-  <circle cx="16" cy="16" r="7" stroke="#f7faf8" stroke-width="3"/>
-  <circle cx="16" cy="16" r="2.5" fill="#f7faf8"/>
+  <rect width="32" height="32" rx="6" fill="#1e3a5f"/>
+  <path fill="#eceff3"
+    d="M8 22V10h3.4c2.8 0 4.5 1.5 4.5 3.8 0 1.5-.8 2.7-2.2 3.3L17.2 22h-3.1
+       l-2.9-4.5H11V22H8zm3-7.2h.6c1.1 0 1.8-.6 1.8-1.5S12.7 12 11.6 12H11v2.8z"/>
 </svg>
 """.strip()
 
 
 def _stylesheet() -> str:
+    # Taste redesign: editorial digest; dials VARIANCE 8 / MOTION 6 / DENSITY 3
     return """
 :root {
-  --bg: #eef3f0;
-  --ink: #12201a;
-  --muted: #5a6a62;
-  --accent: #0b6e4f;
-  --accent-soft: #d7ebe2;
-  --line: #c5d2cb;
-  --card: #f7faf8;
-  --shadow: 0 1px 2px rgba(18, 32, 26, 0.04), 0 8px 24px rgba(18, 32, 26, 0.06);
-  --radius: 12px;
-  --focus: #0b6e4f;
+  --bg: #eceff3;
+  --bg-elev: #f6f7f9;
+  --ink: #16181d;
+  --muted: #5c6570;
+  --accent: #1e3a5f;
+  --accent-hot: #0f6e7c;
+  --line: #cfd5de;
+  --focus: #1e3a5f;
+  --shadow: 0 1px 0 rgba(22, 24, 29, 0.04);
+  --font-display: "Bricolage Grotesque", "Avenir Next", sans-serif;
+  --font-body: "Source Serif 4", "Palatino Linotype", serif;
+  --font-ui: "Source Sans 3", "Segoe UI", sans-serif;
+  --pad: clamp(1.25rem, 4vw, 2rem);
+  --max: 42rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151a;
+    --bg-elev: #1a1e26;
+    --ink: #e8ecf1;
+    --muted: #9aa3ad;
+    --accent: #8eb4e0;
+    --accent-hot: #5ec4c8;
+    --line: #2c3340;
+    --focus: #8eb4e0;
+    --shadow: none;
+  }
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
-  margin: 0 auto;
-  max-width: 44rem;
-  padding: 1.75rem 1.25rem 3.5rem;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-ui);
   background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, #d5e8de 0%, transparent 55%),
-    linear-gradient(180deg, #f4f8f6 0%, var(--bg) 40%);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent) 6%, var(--bg)) 0%,
+      var(--bg) 28%
+    ),
+    var(--bg);
   color: var(--ink);
   line-height: 1.55;
+}
+.site {
+  margin: 0 auto;
+  max-width: var(--max);
+  padding: var(--pad) var(--pad) 3.5rem;
 }
 a {
   color: var(--accent);
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.15em;
-  transition: color 0.15s ease, opacity 0.15s ease;
+  text-underline-offset: 0.18em;
+  transition: color 0.2s ease, text-underline-offset 0.2s ease;
 }
-a:hover { color: #085a40; }
+a:hover {
+  color: var(--accent-hot);
+  text-underline-offset: 0.28em;
+}
 a:focus-visible {
   outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline-offset: 3px;
   border-radius: 2px;
 }
+.site-header {
+  margin-bottom: 1.75rem;
+  animation: rise 0.55s ease both;
+}
+.brand-block { margin-bottom: 1.1rem; }
 .brand {
-  font-family: "Fraunces", "Times New Roman", serif;
-  font-size: clamp(1.85rem, 4vw, 2.25rem);
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 6vw, 2.85rem);
   font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.35rem;
-  line-height: 1.15;
+  letter-spacing: -0.035em;
+  margin: 0 0 0.4rem;
+  line-height: 1.05;
 }
 .brand a {
   color: inherit;
@@ -806,149 +887,207 @@ a:focus-visible {
 }
 .brand a:hover { color: var(--accent); }
 .tagline {
-  margin: 0 0 1rem;
+  margin: 0;
+  max-width: 28rem;
   color: var(--muted);
-  font-size: 0.98rem;
+  font-size: 1.02rem;
   font-weight: 500;
+  line-height: 1.4;
 }
-nav {
+.site-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.1rem;
+  gap: 0.85rem 1.25rem;
   align-items: center;
-  margin: 0 0 1.35rem;
-  color: var(--muted);
-  font-size: 0.92rem;
-  font-weight: 500;
+  justify-content: space-between;
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+  font-weight: 600;
 }
-nav a {
-  color: var(--accent);
+.nav-primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.15rem;
+}
+.nav-primary a {
+  color: var(--ink);
   text-decoration: none;
 }
-nav a:hover { text-decoration: underline; }
+.nav-primary a:hover { color: var(--accent-hot); }
+.lang-switch {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lang-current { color: var(--ink); font-weight: 600; }
+.lang-switch a { text-decoration: none; }
 .day-bar {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 0.9rem 1.1rem;
-  margin: 0 0 1.5rem;
+  padding: 0.35rem 0 0;
+  animation: rise 0.65s 0.06s ease both;
 }
-.day-bar h1 {
-  font-size: 1.2rem;
-  margin: 0 0 0.2rem;
+.day-bar h1,
+.page-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 3.5vw, 1.65rem);
   font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.25rem;
 }
-.day-bar .meta {
+.day-bar .meta,
+.meta {
   margin: 0;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
 }
-h1 { font-size: 1.3rem; margin: 0 0 1rem; }
-.meta { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.9rem; }
-main { display: flex; flex-direction: column; gap: 0.9rem; }
-.prose p { margin: 0 0 0.85rem; }
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
 .item {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 1.05rem 1.15rem 1.15rem;
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.65rem 0.9rem;
+  padding: 1.2rem 0;
+  border-bottom: 1px solid var(--line);
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
-.item h2 {
-  font-size: 1.08rem;
-  margin: 0 0 0.55rem;
+.item:first-child { border-top: 1px solid var(--line); }
+.item:hover {
+  background: color-mix(in srgb, var(--bg-elev) 80%, transparent);
+  transform: translateX(2px);
+}
+.item-index {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
   font-weight: 600;
+  color: var(--accent-hot);
+  letter-spacing: -0.02em;
+  padding-top: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+.item-body { min-width: 0; }
+.item h2 {
+  font-family: var(--font-body);
+  font-size: 1.12rem;
+  font-weight: 600;
+  margin: 0 0 0.45rem;
   line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 .item h2 a {
   color: var(--ink);
   text-decoration: none;
 }
-.item h2 a:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
+.item h2 a:hover { color: var(--accent); }
 .item-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem 0.15rem;
-  margin: 0 0 0.75rem;
+  gap: 0.3rem 0.15rem;
+  margin: 0 0 0.65rem;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
+  font-family: var(--font-ui);
 }
 .badge {
   display: inline-block;
-  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
   color: var(--accent);
   border-radius: 999px;
-  padding: 0.12rem 0.55rem;
-  font-size: 0.78rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 .summary, .why, .affiliate {
-  margin: 0.45rem 0 0;
+  margin: 0.4rem 0 0;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
   color: var(--ink);
-  font-size: 0.94rem;
 }
-.why { color: var(--muted); font-size: 0.9rem; }
-.affiliate {
+.why {
   color: var(--muted);
   font-size: 0.88rem;
-  padding-top: 0.35rem;
+  font-family: var(--font-ui);
+}
+.affiliate {
+  margin-top: 0.7rem;
+  padding-top: 0.65rem;
   border-top: 1px dashed var(--line);
+  font-size: 0.88rem;
+  font-family: var(--font-ui);
+  color: var(--muted);
 }
 .label {
   display: inline-block;
-  font-size: 0.72rem;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--accent);
-  margin-right: 0.35rem;
+  letter-spacing: 0.06em;
+  color: var(--accent-hot);
+  margin-right: 0.4rem;
 }
 .muted { color: var(--muted); }
+.prose {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+}
+.prose p { margin: 0 0 0.95rem; }
 .archive-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
-  overflow: hidden;
-  box-shadow: var(--shadow);
+  border-top: 1px solid var(--line);
 }
 .archive-list li {
   margin: 0;
   border-bottom: 1px solid var(--line);
-  padding: 0.85rem 1.1rem;
+  padding: 0.95rem 0.15rem;
   line-height: 1.4;
+  transition: transform 0.2s ease;
 }
-.archive-list li:last-child { border-bottom: none; }
+.archive-list li:hover { transform: translateX(2px); }
 .archive-list a {
-  color: var(--accent);
-  font-weight: 500;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
   text-decoration: none;
+  letter-spacing: -0.01em;
 }
-.archive-list a:hover { text-decoration: underline; }
-footer {
-  margin-top: 2.25rem;
-  padding-top: 1.1rem;
+.archive-list a:hover { color: var(--accent-hot); }
+.site-footer {
+  margin-top: 2.75rem;
+  padding-top: 1.15rem;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+  font-family: var(--font-ui);
 }
-footer a { color: var(--accent); }
+.site-footer a { color: var(--accent); }
 code {
   font-size: 0.85em;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .site-header, .day-bar { animation: none; }
+  .item, .archive-list li { transition: none; }
+  .item:hover, .archive-list li:hover { transform: none; }
+}
 @media (max-width: 480px) {
-  body { padding: 1.25rem 1rem 2.5rem; }
-  .item { padding: 0.95rem 1rem 1.05rem; }
+  .item { grid-template-columns: 1.9rem 1fr; gap: 0.45rem 0.65rem; }
+  .site-nav { align-items: flex-start; }
 }
 """.strip()
 
