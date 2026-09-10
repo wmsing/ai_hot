@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -154,18 +155,26 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "Published (UTC)" not in home
     assert 'class="item-thumb"' in home
     assert "https://cdn.example/cover.webp" in home
-    assert 'class="day-nav"' in home
-    assert "Previous day" in home
-    assert 'href="archive/2026-09-09/index.html"' in home
-    assert 'class="day-nav-muted">Next day' in home
+    assert 'class="day-nav"' not in home
+    assert "Previous day" not in home
+    assert ">Latest<" in home
+    assert "1 highlights · newest first" in home
+    assert 'class="feed-day-sticky"' in home
+    assert 'data-day="2026-09-10"' in home
+    assert 'id="load-more"' not in home
+    assert (out / "feed.js").is_file()
     older = (out / "archive" / "2026-09-09" / "index.html").read_text(encoding="utf-8")
+    assert "Example Title" in older
     assert "Next day" in older
     assert 'href="../../index.html"' in older
+    assert 'class="day-nav"' in older
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert "发布时间:" in zh_home or "发布时间：" in zh_home
     assert "发布时间（UTC）" not in zh_home
-    assert "前一天" in zh_home
-    assert "后一天" in zh_home
+    assert "前一天" not in zh_home
+    assert "后一天" not in zh_home
+    assert ">最新<" in zh_home
+    assert 'class="feed-day-sticky"' in zh_home
     assert "AI 热点摘要" in zh_home
     assert "更新" in zh_home
     assert 'href="../favicon.svg"' in zh_home
@@ -177,6 +186,133 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "static site" in privacy.lower() or "static" in privacy
     disclosure = (out / "disclosure.html").read_text(encoding="utf-8")
     assert "affiliate_enabled" in disclosure
+
+
+def test_build_site_home_load_more(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    content.mkdir()
+    en_lines = [
+        "# ai_hot digest",
+        "",
+        "Generated (UTC): 2026-09-10T05:00:00+00:00",
+        "Selected: 35",
+        "",
+    ]
+    zh_lines = [
+        "# ai_hot 消息摘要",
+        "",
+        "生成时间（UTC）：2026-09-10T05:00:00+00:00",
+        "精选：35",
+        "",
+    ]
+    for i in range(35):
+        hour = i % 24
+        pub = f"2026-09-10T{hour:02d}:00:00+00:00"
+        en_lines.extend(
+            [
+                f"## {i + 1}. Title {i}",
+                "",
+                "- source: `hn`",
+                f"- url: https://example.com/item-{i}",
+                f"- published: {pub}",
+                "- score=10 | comments=1",
+                f"- summary: Summary {i}",
+                "",
+            ]
+        )
+        zh_lines.extend(
+            [
+                f"## {i + 1}. 标题 {i}",
+                "",
+                "- 来源：`hn`",
+                f"- 链接：https://example.com/item-{i}",
+                f"- 发布时间：{pub}",
+                "- 评分=10 | 评论数=1",
+                f"- 摘要：摘要 {i}",
+                "",
+            ]
+        )
+    (content / "2026-09-10.en.md").write_text("\n".join(en_lines), encoding="utf-8")
+    (content / "2026-09-10.zh.md").write_text("\n".join(zh_lines), encoding="utf-8")
+    out = tmp_path / "public"
+    build_site(content_dir=content, output_dir=out)
+
+    home = (out / "index.html").read_text(encoding="utf-8")
+    assert "35 highlights · newest first" in home
+    assert 'id="load-more"' in home
+    assert 'data-feed-base="feed/en"' in home
+    assert 'data-next="1"' in home
+    assert home.count('class="item"') == 30
+    assert home.count('class="feed-day-sticky"') == 1
+    assert 'data-day="2026-09-10"' in home
+    page1 = (out / "feed" / "en" / "1.json").read_text(encoding="utf-8")
+    data = json.loads(page1)
+    assert data["next"] is None
+    assert data["html"].count('class="item"') == 5
+    assert 'class="feed-day-sticky"' not in data["html"]
+    assert "Title" in data["html"]
+
+    zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
+    assert 'data-feed-base="../feed/zh"' in zh_home
+    assert (out / "feed" / "zh" / "1.json").is_file()
+
+
+def test_build_site_home_sticky_by_day(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    content.mkdir()
+    (content / "2026-09-10.en.md").write_text(
+        "\n".join(
+            [
+                "# ai_hot digest",
+                "",
+                "Generated (UTC): 2026-09-10T05:00:00+00:00",
+                "Selected: 2",
+                "",
+                "## 1. Newer A",
+                "",
+                "- source: `hn`",
+                "- url: https://example.com/a",
+                "- published: 2026-09-10T12:00:00+00:00",
+                "- summary: a",
+                "",
+                "## 2. Newer B",
+                "",
+                "- source: `hn`",
+                "- url: https://example.com/b",
+                "- published: 2026-09-10T08:00:00+00:00",
+                "- summary: b",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (content / "2026-09-09.en.md").write_text(
+        "\n".join(
+            [
+                "# ai_hot digest",
+                "",
+                "Generated (UTC): 2026-09-09T05:00:00+00:00",
+                "Selected: 1",
+                "",
+                "## 1. Older C",
+                "",
+                "- source: `hn`",
+                "- url: https://example.com/c",
+                "- published: 2026-09-09T18:00:00+00:00",
+                "- summary: c",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "public"
+    build_site(content_dir=content, output_dir=out)
+    home = (out / "index.html").read_text(encoding="utf-8")
+    assert home.count('class="feed-day-sticky"') == 2
+    assert home.index('data-day="2026-09-10"') < home.index('data-day="2026-09-09"')
+    assert home.index("Newer A") < home.index("Older C")
+    assert home.index('data-day="2026-09-10"') < home.index("Newer A")
+    assert home.index('data-day="2026-09-09"') < home.index("Older C")
 
 
 def test_build_site_seo(tmp_path: Path) -> None:
@@ -209,10 +345,9 @@ def test_build_site_seo(tmp_path: Path) -> None:
     assert 'hreflang="en" href="https://example.test/"' in home
     assert 'hreflang="zh-Hans" href="https://example.test/zh/"' in home
     assert 'hreflang="x-default" href="https://example.test/"' in home
-    assert (
-        'content="AI Hot Digest for 2026-09-10: 1 AI highlights from '
-        'Hacker News and official feeds."'
-    ) in home
+    assert "Daily AI highlights from HN &amp; official feeds" in home or (
+        'content="Daily AI highlights from HN & official feeds"' in home
+    )
 
     about = (out / "about.html").read_text(encoding="utf-8")
     assert 'rel="canonical" href="https://example.test/about.html"' in about

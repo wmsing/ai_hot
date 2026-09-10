@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from html import escape
 from pathlib import Path
 
@@ -22,6 +23,7 @@ SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
 SITE_TAGLINE_ZH = "AI 热点摘要"
 _REPO_ISSUES = "https://github.com/wmsing/ai_hot/issues"
+HOME_PAGE_SIZE = 30
 
 _BOARD_TITLES: dict[str, tuple[str, str]] = {
     "agent": ("Agent", "Agent"),
@@ -38,6 +40,14 @@ class DayFiles:
     day: date
     en: Path | None
     zh: Path | None
+
+
+@dataclass(frozen=True)
+class TimelineEntry:
+    """首页时间线条目：group_day 为 UTC 发布日（sticky 用）。"""
+
+    group_day: date
+    item: DigestItem
 
 
 @dataclass(frozen=True)
@@ -120,13 +130,56 @@ def build_site(
         _write_sitemap(output_dir, sitemap_urls)
         return
 
+    (output_dir / "feed.js").write_text(_feed_js(), encoding="utf-8")
+    en_timeline = _timeline_items(days, "en")
+    zh_timeline = _timeline_items(days, "zh")
+    _write_feed_json_pages(
+        output_dir,
+        lang="en",
+        items=en_timeline,
+        affiliate_enabled=cfg.affiliate_enabled,
+    )
+    _write_feed_json_pages(
+        output_dir,
+        lang="zh",
+        items=zh_timeline,
+        affiliate_enabled=cfg.affiliate_enabled,
+    )
+
+    if en_timeline:
+        _write(
+            output_dir / "index.html",
+            _render_home_timeline(
+                items=en_timeline,
+                lang="en",
+                has_other_lang=bool(zh_timeline),
+                site=cfg,
+            ),
+        )
+    else:
+        _write(output_dir / "index.html", _render_empty_home("en", cfg))
+    sitemap_urls.append(_abs_url(origin, "/"))
+
+    if zh_timeline:
+        _write(
+            output_dir / "zh" / "index.html",
+            _render_home_timeline(
+                items=zh_timeline,
+                lang="zh",
+                has_other_lang=bool(en_timeline),
+                site=cfg,
+            ),
+        )
+    else:
+        _write(output_dir / "zh" / "index.html", _render_empty_home("zh", cfg))
+    sitemap_urls.append(_abs_url(origin, "/zh/"))
+
     for idx, day_files in enumerate(days):
         day_s = day_files.day.isoformat()
         en_doc = _load_doc(day_files.en)
         zh_doc = _load_doc(day_files.zh)
         has_zh = zh_doc is not None
         has_en = en_doc is not None
-        is_latest = day_files.day == latest.day
         # days 按新→旧；newer=更近一天，older=更早一天
         newer_day = days[idx - 1].day if idx > 0 else None
         older_day = days[idx + 1].day if idx + 1 < len(days) else None
@@ -144,32 +197,10 @@ def build_site(
                 site=cfg,
                 older_day=older_day,
                 newer_day=newer_day,
-                is_home=False,
                 newer_is_latest=newer_is_latest,
             )
             _write(output_dir / "archive" / day_s / "index.html", archive_page)
             sitemap_urls.append(_abs_url(origin, en_archive_path))
-            if is_latest:
-                home_page = _render_digest(
-                    doc=en_doc,
-                    day=day_files.day,
-                    lang="en",
-                    has_other_lang=has_zh,
-                    links=_links_digest_home("en", day_s, has_zh),
-                    site=cfg,
-                    older_day=older_day,
-                    newer_day=None,
-                    is_home=True,
-                    newer_is_latest=False,
-                )
-                _write(output_dir / "index.html", home_page)
-                sitemap_urls.append(_abs_url(origin, "/"))
-        elif is_latest:
-            _write(
-                output_dir / "index.html",
-                _render_missing_home("en", day_files.day, cfg),
-            )
-            sitemap_urls.append(_abs_url(origin, "/"))
 
         if zh_doc is not None:
             archive_page = _render_digest(
@@ -181,7 +212,6 @@ def build_site(
                 site=cfg,
                 older_day=older_day,
                 newer_day=newer_day,
-                is_home=False,
                 newer_is_latest=newer_is_latest,
             )
             _write(
@@ -189,27 +219,6 @@ def build_site(
                 archive_page,
             )
             sitemap_urls.append(_abs_url(origin, zh_archive_path))
-            if is_latest:
-                home_page = _render_digest(
-                    doc=zh_doc,
-                    day=day_files.day,
-                    lang="zh",
-                    has_other_lang=has_en,
-                    links=_links_digest_home("zh", day_s, has_en),
-                    site=cfg,
-                    older_day=older_day,
-                    newer_day=None,
-                    is_home=True,
-                    newer_is_latest=False,
-                )
-                _write(output_dir / "zh" / "index.html", home_page)
-                sitemap_urls.append(_abs_url(origin, "/zh/"))
-        elif is_latest:
-            _write(
-                output_dir / "zh" / "index.html",
-                _render_missing_home("zh", day_files.day, cfg),
-            )
-            sitemap_urls.append(_abs_url(origin, "/zh/"))
 
     _write_robots(output_dir, origin)
     _write_sitemap(output_dir, sitemap_urls)
@@ -520,6 +529,143 @@ def _write_sitemap(output_dir: Path, urls: list[str]) -> None:
     _write(output_dir / "sitemap.xml", "\n".join(lines))
 
 
+def _item_sort_ts(item: DigestItem, day: date) -> float:
+    dt = parse_published(item.published)
+    if dt is not None:
+        return dt.timestamp()
+    fallback = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+    return fallback.timestamp()
+
+
+def _item_group_day(item: DigestItem, archive_day: date) -> date:
+    dt = parse_published(item.published)
+    if dt is not None:
+        return dt.astimezone(timezone.utc).date()
+    return archive_day
+
+
+def _timeline_items(days: list[DayFiles], lang: str) -> list[TimelineEntry]:
+    """跨日合并：按 published 新→旧；同 URL 保留更新的一条。"""
+    by_url: dict[str, tuple[float, TimelineEntry]] = {}
+    orphans: list[tuple[float, TimelineEntry]] = []
+    for day_files in days:
+        path = day_files.en if lang == "en" else day_files.zh
+        doc = _load_doc(path)
+        if doc is None:
+            continue
+        for item in doc.items:
+            ts = _item_sort_ts(item, day_files.day)
+            group_day = _item_group_day(item, day_files.day)
+            entry = TimelineEntry(group_day=group_day, item=item)
+            url = item.url.strip()
+            if not url:
+                orphans.append((ts, entry))
+                continue
+            prev = by_url.get(url)
+            if prev is None or ts > prev[0]:
+                by_url[url] = (ts, entry)
+    ranked = list(by_url.values()) + orphans
+    ranked.sort(key=lambda pair: (-pair[0], pair[1].item.url))
+    out: list[TimelineEntry] = []
+    for idx, (_, entry) in enumerate(ranked, start=1):
+        out.append(
+            TimelineEntry(
+                group_day=entry.group_day,
+                item=entry.item.model_copy(update={"index": idx}),
+            )
+        )
+    return out
+
+
+def _render_day_sticky(day: date) -> str:
+    day_s = day.isoformat()
+    return (
+        f'<div class="feed-day-sticky" data-day="{escape(day_s)}">'
+        f'<time datetime="{escape(day_s)}">{escape(day_s)}</time>'
+        f"</div>"
+    )
+
+
+def _render_timeline_html(
+    entries: list[TimelineEntry],
+    lang: str,
+    *,
+    affiliate_enabled: bool,
+    prev_day: date | None = None,
+) -> str:
+    bits: list[str] = []
+    last = prev_day
+    for entry in entries:
+        if entry.group_day != last:
+            bits.append(_render_day_sticky(entry.group_day))
+            last = entry.group_day
+        bits.append(_render_item(entry.item, lang, affiliate_enabled=affiliate_enabled))
+    return "".join(bits)
+
+
+def _write_feed_json_pages(
+    output_dir: Path,
+    *,
+    lang: str,
+    items: list[TimelineEntry],
+    affiliate_enabled: bool,
+) -> None:
+    """page 0 在首页 HTML；从 1 起写 feed/{lang}/{n}.json。"""
+    if len(items) <= HOME_PAGE_SIZE:
+        return
+    feed_dir = output_dir / "feed" / lang
+    page_count = (len(items) + HOME_PAGE_SIZE - 1) // HOME_PAGE_SIZE
+    for page_i in range(1, page_count):
+        start = page_i * HOME_PAGE_SIZE
+        chunk = items[start : start + HOME_PAGE_SIZE]
+        prev_day = items[start - 1].group_day
+        html = _render_timeline_html(
+            chunk,
+            lang,
+            affiliate_enabled=affiliate_enabled,
+            prev_day=prev_day,
+        )
+        next_page: int | None = page_i + 1 if page_i + 1 < page_count else None
+        payload = {"html": html, "next": next_page}
+        _write(
+            feed_dir / f"{page_i}.json",
+            json.dumps(payload, ensure_ascii=False),
+        )
+
+
+def _feed_js() -> str:
+    return """
+(function () {
+  var btn = document.getElementById("load-more");
+  var feed = document.getElementById("feed");
+  if (!btn || !feed) return;
+  btn.addEventListener("click", function () {
+    var next = btn.getAttribute("data-next");
+    var base = btn.getAttribute("data-feed-base");
+    if (!next || !base) return;
+    btn.disabled = true;
+    fetch(base + "/" + next + ".json")
+      .then(function (res) {
+        if (!res.ok) throw new Error("feed fetch failed");
+        return res.json();
+      })
+      .then(function (data) {
+        feed.insertAdjacentHTML("beforeend", data.html || "");
+        if (data.next == null) {
+          btn.remove();
+        } else {
+          btn.setAttribute("data-next", String(data.next));
+          btn.disabled = false;
+        }
+      })
+      .catch(function () {
+        btn.disabled = false;
+      });
+  });
+})();
+""".strip()
+
+
 def _favicon_href(css_href: str) -> str:
     return css_href.replace("styles.css", "favicon.svg")
 
@@ -552,7 +698,6 @@ def _render_digest(
     site: SiteConfig,
     older_day: date | None = None,
     newer_day: date | None = None,
-    is_home: bool = False,
     newer_is_latest: bool = False,
 ) -> str:
     day_s = day.isoformat()
@@ -578,15 +723,11 @@ def _render_digest(
         lang,
         older_day=older_day,
         newer_day=newer_day,
-        is_home=is_home,
         newer_is_latest=newer_is_latest,
     )
 
     origin = _origin(site)
-    if is_home:
-        en_path, zh_path = "/", "/zh/"
-    else:
-        en_path, zh_path = f"/archive/{day_s}/", f"/zh/archive/{day_s}/"
+    en_path, zh_path = f"/archive/{day_s}/", f"/zh/archive/{day_s}/"
     canonical_path = en_path if lang == "en" else zh_path
     en_hl = en_path if lang == "en" or has_other_lang else None
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
@@ -621,30 +762,104 @@ def _render_digest(
     )
 
 
+def _render_home_timeline(
+    *,
+    items: list[TimelineEntry],
+    lang: str,
+    has_other_lang: bool,
+    site: SiteConfig,
+) -> str:
+    links = _links_digest_home(lang, "", has_other_lang)
+    total = len(items)
+    page0 = items[:HOME_PAGE_SIZE]
+    has_more = total > HOME_PAGE_SIZE
+    if lang == "en":
+        heading = "Latest"
+        meta = f"{total} highlights · newest first"
+        load_l = "Load more"
+        feed_base = "feed/en"
+        script_src = "feed.js"
+    else:
+        heading = "最新"
+        meta = f"共 {total} 条 · 新在前"
+        load_l = "加载更多"
+        feed_base = "../feed/zh"
+        script_src = "../feed.js"
+
+    items_html = _render_timeline_html(
+        page0,
+        lang,
+        affiliate_enabled=site.affiliate_enabled,
+        prev_day=None,
+    )
+    if not items_html:
+        items_html = (
+            '<p class="muted">No items.</p>'
+            if lang == "en"
+            else '<p class="muted">暂无条目。</p>'
+        )
+
+    load_more = ""
+    if has_more:
+        load_more = (
+            f'<div class="load-more-wrap">'
+            f'<button type="button" class="load-more" id="load-more" '
+            f'data-feed-base="{escape(feed_base)}" data-next="1">'
+            f"{escape(load_l)}</button></div>"
+        )
+
+    origin = _origin(site)
+    en_path, zh_path = "/", "/zh/"
+    en_hl = en_path if lang == "en" or has_other_lang else None
+    zh_hl = zh_path if lang == "zh" or has_other_lang else None
+    desc = _static_description("home", lang)
+
+    return _shell(
+        title=SITE_NAME_EN,
+        css_href=links.css,
+        lang=lang,
+        description=desc,
+        canonical=_abs_url(origin, en_path if lang == "en" else zh_path),
+        hreflang=_hreflang_pairs(en_path=en_hl, zh_path=zh_hl, origin=origin),
+        extra_scripts=f'<script src="{escape(script_src)}" defer></script>',
+        body=f"""
+<div class="site">
+<header class="site-header">
+  <div class="brand-block">
+    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
+    {_brand_sub(lang)}
+  </div>
+  {_main_nav(lang, links)}
+  <div class="day-bar">
+    <h1>{escape(heading)}</h1>
+    <p class="meta">{escape(meta)}</p>
+  </div>
+</header>
+<main class="feed" id="feed">
+  {items_html}
+</main>
+{load_more}
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
+""",
+    )
+
+
 def _day_nav(
     lang: str,
     *,
     older_day: date | None,
     newer_day: date | None,
-    is_home: bool,
     newer_is_latest: bool,
 ) -> str:
-    """前一天=更早归档；后一天=更新归档（首页为最新则无后一天）。"""
+    """前一天=更早归档；后一天=更新归档（最新一天的后一天指向首页时间线）。"""
     if lang == "en":
         older_l, newer_l = "← Previous day", "Next day →"
     else:
         older_l, newer_l = "← 前一天", "后一天 →"
 
-    older_href = _day_href(
-        target=older_day,
-        is_home=is_home,
-        link_home=False,
-    )
-    newer_href = _day_href(
-        target=newer_day,
-        is_home=is_home,
-        link_home=newer_is_latest,
-    )
+    older_href = _day_href(target=older_day, link_home=False)
+    newer_href = _day_href(target=newer_day, link_home=newer_is_latest)
 
     older_html = (
         f'<a class="day-nav-link" href="{escape(older_href)}">{escape(older_l)}</a>'
@@ -666,14 +881,11 @@ def _day_nav(
 def _day_href(
     *,
     target: date | None,
-    is_home: bool,
     link_home: bool,
 ) -> str | None:
     if target is None:
         return None
     day_s = target.isoformat()
-    if is_home:
-        return f"archive/{day_s}/index.html"
     if link_home:
         return "../../index.html"
     return f"../{day_s}/index.html"
@@ -1251,6 +1463,7 @@ def _shell(
     description: str | None = None,
     canonical: str | None = None,
     hreflang: list[tuple[str, str]] | None = None,
+    extra_scripts: str = "",
 ) -> str:
     html_lang = "zh-Hans" if lang == "zh" else "en"
     desc = description if description is not None else _page_description(lang)
@@ -1271,6 +1484,7 @@ def _shell(
                 f'\n  <link rel="alternate" hreflang="{escape(hlang)}" '
                 f'href="{escape(href)}">'
             )
+    scripts = f"\n{extra_scripts}" if extra_scripts else ""
     return f"""<!DOCTYPE html>
 <html lang="{html_lang}">
 <head>
@@ -1292,6 +1506,7 @@ def _shell(
 </head>
 <body>
 {body}
+{scripts}
 </body>
 </html>
 """
@@ -1481,6 +1696,52 @@ a:focus-visible {
 .day-nav-muted {
   color: var(--muted);
   opacity: 0.55;
+}
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 1.75rem 0 0.5rem;
+}
+.load-more {
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 0.55rem;
+  padding: 0.65rem 1.25rem;
+  cursor: pointer;
+}
+.load-more:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.load-more:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.feed-day-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 1.35rem 0 0.65rem;
+  padding: 0.55rem 0.1rem 0.5rem;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.feed-day-sticky:first-child {
+  margin-top: 0;
+}
+.feed-day-sticky time {
+  font-variant-numeric: tabular-nums;
 }
 .page-title { margin-bottom: 1.25rem; }
 .arena {
