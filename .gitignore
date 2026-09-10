@@ -26,6 +26,10 @@ public/
 *.swp
 *.swo
 
+# Local agent skill copies (e.g. npx skills add)
+.agents/
+skills-lock.json
+
 # Testing & Quality
 .pytest_cache/
 .mypy_cache/
