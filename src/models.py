@@ -63,6 +63,48 @@ class SiteConfig(BaseModel):
     contact_email: str = ""
 
 
+class LeaderboardConfig(BaseModel):
+    """构建时拉取的 Arena 多榜配置。"""
+
+    enabled: bool = True
+    base_url: str = "https://api.wulong.dev/arena-ai-leaderboards/v1/leaderboard"
+    source_base: str = "https://arena.ai/leaderboard"
+    boards: list[str] = Field(
+        default_factory=lambda: [
+            "agent",
+            "text-to-image",
+            "text-to-video",
+            "image-edit",
+            "image-to-video",
+            "video-edit",
+        ]
+    )
+    top_n: int = 10
+    timeout_seconds: float = 20.0
+    agent_score_name: str = "Net Improvement"
+
+
+class ArenaModelRow(BaseModel):
+    """Arena 榜单上一行。"""
+
+    rank: int
+    model: str
+    vendor: str | None = None
+    score: float | None = None
+
+
+class ArenaLeaderboard(BaseModel):
+    """单榜构建快照。"""
+
+    board: str
+    source_url: str
+    source_page: str
+    score_label: str = "Elo"
+    fetched_at: str = ""
+    last_updated: str = ""
+    models: list[ArenaModelRow] = Field(default_factory=list)
+
+
 class DigestItem(BaseModel):
     """站点用的一条 digest 条目（从 md 解析）。"""
 
@@ -101,6 +143,7 @@ class OllamaConfig(BaseModel):
 class AppConfig(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     site: SiteConfig = Field(default_factory=SiteConfig)
+    leaderboard: LeaderboardConfig = Field(default_factory=LeaderboardConfig)
     hn: HnConfig = Field(default_factory=HnConfig)
     rss: RssConfig = Field(default_factory=RssConfig)
     filter: FilterConfig = Field(default_factory=FilterConfig)

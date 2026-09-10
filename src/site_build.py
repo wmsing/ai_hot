@@ -6,12 +6,13 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from html import escape
 from pathlib import Path
 
 from src.config import load_app_config
-from src.models import DigestDocument, DigestItem, SiteConfig
+from src.leaderboard import fetch_arena_boards
+from src.models import ArenaLeaderboard, DigestDocument, DigestItem, SiteConfig
 from src.site_parse import parse_digest_markdown
 from src.timeutil import format_published, parse_published
 
@@ -21,6 +22,15 @@ SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
 SITE_TAGLINE_ZH = "AI 热点摘要"
 _REPO_ISSUES = "https://github.com/wmsing/ai_hot/issues"
+
+_BOARD_TITLES: dict[str, tuple[str, str]] = {
+    "agent": ("Agent", "Agent"),
+    "text-to-image": ("Text to Image", "文生图"),
+    "text-to-video": ("Text to Video", "文生视频"),
+    "image-edit": ("Image Edit", "图片编辑"),
+    "image-to-video": ("Image to Video", "图生视频"),
+    "video-edit": ("Video Edit", "视频编辑"),
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +44,7 @@ class DayFiles:
 class PageLinks:
     css: str
     home: str
+    arena: str
     archive: str
     disclosure: str
     about: str
@@ -47,9 +58,14 @@ def build_site(
     content_dir: Path,
     output_dir: Path,
     site: SiteConfig | None = None,
+    arena_boards: list[ArenaLeaderboard] | None = None,
 ) -> None:
-    """扫描 content_dir，写出完整静态站到 output_dir。"""
+    """扫描 content_dir，写出完整静态站到 output_dir。
+
+    arena_boards 写入独立 Arena 页；首页与归档不嵌入榜单。
+    """
     cfg = site if site is not None else SiteConfig()
+    boards = arena_boards if arena_boards is not None else []
     days = _scan_days(content_dir)
     if output_dir.exists():
         _clear_dir(output_dir)
@@ -65,6 +81,8 @@ def build_site(
         output_dir / "zh" / "archive" / "index.html",
         _render_archive_index(days, "zh", cfg),
     )
+    _write(output_dir / "arena.html", _render_arena_page("en", cfg, boards))
+    _write(output_dir / "zh" / "arena.html", _render_arena_page("zh", cfg, boards))
     _write(output_dir / "disclosure.html", _render_disclosure("en", cfg))
     _write(output_dir / "zh" / "disclosure.html", _render_disclosure("zh", cfg))
     _write(output_dir / "about.html", _render_about("en", cfg))
@@ -84,6 +102,7 @@ def build_site(
         zh_doc = _load_doc(day_files.zh)
         has_zh = zh_doc is not None
         has_en = en_doc is not None
+        is_latest = day_files.day == latest.day
 
         if en_doc is not None:
             archive_page = _render_digest(
@@ -95,7 +114,7 @@ def build_site(
                 site=cfg,
             )
             _write(output_dir / "archive" / day_s / "index.html", archive_page)
-            if day_files.day == latest.day:
+            if is_latest:
                 home_page = _render_digest(
                     doc=en_doc,
                     day=day_files.day,
@@ -105,7 +124,7 @@ def build_site(
                     site=cfg,
                 )
                 _write(output_dir / "index.html", home_page)
-        elif day_files.day == latest.day:
+        elif is_latest:
             _write(
                 output_dir / "index.html",
                 _render_missing_home("en", day_files.day, cfg),
@@ -124,7 +143,7 @@ def build_site(
                 output_dir / "zh" / "archive" / day_s / "index.html",
                 archive_page,
             )
-            if day_files.day == latest.day:
+            if is_latest:
                 home_page = _render_digest(
                     doc=zh_doc,
                     day=day_files.day,
@@ -134,7 +153,7 @@ def build_site(
                     site=cfg,
                 )
                 _write(output_dir / "zh" / "index.html", home_page)
-        elif day_files.day == latest.day:
+        elif is_latest:
             _write(
                 output_dir / "zh" / "index.html",
                 _render_missing_home("zh", day_files.day, cfg),
@@ -153,6 +172,7 @@ def _make_links(
     return PageLinks(
         css=css,
         home=home,
+        arena=disclosure.replace("disclosure.html", "arena.html"),
         archive=archive,
         disclosure=disclosure,
         about=disclosure.replace("disclosure.html", "about.html"),
@@ -292,14 +312,17 @@ def _lang_nav(lang: str, other_href: str) -> str:
 
 def _main_nav(lang: str, links: PageLinks, *, include_archive: bool = True) -> str:
     if lang == "en":
-        home_l, archive_l = "Home", "Archive"
+        home_l, arena_l, archive_l = "Home", "Leaderboard", "Archive"
         about_l, privacy_l = "About", "Privacy"
         nav_label = "Primary"
     else:
-        home_l, archive_l = "首页", "归档"
+        home_l, arena_l, archive_l = "首页", "排行榜", "归档"
         about_l, privacy_l = "关于", "隐私"
         nav_label = "主导航"
-    parts = [f'<a href="{escape(links.home)}">{home_l}</a>']
+    parts = [
+        f'<a href="{escape(links.home)}">{home_l}</a>',
+        f'<a href="{escape(links.arena)}">{arena_l}</a>',
+    ]
     if include_archive:
         parts.append(f'<a href="{escape(links.archive)}">{archive_l}</a>')
     parts.append(f'<a href="{escape(links.about)}">{about_l}</a>')
@@ -417,6 +440,169 @@ def _render_digest(
 </header>
 <main class="feed">
   {items_html}
+</main>
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
+""",
+    )
+
+
+def _board_title(board: str, lang: str) -> str:
+    titles = _BOARD_TITLES.get(board)
+    if titles is None:
+        return board
+    return titles[0] if lang == "en" else titles[1]
+
+
+def _format_as_of_date(raw: str) -> str:
+    """Arena last_updated → 2026-9-7；解析失败则原样返回。"""
+    text = raw.strip()
+    if not text:
+        return ""
+    for fmt in ("%b %d, %Y", "%B %d, %Y", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S%z"):
+        try:
+            dt = datetime.strptime(text, fmt)
+            return f"{dt.year}-{dt.month}-{dt.day}"
+        except ValueError:
+            continue
+    # drop timezone-less ISO with time
+    if "T" in text:
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            return f"{dt.year}-{dt.month}-{dt.day}"
+        except ValueError:
+            pass
+    return text
+
+
+def _board_heading(board: ArenaLeaderboard, lang: str) -> str:
+    title = _board_title(board.board, lang)
+    as_of = _format_as_of_date(board.last_updated)
+    if not as_of:
+        return title
+    if lang == "en":
+        return f"{title} (as of {as_of})"
+    return f"{title}（截至 {as_of}）"
+
+
+def _format_arena_score(score: float | None) -> str:
+    if score is None:
+        return "—"
+    if score == int(score):
+        return str(int(score))
+    return f"{score:.2f}"
+
+
+def _render_arena_board_section(board: ArenaLeaderboard, lang: str) -> str:
+    heading = _board_heading(board, lang)
+    if lang == "en":
+        col_rank, col_model, col_vendor = "Rank", "Model", "Vendor"
+        note_prefix = "Source:"
+        not_ours = "Third-party scores — not our evaluation."
+        score_col = board.score_label
+    else:
+        col_rank, col_model, col_vendor = "名次", "模型", "厂商"
+        note_prefix = "来源："
+        not_ours = "第三方数据，非本站评测。"
+        if board.score_label == "Net Improvement":
+            score_col = "净提升"
+        elif board.score_label == "Elo":
+            score_col = "评分"
+        else:
+            score_col = board.score_label
+
+    rows: list[str] = []
+    for row in board.models:
+        vendor = escape(row.vendor) if row.vendor else "—"
+        score = _format_arena_score(row.score)
+        rows.append(
+            "<tr>"
+            f'<td class="arena-rank">{row.rank}</td>'
+            f"<td>{escape(row.model)}</td>"
+            f"<td>{vendor}</td>"
+            f'<td class="arena-elo">{escape(score)}</td>'
+            "</tr>"
+        )
+
+    page_href = escape(board.source_page, quote=True)
+    heading_id = f"arena-{escape(board.board)}"
+
+    return f"""
+<section class="arena" aria-labelledby="{heading_id}">
+  <div class="arena-head">
+    <h2 id="{heading_id}">{escape(heading)}</h2>
+  </div>
+  <div class="arena-table-wrap">
+    <table class="arena-table">
+      <thead>
+        <tr>
+          <th scope="col">{escape(col_rank)}</th>
+          <th scope="col">{escape(col_model)}</th>
+          <th scope="col">{escape(col_vendor)}</th>
+          <th scope="col">{escape(score_col)}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {"".join(rows)}
+      </tbody>
+    </table>
+  </div>
+  <p class="arena-note">
+    {escape(note_prefix)}
+    <a href="{page_href}" target="_blank" rel="noopener noreferrer">Arena AI</a>
+    · {escape(not_ours)}
+  </p>
+</section>
+""".strip()
+
+
+def _render_arena_page(
+    lang: str,
+    site: SiteConfig,
+    boards: list[ArenaLeaderboard],
+) -> str:
+    if lang == "en":
+        links = _links_root("en", lang_other="zh/arena.html")
+        heading = "Leaderboard"
+        intro = (
+            "Arena AI leaderboards (community mirror), refreshed on each site build. "
+            "Dates in titles are Arena's last update (scores keep changing). "
+            "Media boards show Elo; Agent shows Net Improvement."
+        )
+        empty = "Leaderboard data is unavailable right now."
+    else:
+        links = _links_root("zh", lang_other="../arena.html")
+        heading = "排行榜"
+        intro = (
+            "Arena AI 排行榜（社区镜像），站点每次构建时刷新。"
+            "标题中的日期为 Arena 侧最近更新日（分数会持续变动）。"
+            "媒体榜为评分（Elo）；Agent 榜展示净提升（Net Improvement）。"
+        )
+        empty = "当前暂无排行榜数据。"
+
+    if boards:
+        body = "\n".join(_render_arena_board_section(b, lang) for b in boards)
+    else:
+        body = f'<p class="muted">{escape(empty)}</p>'
+
+    return _shell(
+        title=f"{SITE_NAME_EN} — {heading}",
+        css_href=links.css,
+        lang=lang,
+        description=_page_description(lang),
+        body=f"""
+<div class="site">
+<header class="site-header">
+  <div class="brand-block">
+    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
+    {_brand_sub(lang)}
+  </div>
+  {_main_nav(lang, links)}
+  <h1 class="page-title">{escape(heading)}</h1>
+  <p class="meta arena-page-intro">{escape(intro)}</p>
+</header>
+<main class="feed arena-page">
+  {body}
 </main>
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
@@ -715,7 +901,10 @@ def _render_privacy(lang: str, site: SiteConfig) -> str:
     )
 
 
-def _render_empty_home(lang: str, site: SiteConfig) -> str:
+def _render_empty_home(
+    lang: str,
+    site: SiteConfig,
+) -> str:
     if lang == "en":
         links = _links_root("en", lang_other="zh/index.html")
         msg = "No digests published yet. Run publish then build."
@@ -743,7 +932,11 @@ def _render_empty_home(lang: str, site: SiteConfig) -> str:
     )
 
 
-def _render_missing_home(lang: str, day: date, site: SiteConfig) -> str:
+def _render_missing_home(
+    lang: str,
+    day: date,
+    site: SiteConfig,
+) -> str:
     day_s = day.isoformat()
     if lang == "en":
         links = _links_root("en", lang_other="zh/index.html")
@@ -974,6 +1167,71 @@ a:focus-visible {
   font-size: 0.95rem;
 }
 .page-title { margin-bottom: 1.25rem; }
+.arena {
+  padding: 1.2rem 1.15rem 1.15rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: soft-in 0.85s 0.05s ease both;
+}
+.arena-head h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 3.2vw, 1.4rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.25rem;
+}
+.arena-sub,
+.arena-page-intro {
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.arena-page-intro { margin-bottom: 1.25rem; }
+.arena-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 6px);
+}
+.arena-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.arena-table th,
+.arena-table td {
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.arena-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.arena-table tbody tr:last-child td { border-bottom: none; }
+.arena-rank,
+.arena-elo {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.arena-meta,
+.arena-note {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
 .feed {
   display: flex;
   flex-direction: column;
@@ -1146,7 +1404,7 @@ code {
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .site-header, .day-bar { animation: none; }
+  .site-header, .day-bar, .arena { animation: none; }
   .item, .archive-list li { transition: none; }
   .item:hover { transform: none; }
 }
@@ -1178,10 +1436,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     _parse_args(argv)
     config = load_app_config()
+    boards = fetch_arena_boards(config.leaderboard, config.http)
     build_site(
         content_dir=Path(config.paths.content_digests_dir),
         output_dir=Path(config.paths.site_output_dir),
         site=config.site,
+        arena_boards=boards,
     )
     print(f"[ai_hot] site built → {config.paths.site_output_dir}/")
     return 0

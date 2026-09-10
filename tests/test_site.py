@@ -143,6 +143,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'rel="sponsored' not in home
     assert "partner.example" not in home
     assert 'href="about.html"' in home
+    assert 'href="arena.html"' in home
+    assert ">Leaderboard<" in home
     assert 'href="privacy.html"' in home
     assert 'class="why"' not in home
     assert "hn score>=100" not in home
