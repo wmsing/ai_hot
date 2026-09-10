@@ -3,6 +3,8 @@
 个人向 **AI 垂直热点定时巡检**：HN + 官方/镜像 RSS → SQLite 去重 → `out/digest.md`（**UTC 当日累计**：同日只追加新 URL，条数单调不减；跨日重新起篇）。  
 静态站 **AI Hot Digest**（中文副标题「AI 热点摘要」）经 Cloudflare Workers（静态 Assets）发布。
 
+website: https://ai-hot.tonysingwm.workers.dev/
+
 ## Deploy
 ```bash
 source .venv/bin/activate
@@ -123,6 +125,7 @@ ruff check src && ruff format --check src
 | RSS | Google DeepMind Blog | [https://deepmind.google/blog/rss.xml](https://deepmind.google/blog/rss.xml)                                                                                                             |
 | RSS | Anthropic News（社区镜像） | [https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml](https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml) |
 | RSS | Hugging Face Blog    | [https://huggingface.co/blog/feed.xml](https://huggingface.co/blog/feed.xml)                                                                                                             |
+| RSS | NVIDIA AI Platforms  | [https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml](https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml)                                                         |
 | RSS | 量子位（关键词过滤）           | [https://www.qbitai.com/feed](https://www.qbitai.com/feed)                                                                                                                               |
 
 
