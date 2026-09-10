@@ -11,6 +11,7 @@ site:
   affiliate_enabled: true
   owner_name: "Tony"  # TODO: 填真实姓名或品牌名（About 页展示）
   contact_email: "tonysingwm@gmail.com"  # TODO: 填可公开联系邮箱（About / Privacy）
+  base_url: https://ai-hot.tonysingwm.workers.dev
 
 # Arena 独立页：构建时拉取指定榜（社区日更镜像）
 leaderboard:

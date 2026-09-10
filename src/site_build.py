@@ -67,6 +67,8 @@ def build_site(
     cfg = site if site is not None else SiteConfig()
     boards = arena_boards if arena_boards is not None else []
     days = _scan_days(content_dir)
+    origin = _origin(cfg)
+    sitemap_urls: list[str] = []
     if output_dir.exists():
         _clear_dir(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -81,19 +83,41 @@ def build_site(
         output_dir / "zh" / "archive" / "index.html",
         _render_archive_index(days, "zh", cfg),
     )
+    sitemap_urls.extend(
+        [
+            _abs_url(origin, "/archive/"),
+            _abs_url(origin, "/zh/archive/"),
+        ]
+    )
     _write(output_dir / "arena.html", _render_arena_page("en", cfg, boards))
     _write(output_dir / "zh" / "arena.html", _render_arena_page("zh", cfg, boards))
+    sitemap_urls.extend(
+        [_abs_url(origin, "/arena.html"), _abs_url(origin, "/zh/arena.html")]
+    )
     _write(output_dir / "disclosure.html", _render_disclosure("en", cfg))
     _write(output_dir / "zh" / "disclosure.html", _render_disclosure("zh", cfg))
     _write(output_dir / "about.html", _render_about("en", cfg))
     _write(output_dir / "zh" / "about.html", _render_about("zh", cfg))
     _write(output_dir / "privacy.html", _render_privacy("en", cfg))
     _write(output_dir / "zh" / "privacy.html", _render_privacy("zh", cfg))
+    sitemap_urls.extend(
+        [
+            _abs_url(origin, "/disclosure.html"),
+            _abs_url(origin, "/zh/disclosure.html"),
+            _abs_url(origin, "/about.html"),
+            _abs_url(origin, "/zh/about.html"),
+            _abs_url(origin, "/privacy.html"),
+            _abs_url(origin, "/zh/privacy.html"),
+        ]
+    )
 
     latest = days[0] if days else None
     if latest is None:
         _write(output_dir / "index.html", _render_empty_home("en", cfg))
         _write(output_dir / "zh" / "index.html", _render_empty_home("zh", cfg))
+        sitemap_urls.extend([_abs_url(origin, "/"), _abs_url(origin, "/zh/")])
+        _write_robots(output_dir, origin)
+        _write_sitemap(output_dir, sitemap_urls)
         return
 
     for idx, day_files in enumerate(days):
@@ -106,6 +130,9 @@ def build_site(
         # days 按新→旧；newer=更近一天，older=更早一天
         newer_day = days[idx - 1].day if idx > 0 else None
         older_day = days[idx + 1].day if idx + 1 < len(days) else None
+        newer_is_latest = newer_day == latest.day if newer_day else False
+        en_archive_path = f"/archive/{day_s}/"
+        zh_archive_path = f"/zh/archive/{day_s}/"
 
         if en_doc is not None:
             archive_page = _render_digest(
@@ -118,8 +145,10 @@ def build_site(
                 older_day=older_day,
                 newer_day=newer_day,
                 is_home=False,
+                newer_is_latest=newer_is_latest,
             )
             _write(output_dir / "archive" / day_s / "index.html", archive_page)
+            sitemap_urls.append(_abs_url(origin, en_archive_path))
             if is_latest:
                 home_page = _render_digest(
                     doc=en_doc,
@@ -131,13 +160,16 @@ def build_site(
                     older_day=older_day,
                     newer_day=None,
                     is_home=True,
+                    newer_is_latest=False,
                 )
                 _write(output_dir / "index.html", home_page)
+                sitemap_urls.append(_abs_url(origin, "/"))
         elif is_latest:
             _write(
                 output_dir / "index.html",
                 _render_missing_home("en", day_files.day, cfg),
             )
+            sitemap_urls.append(_abs_url(origin, "/"))
 
         if zh_doc is not None:
             archive_page = _render_digest(
@@ -150,11 +182,13 @@ def build_site(
                 older_day=older_day,
                 newer_day=newer_day,
                 is_home=False,
+                newer_is_latest=newer_is_latest,
             )
             _write(
                 output_dir / "zh" / "archive" / day_s / "index.html",
                 archive_page,
             )
+            sitemap_urls.append(_abs_url(origin, zh_archive_path))
             if is_latest:
                 home_page = _render_digest(
                     doc=zh_doc,
@@ -166,13 +200,19 @@ def build_site(
                     older_day=older_day,
                     newer_day=None,
                     is_home=True,
+                    newer_is_latest=False,
                 )
                 _write(output_dir / "zh" / "index.html", home_page)
+                sitemap_urls.append(_abs_url(origin, "/zh/"))
         elif is_latest:
             _write(
                 output_dir / "zh" / "index.html",
                 _render_missing_home("zh", day_files.day, cfg),
             )
+            sitemap_urls.append(_abs_url(origin, "/zh/"))
+
+    _write_robots(output_dir, origin)
+    _write_sitemap(output_dir, sitemap_urls)
 
 
 def _make_links(
@@ -384,6 +424,102 @@ def _page_description(lang: str) -> str:
     return SITE_TAGLINE_ZH if lang == "zh" else SITE_TAGLINE_EN
 
 
+def _digest_description(lang: str, day: date, selected: int) -> str:
+    day_s = day.isoformat()
+    if lang == "en":
+        return (
+            f"AI Hot Digest for {day_s}: {selected} AI highlights from "
+            "Hacker News and official feeds."
+        )
+    return (
+        f"AI 热点摘要 {day_s}：精选 {selected} 条来自 Hacker News 与官方源的 AI 资讯。"
+    )
+
+
+def _static_description(page: str, lang: str) -> str:
+    """page: home|archive|arena|about|privacy|disclosure|empty|missing"""
+    en = {
+        "home": SITE_TAGLINE_EN,
+        "archive": "Browse archived daily AI Hot Digests by date.",
+        "arena": "AI model leaderboards from Arena.ai (third-party scores).",
+        "about": "About AI Hot Digest — personal AI news curation from HN and RSS.",
+        "privacy": "Privacy policy for the AI Hot Digest static site.",
+        "disclosure": "Affiliate disclosure for AI Hot Digest.",
+        "empty": "AI Hot Digest — no digests published yet.",
+        "missing": "AI Hot Digest — latest day content is temporarily unavailable.",
+    }
+    zh = {
+        "home": SITE_TAGLINE_ZH,
+        "archive": "按日期浏览 AI 热点摘要归档。",
+        "arena": "来自 Arena.ai 的 AI 模型榜（第三方数据）。",
+        "about": "关于 AI Hot Digest：个人维护的 HN 与 RSS AI 热点摘要。",
+        "privacy": "AI Hot Digest 静态站隐私说明。",
+        "disclosure": "AI Hot Digest 联盟推广披露说明。",
+        "empty": "AI Hot Digest — 暂无摘要。",
+        "missing": "AI Hot Digest — 最新日内容暂不可用。",
+    }
+    table = zh if lang == "zh" else en
+    return table.get(page, _page_description(lang))
+
+
+def _origin(site: SiteConfig) -> str:
+    return site.base_url.rstrip("/")
+
+
+def _abs_url(origin: str, path: str) -> str:
+    text = path.strip()
+    if not text or text == "/":
+        return f"{origin}/"
+    if not text.startswith("/"):
+        text = "/" + text
+    return origin + text
+
+
+def _hreflang_pairs(
+    *,
+    en_path: str | None,
+    zh_path: str | None,
+    origin: str,
+) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    en_url = _abs_url(origin, en_path) if en_path is not None else None
+    zh_url = _abs_url(origin, zh_path) if zh_path is not None else None
+    if en_url:
+        pairs.append(("en", en_url))
+    if zh_url:
+        pairs.append(("zh-Hans", zh_url))
+    default = en_url or zh_url
+    if default:
+        pairs.append(("x-default", default))
+    return pairs
+
+
+def _write_robots(output_dir: Path, origin: str) -> None:
+    body = f"User-agent: *\nAllow: /\n\nSitemap: {origin}/sitemap.xml\n"
+    _write(output_dir / "robots.txt", body)
+
+
+def _write_sitemap(output_dir: Path, urls: list[str]) -> None:
+    # stable unique order
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            ordered.append(url)
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for url in ordered:
+        lines.append("  <url>")
+        lines.append(f"    <loc>{escape(url)}</loc>")
+        lines.append("  </url>")
+    lines.append("</urlset>")
+    lines.append("")
+    _write(output_dir / "sitemap.xml", "\n".join(lines))
+
+
 def _favicon_href(css_href: str) -> str:
     return css_href.replace("styles.css", "favicon.svg")
 
@@ -419,7 +555,6 @@ def _render_digest(
     is_home: bool = False,
     newer_is_latest: bool = False,
 ) -> str:
-    del has_other_lang  # encoded in links.lang_other
     day_s = day.isoformat()
     gen = escape(doc.generated_at) if doc.generated_at else "—"
     selected = doc.selected if doc.selected is not None else len(doc.items)
@@ -447,11 +582,22 @@ def _render_digest(
         newer_is_latest=newer_is_latest,
     )
 
+    origin = _origin(site)
+    if is_home:
+        en_path, zh_path = "/", "/zh/"
+    else:
+        en_path, zh_path = f"/archive/{day_s}/", f"/zh/archive/{day_s}/"
+    canonical_path = en_path if lang == "en" else zh_path
+    en_hl = en_path if lang == "en" or has_other_lang else None
+    zh_hl = zh_path if lang == "zh" or has_other_lang else None
+
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
         lang=lang,
-        description=_page_description(lang),
+        description=_digest_description(lang, day, selected),
+        canonical=_abs_url(origin, canonical_path),
+        hreflang=_hreflang_pairs(en_path=en_hl, zh_path=zh_hl, origin=origin),
         body=f"""
 <div class="site">
 <header class="site-header">
@@ -672,11 +818,15 @@ def _render_arena_page(
     else:
         body = f'<p class="muted">{escape(empty)}</p>'
 
+    origin = _origin(site)
+    en_path, zh_path = "/arena.html", "/zh/arena.html"
     return _shell(
         title=f"{SITE_NAME_EN} — {heading}",
         css_href=links.css,
         lang=lang,
-        description=_page_description(lang),
+        description=_static_description("arena", lang),
+        canonical=_abs_url(origin, en_path if lang == "en" else zh_path),
+        hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
 <header class="site-header">
@@ -731,7 +881,7 @@ def _render_item(
     published_disp = _display_published(item.published)
     if published_disp:
         meta_bits.append(
-            f'<span>{escape(labels["published"])}: {escape(published_disp)}</span>'
+            f"<span>{escape(labels['published'])}: {escape(published_disp)}</span>"
         )
     score_disp = _display_score_line(item.score_line)
     if score_disp:
@@ -830,11 +980,15 @@ def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> 
         rows.append("</ul>")
         lis = "\n".join(rows)
 
+    origin = _origin(site)
+    en_path, zh_path = "/archive/", "/zh/archive/"
     return _shell(
         title=f"{SITE_NAME_EN} — {heading}",
         css_href=links.css,
         lang=lang,
-        description=_page_description(lang),
+        description=_static_description("archive", lang),
+        canonical=_abs_url(origin, en_path if lang == "en" else zh_path),
+        hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
 <header class="site-header">
@@ -859,12 +1013,18 @@ def _static_page_shell(
     site: SiteConfig,
     heading: str,
     body_text: str,
+    page_key: str,
+    en_path: str,
+    zh_path: str,
 ) -> str:
+    origin = _origin(site)
     return _shell(
         title=f"{SITE_NAME_EN} — {heading}",
         css_href=links.css,
         lang=lang,
-        description=_page_description(lang),
+        description=_static_description(page_key, lang),
+        canonical=_abs_url(origin, en_path if lang == "en" else zh_path),
+        hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
 <header class="site-header">
@@ -922,6 +1082,9 @@ def _render_disclosure(lang: str, site: SiteConfig) -> str:
         site=site,
         heading=heading,
         body_text=body_text,
+        page_key="disclosure",
+        en_path="/disclosure.html",
+        zh_path="/zh/disclosure.html",
     )
 
 
@@ -956,6 +1119,9 @@ def _render_about(lang: str, site: SiteConfig) -> str:
         site=site,
         heading=heading,
         body_text=body_text,
+        page_key="about",
+        en_path="/about.html",
+        zh_path="/zh/about.html",
     )
 
 
@@ -995,6 +1161,9 @@ def _render_privacy(lang: str, site: SiteConfig) -> str:
         site=site,
         heading=heading,
         body_text=body_text,
+        page_key="privacy",
+        en_path="/privacy.html",
+        zh_path="/zh/privacy.html",
     )
 
 
@@ -1008,11 +1177,15 @@ def _render_empty_home(
     else:
         links = _links_root("zh", lang_other="../index.html")
         msg = "尚无已发布摘要。请先 publish 再 build。"
+    origin = _origin(site)
+    en_path, zh_path = "/", "/zh/"
     return _shell(
         title=SITE_NAME_EN,
         css_href=links.css,
         lang=lang,
-        description=_page_description(lang),
+        description=_static_description("empty", lang),
+        canonical=_abs_url(origin, en_path if lang == "en" else zh_path),
+        hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
 <header class="site-header">
@@ -1041,11 +1214,15 @@ def _render_missing_home(
     else:
         links = _links_root("zh", lang_other="../index.html")
         msg = f"{day_s} 的中文摘要缺失。"
+    origin = _origin(site)
+    en_path, zh_path = "/", "/zh/"
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
         lang=lang,
-        description=_page_description(lang),
+        description=_static_description("missing", lang),
+        canonical=_abs_url(origin, en_path if lang == "en" else zh_path),
+        hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
 <header class="site-header">
@@ -1072,6 +1249,8 @@ def _shell(
     lang: str,
     body: str,
     description: str | None = None,
+    canonical: str | None = None,
+    hreflang: list[tuple[str, str]] | None = None,
 ) -> str:
     html_lang = "zh-Hans" if lang == "zh" else "en"
     desc = description if description is not None else _page_description(lang)
@@ -1082,6 +1261,16 @@ def _shell(
         "family=Literata:opsz,wght@7..72,400;600&amp;"
         "family=Source+Sans+3:wght@400;500;600&amp;display=swap"
     )
+    seo_links = ""
+    if canonical:
+        seo_links += f'\n  <link rel="canonical" href="{escape(canonical)}">'
+        seo_links += f'\n  <meta property="og:url" content="{escape(canonical)}">'
+    if hreflang:
+        for hlang, href in hreflang:
+            seo_links += (
+                f'\n  <link rel="alternate" hreflang="{escape(hlang)}" '
+                f'href="{escape(href)}">'
+            )
     return f"""<!DOCTYPE html>
 <html lang="{html_lang}">
 <head>
@@ -1094,6 +1283,7 @@ def _shell(
   <meta property="og:title" content="{escape(title)}">
   <meta property="og:description" content="{escape(desc)}">
   <meta property="og:type" content="website">
+{seo_links}
   <link rel="icon" href="{escape(favicon)}" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -179,6 +179,57 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "affiliate_enabled" in disclosure
 
 
+def test_build_site_seo(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    out = tmp_path / "public"
+    base = "https://example.test"
+    build_site(
+        content_dir=content,
+        output_dir=out,
+        site=SiteConfig(base_url=base),
+    )
+
+    robots = (out / "robots.txt").read_text(encoding="utf-8")
+    assert "User-agent: *" in robots
+    assert "Allow: /" in robots
+    assert f"Sitemap: {base}/sitemap.xml" in robots
+
+    sitemap = (out / "sitemap.xml").read_text(encoding="utf-8")
+    assert f"<loc>{base}/</loc>" in sitemap
+    assert f"<loc>{base}/zh/</loc>" in sitemap
+    assert f"<loc>{base}/archive/</loc>" in sitemap
+    assert f"<loc>{base}/archive/2026-09-10/</loc>" in sitemap
+    assert f"<loc>{base}/zh/archive/2026-09-10/</loc>" in sitemap
+    assert f"<loc>{base}/about.html</loc>" in sitemap
+    assert f"<loc>{base}/arena.html</loc>" in sitemap
+
+    home = (out / "index.html").read_text(encoding="utf-8")
+    assert 'rel="canonical" href="https://example.test/"' in home
+    assert 'hreflang="en" href="https://example.test/"' in home
+    assert 'hreflang="zh-Hans" href="https://example.test/zh/"' in home
+    assert 'hreflang="x-default" href="https://example.test/"' in home
+    assert (
+        'content="AI Hot Digest for 2026-09-10: 1 AI highlights from '
+        'Hacker News and official feeds."'
+    ) in home
+
+    about = (out / "about.html").read_text(encoding="utf-8")
+    assert 'rel="canonical" href="https://example.test/about.html"' in about
+    assert "About AI Hot Digest" in about
+    assert 'hreflang="zh-Hans" href="https://example.test/zh/about.html"' in about
+
+    arena = (out / "arena.html").read_text(encoding="utf-8")
+    assert "AI model leaderboards" in arena
+
+    archive_day = (out / "archive" / "2026-09-09" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'hreflang="zh-Hans" href="https://example.test/zh/archive/2026-09-09/"' in (
+        archive_day
+    )
+
+
 def test_build_site_affiliate_enabled(tmp_path: Path) -> None:
     content = tmp_path / "digests"
     _seed_digests(content)

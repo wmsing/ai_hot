@@ -56,11 +56,13 @@ class PathsConfig(BaseModel):
 
 
 class SiteConfig(BaseModel):
-    """静态站展示与联盟开关（非密钥）。"""
+    """静态站展示、SEO 与联盟开关（非密钥）。"""
 
     affiliate_enabled: bool = False
     owner_name: str = ""
     contact_email: str = ""
+    # sitemap / canonical / hreflang 用的站点根（无尾斜杠）
+    base_url: str = "https://ai-hot.tonysingwm.workers.dev"
 
 
 class LeaderboardConfig(BaseModel):
