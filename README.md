@@ -91,7 +91,7 @@ git push
 
 - 业务阈值 / RSS / 站点：`config.yaml`（可进 git）
 - 密钥 / 环境：`.env`（勿提交）
-- 静态站含 About / Privacy / Disclosure；联盟链接由 `site.affiliate_enabled` 控制（默认关）
+- 静态站含 About / Privacy / Disclosure；`site.affiliate_enabled` 已开。PartnerStack 前请在 `config.yaml` 填 `owner_name` / `contact_email` 后重新部署。
 - Anthropic 无官方 RSS，当前用社区镜像，可在 `config.yaml` 替换
 
 

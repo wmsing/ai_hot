@@ -6,11 +6,11 @@ paths:
   content_digests_dir: content/digests
   site_output_dir: public
 
-# 静态站：联盟默认关；owner/contact 空则 About/Privacy 用通用占位文案
+# 静态站 / PartnerStack：开联盟后 Disclosure 写佣金说明；owner/contact 务必填真名与邮箱
 site:
-  affiliate_enabled: false
-  owner_name: ""
-  contact_email: ""
+  affiliate_enabled: true
+  owner_name: ""  # TODO: 填真实姓名或品牌名（About 页展示）
+  contact_email: ""  # TODO: 填可公开联系邮箱（About / Privacy）
 
 hn:
   enabled: true
