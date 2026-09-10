@@ -5,14 +5,15 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from src.digest import write_digest
+from src.digest import load_hot_items, merge_by_url, same_utc_day, write_digest
 from src.http_client import build_client
 from src.keywords import matched_keyword, passes_keywords
 from src.models import AppConfig, FeedConfig, HotItem, OllamaConfig
-from src.ollama_client import summarize_item
+from src.ollama_client import summarize_item, translate_item_to_english
 from src.sources.hn import fetch_hn_candidates
 from src.sources.rss import fetch_rss_candidates
 from src.storage import ItemStore
+from src.textutil import contains_cjk
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,11 @@ def run_once(
     *,
     llm_model: str | None = None,
 ) -> list[HotItem]:
-    """执行一次巡检，返回本轮入选条目。
+    """执行一次巡检，返回当日累计 digest 条目。
 
     llm_model 为 None → 模式 A（RSS/AskHN 原生简介）。
-    有值 → 模式 B（对入选条目用 Ollama 生成简介）。
+    有值 → 模式 B（对本轮新条目用 Ollama 生成简介）。
+    同 UTC 日会与已有 digest.md 按 URL 合并（旧在前、新追加）。
     """
     now = datetime.now(timezone.utc)
     store = ItemStore(config.paths.sqlite_path)
@@ -84,8 +86,16 @@ def run_once(
             ollama = config.ollama.model_copy(update={"model": llm_model})
             selected = _enrich_with_llm(selected, ollama)
 
+        # digest.md 默认英文：含汉字的 title/summary 用 Ollama 译成英文
+        selected = _translate_cjk_fields_to_english(selected, config.ollama)
+
         for item in selected:
             store.upsert_seen(item, now=now)
+
+        # UTC 当日累计：旧条目保留，本轮新 URL 追加
+        prev_at, prev_items = load_hot_items(config.paths.digest_path)
+        if prev_at is not None and same_utc_day(prev_at, now):
+            selected = merge_by_url(prev_items, selected)
 
         write_digest(config.paths.digest_path, selected, generated_at=now)
         logger.info(
@@ -109,3 +119,31 @@ def _enrich_with_llm(items: list[HotItem], ollama: OllamaConfig) -> list[HotItem
             logger.warning("llm summarize failed source=%s err=%s", item.source, exc)
             enriched.append(item)
     return enriched
+
+
+def _needs_english_fields(item: HotItem) -> bool:
+    if contains_cjk(item.title):
+        return True
+    if item.summary and contains_cjk(item.summary):
+        return True
+    return False
+
+
+def _translate_cjk_fields_to_english(
+    items: list[HotItem], ollama: OllamaConfig
+) -> list[HotItem]:
+    out: list[HotItem] = []
+    for item in items:
+        if not _needs_english_fields(item):
+            out.append(item)
+            continue
+        try:
+            title_en, summary_en = translate_item_to_english(item, ollama)
+            updates: dict[str, str | None] = {"title": title_en}
+            if summary_en is not None:
+                updates["summary"] = summary_en
+            out.append(item.model_copy(update=updates))
+        except Exception as exc:
+            logger.warning("llm to-en failed source=%s err=%s", item.source, exc)
+            out.append(item)
+    return out

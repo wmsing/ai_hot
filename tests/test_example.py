@@ -8,7 +8,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.digest import write_digest
+from src.digest import (
+    load_hot_items,
+    merge_by_url,
+    same_utc_day,
+    write_digest,
+)
 from src.models import HotItem
 from src.normalize import normalize_url, title_key
 from src.storage import ItemStore
@@ -88,6 +93,84 @@ def test_write_digest(tmp_path: Path) -> None:
     assert "published: n/a" in text
 
 
+def test_merge_by_url_appends_and_dedupes() -> None:
+    existing = [
+        HotItem(source="hn", title="A", url="https://example.com/a", reason="r1"),
+        HotItem(source="hn", title="B", url="https://example.com/b", reason="r2"),
+    ]
+    new = [
+        HotItem(source="hn", title="B dup", url="https://example.com/b", reason="r2"),
+        HotItem(source="rss:x", title="C", url="https://example.com/c", reason="r3"),
+    ]
+    merged = merge_by_url(existing, new)
+    assert [i.url for i in merged] == [
+        "https://example.com/a",
+        "https://example.com/b",
+        "https://example.com/c",
+    ]
+    assert len(merged) >= len(existing)
+
+
+def test_same_utc_day() -> None:
+    day = datetime(2026, 9, 10, 1, 0, 0, tzinfo=timezone.utc)
+    assert same_utc_day(day, datetime(2026, 9, 10, 23, 0, 0, tzinfo=timezone.utc))
+    assert not same_utc_day(day, datetime(2026, 9, 11, 0, 0, 0, tzinfo=timezone.utc))
+
+
+def test_load_and_merge_roundtrip(tmp_path: Path) -> None:
+    path = tmp_path / "digest.md"
+    t0 = datetime(2026, 9, 10, 8, 0, 0, tzinfo=timezone.utc)
+    write_digest(
+        path,
+        [
+            HotItem(
+                source="hn",
+                title="One",
+                url="https://example.com/1",
+                score=100,
+                comments=20,
+                summary="first",
+                published_at=t0,
+                reason="r1",
+            ),
+            HotItem(
+                source="rss:openai",
+                title="Two",
+                url="https://example.com/2",
+                summary="second",
+                reason="r2",
+            ),
+        ],
+        generated_at=t0,
+    )
+    prev_at, prev_items = load_hot_items(path)
+    assert prev_at is not None
+    assert same_utc_day(prev_at, t0)
+    assert len(prev_items) == 2
+
+    new = [
+        HotItem(
+            source="hn",
+            title="Two again",
+            url="https://example.com/2",
+            reason="dup",
+        ),
+        HotItem(
+            source="hn",
+            title="Three",
+            url="https://example.com/3",
+            score=150,
+            comments=40,
+            reason="r3",
+        ),
+    ]
+    merged = merge_by_url(prev_items, new)
+    assert len(merged) == 3
+    assert merged[-1].url == "https://example.com/3"
+    assert merged[0].summary == "first"
+    assert merged[0].score == 100
+
+
 def test_digest_includes_published(tmp_path: Path) -> None:
     path = tmp_path / "digest.md"
     write_digest(
@@ -140,11 +223,57 @@ def test_resolve_llm_model() -> None:
     assert resolve_llm_model("qwen3:8b", "qwen3:4b-instruct") == "qwen3:8b"
 
 
-def test_strip_html_truncate() -> None:
-    from src.textutil import strip_html, truncate
+def test_contains_cjk() -> None:
+    from src.textutil import contains_cjk
 
-    assert strip_html("<p>Hello <b>World</b></p>") == "Hello World"
-    assert truncate("abcd", 3) == "ab…"
+    assert contains_cjk("实测星火X2.5")
+    assert contains_cjk("Hello 世界")
+    assert not contains_cjk("SkyProduction MiniMax")
+
+
+def test_translate_cjk_fields_to_english_mocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.models import OllamaConfig
+    from src.pipeline import _translate_cjk_fields_to_english
+
+    items = [
+        HotItem(
+            source="rss:qbitai",
+            title="实测星火X2.5：手搓粒子月亮",
+            url="https://example.com/a",
+            summary="赶上了API限时五折",
+            reason="rss_new feed=qbitai",
+        ),
+        HotItem(
+            source="rss:openai",
+            title="An Alien Mind",
+            url="https://example.com/b",
+            summary="English already",
+            reason="rss_new feed=openai",
+        ),
+    ]
+
+    def _fake(item: HotItem, ollama: OllamaConfig) -> tuple[str, str | None]:
+        assert "星火" in item.title
+        return ("Hands-on Spark X2.5", "API half-price promo")
+
+    monkeypatch.setattr("src.pipeline.translate_item_to_english", _fake)
+    out = _translate_cjk_fields_to_english(items, OllamaConfig())
+    assert out[0].title == "Hands-on Spark X2.5"
+    assert out[0].summary == "API half-price promo"
+    assert out[1].title == "An Alien Mind"
+    assert out[1].summary == "English already"
+
+
+def test_parse_title_summary() -> None:
+    from src.ollama_client import _parse_title_summary
+
+    title, summary = _parse_title_summary(
+        "TITLE: Hello World\nSUMMARY: A short blurb.\n"
+    )
+    assert title == "Hello World"
+    assert summary == "A short blurb."
 
 
 def test_qbitai_keyword_filter() -> None:

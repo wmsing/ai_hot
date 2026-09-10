@@ -59,3 +59,48 @@ def summarize_item(item: HotItem, ollama: OllamaConfig) -> str:
     )
     logger.info("llm summarize source=%s title=%s", item.source, item.title[:60])
     return ollama_chat(system=_SUMMARY_SYSTEM, user=user, ollama=ollama)
+
+
+_TO_EN_SYSTEM = """You translate Chinese AI/tech news fields into English for a digest.
+Rules:
+1. Output exactly two lines in this format (no other text):
+TITLE: <English title>
+SUMMARY: <English summary; one or two short sentences; use n/a if input summary empty>
+2. Keep product names (MiniMax, OpenAI, etc.) recognizable
+3. No markdown, no quotes around the whole line"""
+
+
+def translate_item_to_english(
+    item: HotItem, ollama: OllamaConfig
+) -> tuple[str, str | None]:
+    """把条目 title/summary 译成英文，返回 (title, summary)。"""
+    summary_in = item.summary.strip() if item.summary else ""
+    user = (
+        f"Title: {item.title}\n"
+        f"Summary: {summary_in or '(none)'}\n"
+        f"Source: {item.source}\n"
+    )
+    logger.info("llm to-en source=%s title=%s", item.source, item.title[:60])
+    raw = ollama_chat(system=_TO_EN_SYSTEM, user=user, ollama=ollama)
+    title_out, summary_out = _parse_title_summary(raw)
+    if not title_out:
+        raise RuntimeError(f"ollama to-en missing TITLE: {raw[:120]!r}")
+    if not summary_in:
+        return title_out, None
+    cleaned = summary_out.strip()
+    if cleaned.lower() in {"", "n/a", "(none)", "none"}:
+        raise RuntimeError(f"ollama to-en missing SUMMARY: {raw[:120]!r}")
+    return title_out, cleaned
+
+
+def _parse_title_summary(raw: str) -> tuple[str, str]:
+    title = ""
+    summary = ""
+    for line in raw.splitlines():
+        stripped = line.strip()
+        upper = stripped.upper()
+        if upper.startswith("TITLE:"):
+            title = stripped.split(":", 1)[1].strip()
+        elif upper.startswith("SUMMARY:"):
+            summary = stripped.split(":", 1)[1].strip()
+    return title, summary

@@ -20,6 +20,12 @@ class _StripHTML(HTMLParser):
 
 
 _WS_RE = re.compile(r"\s+")
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def contains_cjk(text: str) -> bool:
+    """是否包含汉字（用于 digest 英文化判定）。"""
+    return _CJK_RE.search(text) is not None
 
 
 def strip_html(raw: str) -> str:
