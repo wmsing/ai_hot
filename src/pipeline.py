@@ -6,14 +6,14 @@ import logging
 from datetime import datetime, timezone
 
 from src.digest import load_hot_items, merge_by_url, same_utc_day, write_digest
+from src.digest_en import translate_cjk_fields_to_english
 from src.http_client import build_client
 from src.keywords import matched_keyword, passes_keywords
 from src.models import AppConfig, FeedConfig, HotItem, OllamaConfig
-from src.ollama_client import summarize_item, translate_item_to_english
+from src.ollama_client import summarize_item
 from src.sources.hn import fetch_hn_candidates
 from src.sources.rss import fetch_rss_candidates
 from src.storage import ItemStore
-from src.textutil import contains_cjk
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def run_once(
             selected = _enrich_with_llm(selected, ollama)
 
         # digest.md 默认英文：含汉字的 title/summary 用 Ollama 译成英文
-        selected = _translate_cjk_fields_to_english(selected, config.ollama)
+        selected = translate_cjk_fields_to_english(selected, config.ollama)
 
         for item in selected:
             store.upsert_seen(item, now=now)
@@ -119,31 +119,3 @@ def _enrich_with_llm(items: list[HotItem], ollama: OllamaConfig) -> list[HotItem
             logger.warning("llm summarize failed source=%s err=%s", item.source, exc)
             enriched.append(item)
     return enriched
-
-
-def _needs_english_fields(item: HotItem) -> bool:
-    if contains_cjk(item.title):
-        return True
-    if item.summary and contains_cjk(item.summary):
-        return True
-    return False
-
-
-def _translate_cjk_fields_to_english(
-    items: list[HotItem], ollama: OllamaConfig
-) -> list[HotItem]:
-    out: list[HotItem] = []
-    for item in items:
-        if not _needs_english_fields(item):
-            out.append(item)
-            continue
-        try:
-            title_en, summary_en = translate_item_to_english(item, ollama)
-            updates: dict[str, str | None] = {"title": title_en}
-            if summary_en is not None:
-                updates["summary"] = summary_en
-            out.append(item.model_copy(update=updates))
-        except Exception as exc:
-            logger.warning("llm to-en failed source=%s err=%s", item.source, exc)
-            out.append(item)
-    return out

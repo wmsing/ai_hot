@@ -28,6 +28,9 @@ python -m src.main
 python -m src.main --llm qwen
 # 查看：out/digest.md ，库：data/ai_hot.db
 
+# 仅把 digest.md 里残留中文 title/summary 译成英文（不重新抓取）
+python -m src.digest_en
+
 # 本地 Ollama（默认 qwen3:4b-instruct）把英文 digest 译成中文
 python -m src.translate
 # 查看：out/digest.zh.md

@@ -234,8 +234,8 @@ def test_contains_cjk() -> None:
 def test_translate_cjk_fields_to_english_mocked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from src.digest_en import translate_cjk_fields_to_english
     from src.models import OllamaConfig
-    from src.pipeline import _translate_cjk_fields_to_english
 
     items = [
         HotItem(
@@ -258,12 +258,57 @@ def test_translate_cjk_fields_to_english_mocked(
         assert "星火" in item.title
         return ("Hands-on Spark X2.5", "API half-price promo")
 
-    monkeypatch.setattr("src.pipeline.translate_item_to_english", _fake)
-    out = _translate_cjk_fields_to_english(items, OllamaConfig())
+    monkeypatch.setattr("src.digest_en.translate_item_to_english", _fake)
+    out = translate_cjk_fields_to_english(items, OllamaConfig())
     assert out[0].title == "Hands-on Spark X2.5"
     assert out[0].summary == "API half-price promo"
     assert out[1].title == "An Alien Mind"
     assert out[1].summary == "English already"
+
+
+def test_rewrite_digest_english_mocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.digest_en import rewrite_digest_english
+    from src.models import AppConfig, OllamaConfig, PathsConfig
+
+    path = tmp_path / "digest.md"
+    write_digest(
+        path,
+        [
+            HotItem(
+                source="rss:qbitai",
+                title="实测星火",
+                url="https://example.com/a",
+                summary="限时五折",
+                reason="r",
+            ),
+            HotItem(
+                source="hn",
+                title="Hello",
+                url="https://example.com/b",
+                summary="ok",
+                reason="r",
+            ),
+        ],
+        generated_at=datetime(2026, 9, 10, 8, 0, 0, tzinfo=timezone.utc),
+    )
+
+    def _fake(item: HotItem, ollama: OllamaConfig) -> tuple[str, str | None]:
+        return ("Spark hands-on", "Half-price API")
+
+    monkeypatch.setattr("src.digest_en.translate_item_to_english", _fake)
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(path)),
+        ollama=OllamaConfig(),
+    )
+    out, n = rewrite_digest_english(cfg)
+    assert out == path
+    assert n == 1
+    text = path.read_text(encoding="utf-8")
+    assert "Spark hands-on" in text
+    assert "实测" not in text
+    assert "Hello" in text
 
 
 def test_parse_title_summary() -> None:
