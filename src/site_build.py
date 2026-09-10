@@ -644,7 +644,8 @@ def _feed_js() -> str:
     var base = btn.getAttribute("data-feed-base");
     if (!next || !base) return;
     btn.disabled = true;
-    fetch(base + "/" + next + ".html")
+    // Workers Assets 会把 *.html 规范成无扩展名路径（/feed/en/1）
+    fetch(base + "/" + next)
       .then(function (res) {
         if (!res.ok) throw new Error("feed fetch failed");
         return res.text();
