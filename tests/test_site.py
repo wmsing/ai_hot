@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import date
 from pathlib import Path
 
@@ -241,22 +240,22 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
     home = (out / "index.html").read_text(encoding="utf-8")
     assert "highlights · newest first" not in home
     assert 'id="load-more"' in home
-    assert 'data-feed-base="feed/en"' in home
+    assert 'data-feed-base="/feed/en"' in home
     assert 'data-next="1"' in home
     assert home.count('class="item"') == 20
     assert home.count('class="feed-day-sticky"') == 1
     assert 'data-day="2026-09-10"' in home
-    page1 = (out / "feed" / "en" / "1.json").read_text(encoding="utf-8")
-    data = json.loads(page1)
-    assert data["next"] is None
-    assert data["html"].count('class="item"') == 15
-    assert 'class="feed-day-sticky"' not in data["html"]
-    assert "Title" in data["html"]
+    page1 = (out / "feed" / "en" / "1.html").read_text(encoding="utf-8")
+    assert 'class="feed-chunk"' in page1
+    assert 'data-next=""' in page1
+    assert page1.count('class="item"') == 15
+    assert 'class="feed-day-sticky"' not in page1
+    assert "Title" in page1
 
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert "条 · 新在前" not in zh_home
-    assert 'data-feed-base="../feed/zh"' in zh_home
-    assert (out / "feed" / "zh" / "1.json").is_file()
+    assert 'data-feed-base="/feed/zh"' in zh_home
+    assert (out / "feed" / "zh" / "1.html").is_file()
 
 
 def test_build_site_home_sticky_by_day(tmp_path: Path) -> None:

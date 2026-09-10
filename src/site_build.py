@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from dataclasses import dataclass
@@ -610,7 +609,7 @@ def _write_feed_json_pages(
     items: list[TimelineEntry],
     affiliate_enabled: bool,
 ) -> None:
-    """page 0 在首页 HTML；从 1 起写 feed/{lang}/{n}.json。"""
+    """page 0 在首页 HTML；从 1 起写 feed/{lang}/{n}.html 分片。"""
     if len(items) <= HOME_PAGE_SIZE:
         return
     feed_dir = output_dir / "feed" / lang
@@ -619,18 +618,19 @@ def _write_feed_json_pages(
         start = page_i * HOME_PAGE_SIZE
         chunk = items[start : start + HOME_PAGE_SIZE]
         prev_day = items[start - 1].group_day
-        html = _render_timeline_html(
+        inner = _render_timeline_html(
             chunk,
             lang,
             affiliate_enabled=affiliate_enabled,
             prev_day=prev_day,
         )
         next_page: int | None = page_i + 1 if page_i + 1 < page_count else None
-        payload = {"html": html, "next": next_page}
-        _write(
-            feed_dir / f"{page_i}.json",
-            json.dumps(payload, ensure_ascii=False),
+        next_attr = "" if next_page is None else str(next_page)
+        html = (
+            f'<div class="feed-chunk" data-next="{escape(next_attr)}">'
+            f"{inner}</div>\n"
         )
+        _write(feed_dir / f"{page_i}.html", html)
 
 
 def _feed_js() -> str:
@@ -644,17 +644,22 @@ def _feed_js() -> str:
     var base = btn.getAttribute("data-feed-base");
     if (!next || !base) return;
     btn.disabled = true;
-    fetch(base + "/" + next + ".json")
+    fetch(base + "/" + next + ".html")
       .then(function (res) {
         if (!res.ok) throw new Error("feed fetch failed");
-        return res.json();
+        return res.text();
       })
-      .then(function (data) {
-        feed.insertAdjacentHTML("beforeend", data.html || "");
-        if (data.next == null) {
+      .then(function (text) {
+        var wrap = document.createElement("div");
+        wrap.innerHTML = text;
+        var chunk = wrap.querySelector(".feed-chunk");
+        if (!chunk) throw new Error("feed chunk missing");
+        feed.insertAdjacentHTML("beforeend", chunk.innerHTML);
+        var more = chunk.getAttribute("data-next");
+        if (!more) {
           btn.remove();
         } else {
-          btn.setAttribute("data-next", String(data.next));
+          btn.setAttribute("data-next", more);
           btn.disabled = false;
         }
       })
@@ -775,11 +780,11 @@ def _render_home_timeline(
     has_more = total > HOME_PAGE_SIZE
     if lang == "en":
         load_l = "Load more"
-        feed_base = "feed/en"
+        feed_base = "/feed/en"
         script_src = "feed.js"
     else:
         load_l = "加载更多"
-        feed_base = "../feed/zh"
+        feed_base = "/feed/zh"
         script_src = "../feed.js"
 
     items_html = _render_timeline_html(
