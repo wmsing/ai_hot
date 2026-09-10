@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 _SYSTEM = """你是技术资讯翻译。将用户给出的英文 Markdown digest 译成简体中文。
 硬性规则：
 1. 保持 Markdown 结构（标题层级、列表、空行）不变
-2. URL、代码、source 反引号内的标识不要改
-3. published 行的 ISO 时间戳原样保留，不要翻译或改时区写法
+2. URL、代码、source 反引号内的标识、image 行的图片 URL 不要改
+3. published 行的时间（如 2026-09-10 01:00 UTC 或旧 ISO）原样保留，不要翻译或改时区写法
 4. 专有名词可保留英文（如 OpenAI、Hacker News），其余用通顺中文
 5. 只输出译后的 Markdown 全文，不要前言后语"""
 

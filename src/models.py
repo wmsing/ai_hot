@@ -18,6 +18,7 @@ class HotItem(BaseModel):
     score: int | None = None
     comments: int | None = None
     summary: str | None = None
+    image_url: str | None = None
     published_at: datetime | None = None
     reason: str = ""
     fetched_at: datetime = Field(default_factory=utc_now)
@@ -74,6 +75,7 @@ class DigestItem(BaseModel):
     summary: str = ""
     reason: str = ""
     affiliate_url: str = ""
+    image_url: str = ""
 
 
 class DigestDocument(BaseModel):

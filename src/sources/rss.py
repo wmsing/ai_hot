@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import feedparser
@@ -13,6 +14,11 @@ from src.textutil import strip_html, truncate
 from src.timeutil import from_rss_entry
 
 logger = logging.getLogger(__name__)
+
+_IMG_SRC_RE = re.compile(
+    r"""<img[^>]+src=["']([^"']+)["']""",
+    re.IGNORECASE,
+)
 
 
 def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
@@ -49,6 +55,7 @@ def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
                     score=None,
                     comments=None,
                     summary=_entry_summary(entry),
+                    image_url=_entry_image(entry),
                     published_at=from_rss_entry(entry),
                     reason=f"rss_new feed={feed.name}",
                 )
@@ -75,3 +82,62 @@ def _entry_summary(entry: Any) -> str | None:
     if not text:
         return None
     return truncate(text, 280)
+
+
+def _entry_image(entry: Any) -> str | None:
+    """从 media / enclosure / HTML 摘要里取首张可用图。"""
+    for thumb in getattr(entry, "media_thumbnail", None) or []:
+        url = _abs_http_url(_mapping_get(thumb, "url"))
+        if url:
+            return url
+    for media in getattr(entry, "media_content", None) or []:
+        medium = str(_mapping_get(media, "medium") or "")
+        typ = str(_mapping_get(media, "type") or "")
+        url = _abs_http_url(_mapping_get(media, "url"))
+        if url and (medium == "image" or typ.startswith("image/")):
+            return url
+        if url and _looks_like_image_url(url):
+            return url
+    for enc in getattr(entry, "enclosures", None) or []:
+        typ = str(_mapping_get(enc, "type") or "")
+        if typ.startswith("image/"):
+            url = _abs_http_url(_mapping_get(enc, "href") or _mapping_get(enc, "url"))
+            if url:
+                return url
+    html_bits: list[str] = []
+    summary = getattr(entry, "summary", None) or getattr(entry, "description", None)
+    if summary:
+        html_bits.append(str(summary))
+    for block in getattr(entry, "content", None) or []:
+        val = _mapping_get(block, "value")
+        if val:
+            html_bits.append(str(val))
+    for html in html_bits:
+        match = _IMG_SRC_RE.search(html)
+        if match:
+            url = _abs_http_url(match.group(1))
+            if url:
+                return url
+    return None
+
+
+def _mapping_get(obj: Any, key: str) -> Any:
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+def _abs_http_url(raw: Any) -> str | None:
+    text = str(raw or "").strip()
+    if text.startswith("//"):
+        text = "https:" + text
+    if text.startswith("http://") or text.startswith("https://"):
+        return text
+    return None
+
+
+def _looks_like_image_url(url: str) -> bool:
+    path = url.split("?", 1)[0].lower()
+    return path.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg"))

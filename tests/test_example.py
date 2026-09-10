@@ -88,9 +88,85 @@ def test_write_digest(tmp_path: Path) -> None:
     )
     text = path.read_text(encoding="utf-8")
     assert "Example" in text
-    assert "why: hn score>=100" in text
+    assert "why:" not in text
+    assert "score=120 | comments=30" in text
     assert "summary: n/a" in text
-    assert "published: n/a" in text
+    assert "published:" not in text
+
+
+def test_write_digest_omits_empty_score(tmp_path: Path) -> None:
+    path = tmp_path / "digest.md"
+    write_digest(
+        path,
+        [
+            HotItem(
+                source="rss:openai",
+                title="T",
+                url="https://example.com",
+                summary="blurb",
+                published_at=datetime(2026, 9, 10, 1, 58, 0, tzinfo=timezone.utc),
+                reason="rss_new feed=openai",
+            )
+        ],
+        generated_at=datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "published: 2026-09-10 01:00 UTC" in text
+    assert "score=" not in text
+    assert "why:" not in text
+
+
+def test_write_digest_includes_image(tmp_path: Path) -> None:
+    path = tmp_path / "digest.md"
+    write_digest(
+        path,
+        [
+            HotItem(
+                source="rss:google_ai",
+                title="T",
+                url="https://example.com",
+                image_url="https://cdn.example/a.webp",
+                summary="blurb",
+                reason="r",
+            )
+        ],
+        generated_at=datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "- image: https://cdn.example/a.webp" in text
+
+
+def test_entry_image_from_media_and_html() -> None:
+    from types import SimpleNamespace
+
+    from src.sources.rss import _entry_image
+
+    media_entry = SimpleNamespace(
+        media_thumbnail=[{"url": "https://cdn.example/thumb.jpg"}],
+        media_content=[],
+        enclosures=[],
+        summary="",
+        content=[],
+    )
+    assert _entry_image(media_entry) == "https://cdn.example/thumb.jpg"
+
+    html_entry = SimpleNamespace(
+        media_thumbnail=[],
+        media_content=[],
+        enclosures=[],
+        summary='<p><img src="https://cdn.example/from-html.png" /></p>',
+        content=[],
+    )
+    assert _entry_image(html_entry) == "https://cdn.example/from-html.png"
+
+    empty = SimpleNamespace(
+        media_thumbnail=[],
+        media_content=[],
+        enclosures=[],
+        summary="no image here",
+        content=[],
+    )
+    assert _entry_image(empty) is None
 
 
 def test_merge_by_url_appends_and_dedupes() -> None:
@@ -186,7 +262,7 @@ def test_digest_includes_published(tmp_path: Path) -> None:
         ],
         generated_at=datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
     )
-    assert "published: 2026-09-10T08:00:00+00:00" in path.read_text(encoding="utf-8")
+    assert "published: 2026-09-10 08:00 UTC" in path.read_text(encoding="utf-8")
 
 
 def test_from_unix() -> None:
@@ -194,7 +270,8 @@ def test_from_unix() -> None:
 
     dt = from_unix(1_725_955_200)
     assert dt is not None
-    assert format_published(dt).startswith("2024-")
+    assert format_published(dt).endswith("UTC")
+    assert format_published(dt).count(":") == 1
 
 
 def test_digest_includes_summary(tmp_path: Path) -> None:

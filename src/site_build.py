@@ -13,6 +13,7 @@ from pathlib import Path
 from src.config import load_app_config
 from src.models import DigestDocument, DigestItem, SiteConfig
 from src.site_parse import parse_digest_markdown
+from src.timeutil import format_published, parse_published
 
 _DIGEST_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(en|zh)\.md$")
 
@@ -430,9 +431,9 @@ def _render_item(
     affiliate_enabled: bool,
 ) -> str:
     labels = (
-        {"summary": "Summary", "why": "Why", "affiliate": "Affiliate offer"}
+        {"summary": "Summary", "affiliate": "Affiliate offer"}
         if lang == "en"
-        else {"summary": "摘要", "why": "原因", "affiliate": "联盟推荐"}
+        else {"summary": "摘要", "affiliate": "联盟推荐"}
     )
     title = escape(item.title)
     if item.url.strip():
@@ -446,17 +447,29 @@ def _render_item(
     meta_bits: list[str] = []
     if item.source:
         meta_bits.append(f'<span class="badge">{escape(item.source)}</span>')
-    if item.published:
-        meta_bits.append(f"<span>{escape(item.published)}</span>")
-    if item.score_line:
-        meta_bits.append(f"<span>{escape(item.score_line)}</span>")
+    published_disp = _display_published(item.published)
+    if published_disp:
+        meta_bits.append(f"<span>{escape(published_disp)}</span>")
+    score_disp = _display_score_line(item.score_line)
+    if score_disp:
+        meta_bits.append(f"<span>{escape(score_disp)}</span>")
 
     bits = [
         '<article class="item">',
         f'<span class="item-index" aria-hidden="true">{item.index:02d}</span>',
-        '<div class="item-body">',
-        f"<h2>{title_html}</h2>",
     ]
+    img = item.image_url.strip()
+    if img:
+        href = escape(item.url.strip() or img, quote=True)
+        src = escape(img, quote=True)
+        bits.append(
+            f'<a class="item-thumb" href="{href}" '
+            f'target="_blank" rel="noopener noreferrer">'
+            f'<img src="{src}" alt="" loading="lazy" '
+            f'referrerpolicy="no-referrer" decoding="async" /></a>'
+        )
+    bits.append('<div class="item-body">')
+    bits.append(f"<h2>{title_html}</h2>")
     if meta_bits:
         bits.append(f'<p class="item-meta">{" · ".join(meta_bits)}</p>')
     if item.summary:
@@ -464,11 +477,7 @@ def _render_item(
             f'<p class="summary"><span class="label">{labels["summary"]}</span> '
             f"{escape(item.summary)}</p>"
         )
-    if item.reason:
-        bits.append(
-            f'<p class="why"><span class="label">{labels["why"]}</span> '
-            f"{escape(item.reason)}</p>"
-        )
+    # Why / reason 不对读者展示
     aff = item.affiliate_url.strip()
     if affiliate_enabled and aff:
         bits.append(
@@ -478,6 +487,25 @@ def _render_item(
         )
     bits.extend(["</div>", "</article>"])
     return "\n".join(bits)
+
+
+def _display_published(raw: str) -> str:
+    text = raw.strip()
+    if not text or text.lower() == "n/a":
+        return ""
+    dt = parse_published(text)
+    if dt is None:
+        return text
+    return format_published(dt)
+
+
+def _display_score_line(raw: str) -> str:
+    text = raw.strip()
+    if not text:
+        return ""
+    if "n/a" in text.lower() and not re.search(r"\d", text):
+        return ""
+    return text
 
 
 def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> str:
@@ -760,8 +788,8 @@ def _shell(
     favicon = _favicon_href(css_href)
     fonts = (
         "https://fonts.googleapis.com/css2?"
-        "family=Bricolage+Grotesque:opsz,wght@12..96,600;700&amp;"
-        "family=Source+Serif+4:opsz,wght@8..60,400;600&amp;"
+        "family=Outfit:wght@500;600;700&amp;"
+        "family=Literata:opsz,wght@7..72,400;600&amp;"
         "family=Source+Sans+3:wght@400;500;600&amp;display=swap"
     )
     return f"""<!DOCTYPE html>
@@ -771,8 +799,8 @@ def _shell(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(title)}</title>
   <meta name="description" content="{escape(desc)}">
-  <meta name="theme-color" content="#eceff3" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#eef3f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1613" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="{escape(title)}">
   <meta property="og:description" content="{escape(desc)}">
   <meta property="og:type" content="website">
@@ -792,44 +820,43 @@ def _shell(
 def _favicon_svg() -> str:
     return """
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="6" fill="#1e3a5f"/>
-  <path fill="#eceff3"
-    d="M8 22V10h3.4c2.8 0 4.5 1.5 4.5 3.8 0 1.5-.8 2.7-2.2 3.3L17.2 22h-3.1
-       l-2.9-4.5H11V22H8zm3-7.2h.6c1.1 0 1.8-.6 1.8-1.5S12.7 12 11.6 12H11v2.8z"/>
+  <rect width="32" height="32" rx="10" fill="#1a3c32"/>
+  <circle cx="16" cy="16" r="6.5" stroke="#eef3f0" stroke-width="2.5"/>
 </svg>
 """.strip()
 
 
 def _stylesheet() -> str:
-    # Taste redesign: editorial digest; dials VARIANCE 8 / MOTION 6 / DENSITY 3
+    # Taste soft + ink green (墨绿); dials VARIANCE 5 / MOTION 3 / DENSITY 2
     return """
 :root {
-  --bg: #eceff3;
-  --bg-elev: #f6f7f9;
-  --ink: #16181d;
-  --muted: #5c6570;
-  --accent: #1e3a5f;
-  --accent-hot: #0f6e7c;
-  --line: #cfd5de;
-  --focus: #1e3a5f;
-  --shadow: 0 1px 0 rgba(22, 24, 29, 0.04);
-  --font-display: "Bricolage Grotesque", "Avenir Next", sans-serif;
-  --font-body: "Source Serif 4", "Palatino Linotype", serif;
+  --bg: #eef3f0;
+  --bg-elev: #f7faf8;
+  --ink: #14201b;
+  --muted: #5a6b63;
+  --accent: #1a3c32;
+  --accent-hot: #245246;
+  --line: #d2ddd6;
+  --focus: #1a3c32;
+  --shadow: 0 8px 28px rgba(20, 32, 27, 0.07);
+  --radius: 16px;
+  --font-display: "Outfit", "Avenir Next", sans-serif;
+  --font-body: "Literata", "Palatino Linotype", serif;
   --font-ui: "Source Sans 3", "Segoe UI", sans-serif;
-  --pad: clamp(1.25rem, 4vw, 2rem);
-  --max: 42rem;
+  --pad: clamp(1.5rem, 5vw, 2.5rem);
+  --max: 44rem;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12151a;
-    --bg-elev: #1a1e26;
-    --ink: #e8ecf1;
-    --muted: #9aa3ad;
-    --accent: #8eb4e0;
-    --accent-hot: #5ec4c8;
-    --line: #2c3340;
-    --focus: #8eb4e0;
-    --shadow: none;
+    --bg: #0f1613;
+    --bg-elev: #17201c;
+    --ink: #e4ebe7;
+    --muted: #95a59d;
+    --accent: #7eb39f;
+    --accent-hot: #96c7b4;
+    --line: #2a3832;
+    --focus: #7eb39f;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   }
 }
 * { box-sizing: border-box; }
@@ -838,48 +865,46 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: var(--font-ui);
+  font-size: 1.0625rem;
   background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--accent) 6%, var(--bg)) 0%,
-      var(--bg) 28%
+    radial-gradient(
+      ellipse 90% 55% at 50% -20%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 60%
     ),
     var(--bg);
   color: var(--ink);
-  line-height: 1.55;
+  line-height: 1.7;
 }
 .site {
   margin: 0 auto;
   max-width: var(--max);
-  padding: var(--pad) var(--pad) 3.5rem;
+  padding: var(--pad) var(--pad) 4rem;
 }
 a {
   color: var(--accent);
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
-  transition: color 0.2s ease, text-underline-offset 0.2s ease;
+  text-underline-offset: 0.2em;
+  transition: color 0.28s ease, opacity 0.28s ease;
 }
-a:hover {
-  color: var(--accent-hot);
-  text-underline-offset: 0.28em;
-}
+a:hover { color: var(--accent-hot); }
 a:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 .site-header {
-  margin-bottom: 1.75rem;
-  animation: rise 0.55s ease both;
+  margin-bottom: 2rem;
+  animation: soft-in 0.7s ease both;
 }
-.brand-block { margin-bottom: 1.1rem; }
+.brand-block { margin-bottom: 1.35rem; }
 .brand {
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 6vw, 2.85rem);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  margin: 0 0 0.4rem;
-  line-height: 1.05;
+  font-size: clamp(2.45rem, 7vw, 3.25rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.5rem;
+  line-height: 1.08;
 }
 .brand a {
   color: inherit;
@@ -890,30 +915,32 @@ a:focus-visible {
   margin: 0;
   max-width: 28rem;
   color: var(--muted);
-  font-size: 1.02rem;
-  font-weight: 500;
-  line-height: 1.4;
+  font-size: 1.18rem;
+  font-weight: 400;
+  line-height: 1.5;
 }
 .site-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.85rem 1.25rem;
+  gap: 0.9rem 1.35rem;
   align-items: center;
   justify-content: space-between;
-  margin: 0 0 1.5rem;
-  padding: 0.85rem 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  font-size: 0.9rem;
-  font-weight: 600;
+  margin: 0 0 1.75rem;
+  padding: 0.95rem 1.1rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: var(--shadow);
+  font-size: 1rem;
+  font-weight: 500;
 }
 .nav-primary {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.15rem;
+  gap: 0.8rem 1.2rem;
 }
 .nav-primary a {
-  color: var(--ink);
+  color: var(--muted);
   text-decoration: none;
 }
 .nav-primary a:hover { color: var(--accent-hot); }
@@ -925,57 +952,88 @@ a:focus-visible {
 .lang-current { color: var(--ink); font-weight: 600; }
 .lang-switch a { text-decoration: none; }
 .day-bar {
-  padding: 0.35rem 0 0;
-  animation: rise 0.65s 0.06s ease both;
+  padding: 1rem 1.15rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: soft-in 0.85s 0.08s ease both;
 }
 .day-bar h1,
 .page-title {
   font-family: var(--font-display);
-  font-size: clamp(1.35rem, 3.5vw, 1.65rem);
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
   font-weight: 600;
   letter-spacing: -0.02em;
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.3rem;
 }
 .day-bar .meta,
 .meta {
   margin: 0;
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.95rem;
 }
+.page-title { margin-bottom: 1.25rem; }
 .feed {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.95rem;
 }
 .item {
   display: grid;
-  grid-template-columns: 2.4rem 1fr;
-  gap: 0.65rem 0.9rem;
-  padding: 1.2rem 0;
-  border-bottom: 1px solid var(--line);
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 0.55rem 0.95rem;
+  padding: 1.3rem 1.25rem 1.35rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.3s ease;
 }
-.item:first-child { border-top: 1px solid var(--line); }
+.item:has(.item-thumb) {
+  grid-template-columns: 2.5rem 5.75rem 1fr;
+}
 .item:hover {
-  background: color-mix(in srgb, var(--bg-elev) 80%, transparent);
-  transform: translateX(2px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  box-shadow: 0 12px 32px rgba(20, 32, 27, 0.09);
+  transform: translateY(-2px);
 }
 .item-index {
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 600;
-  color: var(--accent-hot);
+  color: var(--accent);
   letter-spacing: -0.02em;
-  padding-top: 0.2rem;
+  padding-top: 0.3rem;
   font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.item-thumb {
+  display: block;
+  width: 5.75rem;
+  height: 5.75rem;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--line) 55%, transparent);
+  flex-shrink: 0;
+}
+.item-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .item-body { min-width: 0; }
 .item h2 {
   font-family: var(--font-body);
-  font-size: 1.12rem;
+  font-size: clamp(1.22rem, 2.5vw, 1.38rem);
   font-weight: 600;
-  margin: 0 0 0.45rem;
-  line-height: 1.35;
+  margin: 0 0 0.55rem;
+  line-height: 1.4;
   letter-spacing: -0.01em;
 }
 .item h2 a {
@@ -988,72 +1046,79 @@ a:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem 0.15rem;
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.75rem;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-family: var(--font-ui);
 }
 .badge {
   display: inline-block;
-  border: 1px solid var(--line);
-  background: var(--bg-elev);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
   color: var(--accent);
   border-radius: 999px;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.72rem;
+  padding: 0.16rem 0.6rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 .summary, .why, .affiliate {
-  margin: 0.4rem 0 0;
+  margin: 0.5rem 0 0;
   font-family: var(--font-body);
-  font-size: 0.98rem;
+  font-size: 1.12rem;
   color: var(--ink);
 }
 .why {
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.98rem;
   font-family: var(--font-ui);
 }
 .affiliate {
-  margin-top: 0.7rem;
-  padding-top: 0.65rem;
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
   border-top: 1px dashed var(--line);
-  font-size: 0.88rem;
+  font-size: 0.98rem;
   font-family: var(--font-ui);
   color: var(--muted);
 }
 .label {
   display: inline-block;
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent-hot);
+  letter-spacing: 0.05em;
+  color: var(--accent);
   margin-right: 0.4rem;
 }
 .muted { color: var(--muted); }
 .prose {
   font-family: var(--font-body);
-  font-size: 1.05rem;
+  font-size: 1.18rem;
 }
-.prose p { margin: 0 0 0.95rem; }
+.prose p { margin: 0 0 1rem; }
 .archive-list {
   list-style: none;
   margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--line);
+  padding: 0.35rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
 .archive-list li {
   margin: 0;
   border-bottom: 1px solid var(--line);
-  padding: 0.95rem 0.15rem;
+  padding: 0.95rem 1rem;
   line-height: 1.4;
-  transition: transform 0.2s ease;
+  transition: background-color 0.25s ease;
 }
-.archive-list li:hover { transform: translateX(2px); }
+.archive-list li:last-child { border-bottom: none; }
+.archive-list li:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
 .archive-list a {
   color: var(--ink);
   font-family: var(--font-display);
@@ -1063,8 +1128,8 @@ a:focus-visible {
 }
 .archive-list a:hover { color: var(--accent-hot); }
 .site-footer {
-  margin-top: 2.75rem;
-  padding-top: 1.15rem;
+  margin-top: 3rem;
+  padding-top: 1.25rem;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.84rem;
@@ -1075,19 +1140,32 @@ code {
   font-size: 0.85em;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
-@keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
+@keyframes soft-in {
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .site-header, .day-bar { animation: none; }
   .item, .archive-list li { transition: none; }
-  .item:hover, .archive-list li:hover { transform: none; }
+  .item:hover { transform: none; }
 }
 @media (max-width: 480px) {
-  .item { grid-template-columns: 1.9rem 1fr; gap: 0.45rem 0.65rem; }
-  .site-nav { align-items: flex-start; }
+  .item {
+    grid-template-columns: 1.8rem 1fr;
+    padding: 1.05rem 1rem 1.1rem;
+  }
+  .item:has(.item-thumb) {
+    grid-template-columns: 1.8rem 4.5rem 1fr;
+  }
+  .item-thumb {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+  .site-nav {
+    align-items: flex-start;
+    padding: 0.85rem 0.95rem;
+  }
 }
 """.strip()
 

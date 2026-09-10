@@ -21,6 +21,7 @@ Selected: 1
 - url: https://example.com/a
 - published: 2026-09-10T01:00:00+00:00
 - score=120 | comments=30
+- image: https://cdn.example/cover.webp
 - summary: Hello summary
 - why: hn score>=100
 - affiliate: https://partner.example/offer
@@ -55,6 +56,7 @@ def test_parse_digest_en() -> None:
     assert "Hello summary" in item.summary
     assert "score=120" in item.score_line
     assert item.affiliate_url == "https://partner.example/offer"
+    assert item.image_url == "https://cdn.example/cover.webp"
 
 
 def test_parse_digest_zh() -> None:
@@ -130,7 +132,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="day-bar"' in home
     assert 'class="site-header"' in home
     assert 'class="item-index"' in home
-    assert "Bricolage+Grotesque" in home
+    assert "Outfit" in home
+    assert "Literata" in home
     assert 'property="og:title"' in home
     assert 'rel="icon"' in home
     assert 'href="favicon.svg"' in home
@@ -141,6 +144,12 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "partner.example" not in home
     assert 'href="about.html"' in home
     assert 'href="privacy.html"' in home
+    assert 'class="why"' not in home
+    assert "hn score>=100" not in home
+    assert "score=n/a" not in home
+    assert "2026-09-10 01:00 UTC" in home
+    assert 'class="item-thumb"' in home
+    assert "https://cdn.example/cover.webp" in home
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert "AI 热点摘要" in zh_home
     assert "更新" in zh_home

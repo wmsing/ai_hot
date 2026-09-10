@@ -18,12 +18,15 @@ _FIELD_MAP = {
     "summary": "summary",
     "why": "reason",
     "affiliate": "affiliate_url",
+    "image": "image_url",
     "来源": "source",
     "链接": "url",
     "发布时间": "published",
     "摘要": "summary",
     "原因": "reason",
     "联盟链接": "affiliate_url",
+    "图片": "image_url",
+    "封面": "image_url",
 }
 
 
@@ -51,6 +54,7 @@ def parse_digest_markdown(text: str) -> DigestDocument:
                 summary=str(current.get("summary", "")),
                 reason=str(current.get("reason", "")),
                 affiliate_url=str(current.get("affiliate_url", "")).strip(),
+                image_url=str(current.get("image_url", "")).strip(),
             )
         )
         current = None

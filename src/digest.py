@@ -8,12 +8,13 @@ from pathlib import Path
 
 from src.models import DigestItem, HotItem
 from src.site_parse import parse_digest_markdown
-from src.timeutil import format_published
+from src.timeutil import format_published, parse_published
 
 _SCORE_RE = re.compile(
-    r"score=(?P<score>n/a|\d+)\s*\|\s*comments=(?P<comments>n/a|\d+)",
+    r"score=(?P<score>n/a|\d+)(?:\s*\|\s*comments=(?P<comments>n/a|\d+))?",
     re.IGNORECASE,
 )
+_COMMENTS_ONLY_RE = re.compile(r"^comments=(?P<comments>\d+)$", re.IGNORECASE)
 
 
 def same_utc_day(generated_at: datetime, now: datetime) -> bool:
@@ -49,13 +50,25 @@ def load_hot_items(path: str | Path) -> tuple[datetime | None, list[HotItem]]:
     return generated_at, items
 
 
+def format_score_line(score: int | None, comments: int | None) -> str | None:
+    """有分数/评论才返回展示行；全空则 None。"""
+    bits: list[str] = []
+    if score is not None:
+        bits.append(f"score={score}")
+    if comments is not None:
+        bits.append(f"comments={comments}")
+    if not bits:
+        return None
+    return " | ".join(bits)
+
+
 def write_digest(
     path: str | Path,
     items: list[HotItem],
     *,
     generated_at: datetime,
 ) -> None:
-    """写入 digest（整文件重写；调用方负责当日累计合并）。"""
+    """写入 digest（整文件重写；调用方负责当日累计合并）。不写 why。"""
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -70,28 +83,28 @@ def write_digest(
         lines.append("")
     else:
         for idx, item in enumerate(items, start=1):
-            if item.score is not None:
-                score_bit = f"score={item.score}"
-            else:
-                score_bit = "score=n/a"
-            if item.comments is not None:
-                comments_bit = f"comments={item.comments}"
-            else:
-                comments_bit = "comments=n/a"
             summary = item.summary.strip() if item.summary else "n/a"
-            lines.extend(
+            block = [
+                f"## {idx}. {item.title}",
+                "",
+                f"- source: `{item.source}`",
+                f"- url: {item.url}",
+            ]
+            published = format_published(item.published_at)
+            if published != "n/a":
+                block.append(f"- published: {published}")
+            score_line = format_score_line(item.score, item.comments)
+            if score_line is not None:
+                block.append(f"- {score_line}")
+            if item.image_url and item.image_url.strip():
+                block.append(f"- image: {item.image_url.strip()}")
+            block.extend(
                 [
-                    f"## {idx}. {item.title}",
-                    "",
-                    f"- source: `{item.source}`",
-                    f"- url: {item.url}",
-                    f"- published: {format_published(item.published_at)}",
-                    f"- {score_bit} | {comments_bit}",
                     f"- summary: {summary}",
-                    f"- why: {item.reason}",
                     "",
                 ]
             )
+            lines.extend(block)
     out.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -110,7 +123,7 @@ def _parse_generated_at(raw: str) -> datetime | None:
 
 def _digest_item_to_hot(item: DigestItem) -> HotItem:
     score, comments = _parse_score_line(item.score_line)
-    published_at = _parse_published(item.published)
+    published_at = parse_published(item.published)
     summary = item.summary.strip()
     if summary.lower() in {"", "n/a"}:
         summary_out: str | None = None
@@ -123,30 +136,28 @@ def _digest_item_to_hot(item: DigestItem) -> HotItem:
         score=score,
         comments=comments,
         summary=summary_out,
+        image_url=item.image_url.strip() or None,
         published_at=published_at,
         reason=item.reason,
     )
 
 
 def _parse_score_line(raw: str) -> tuple[int | None, int | None]:
-    match = _SCORE_RE.search(raw.strip())
-    if not match:
-        return None, None
-    score_s = match.group("score")
-    comments_s = match.group("comments")
-    score = None if score_s.lower() == "n/a" else int(score_s)
-    comments = None if comments_s.lower() == "n/a" else int(comments_s)
-    return score, comments
-
-
-def _parse_published(raw: str) -> datetime | None:
     text = raw.strip()
-    if not text or text.lower() == "n/a":
-        return None
-    try:
-        dt = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    if not text:
+        return None, None
+    match = _SCORE_RE.search(text)
+    if match:
+        score_s = match.group("score")
+        comments_s = match.group("comments")
+        score = None if score_s is None or score_s.lower() == "n/a" else int(score_s)
+        comments = (
+            None
+            if comments_s is None or comments_s.lower() == "n/a"
+            else int(comments_s)
+        )
+        return score, comments
+    only = _COMMENTS_ONLY_RE.match(text)
+    if only:
+        return None, int(only.group("comments"))
+    return None, None
