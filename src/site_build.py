@@ -704,9 +704,17 @@ def _render_item(
     affiliate_enabled: bool,
 ) -> str:
     labels = (
-        {"summary": "Summary", "affiliate": "Affiliate offer"}
+        {
+            "summary": "Summary",
+            "affiliate": "Affiliate offer",
+            "published": "Published (UTC)",
+        }
         if lang == "en"
-        else {"summary": "摘要", "affiliate": "联盟推荐"}
+        else {
+            "summary": "摘要",
+            "affiliate": "联盟推荐",
+            "published": "发布时间（UTC）",
+        }
     )
     title = escape(item.title)
     if item.url.strip():
@@ -722,7 +730,9 @@ def _render_item(
         meta_bits.append(f'<span class="badge">{escape(item.source)}</span>')
     published_disp = _display_published(item.published)
     if published_disp:
-        meta_bits.append(f"<span>{escape(published_disp)}</span>")
+        meta_bits.append(
+            f'<span>{escape(labels["published"])}: {escape(published_disp)}</span>'
+        )
     score_disp = _display_score_line(item.score_line)
     if score_disp:
         meta_bits.append(f"<span>{escape(score_disp)}</span>")
