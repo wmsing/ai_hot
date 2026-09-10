@@ -23,7 +23,7 @@ SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
 SITE_TAGLINE_ZH = "AI 热点摘要"
 _REPO_ISSUES = "https://github.com/wmsing/ai_hot/issues"
-HOME_PAGE_SIZE = 30
+HOME_PAGE_SIZE = 20
 
 _BOARD_TITLES: dict[str, tuple[str, str]] = {
     "agent": ("Agent", "Agent"),

@@ -243,13 +243,13 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
     assert 'id="load-more"' in home
     assert 'data-feed-base="feed/en"' in home
     assert 'data-next="1"' in home
-    assert home.count('class="item"') == 30
+    assert home.count('class="item"') == 20
     assert home.count('class="feed-day-sticky"') == 1
     assert 'data-day="2026-09-10"' in home
     page1 = (out / "feed" / "en" / "1.json").read_text(encoding="utf-8")
     data = json.loads(page1)
     assert data["next"] is None
-    assert data["html"].count('class="item"') == 5
+    assert data["html"].count('class="item"') == 15
     assert 'class="feed-day-sticky"' not in data["html"]
     assert "Title" in data["html"]
 
