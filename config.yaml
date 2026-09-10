@@ -1,0 +1,77 @@
+# 非密钥配置（可进 git）。密钥只放 .env
+paths:
+  sqlite_path: data/ai_hot.db
+  digest_path: out/digest.md
+  digest_zh_path: out/digest.zh.md
+  content_digests_dir: content/digests
+  site_output_dir: public
+
+hn:
+  enabled: true
+  top_n: 30
+  min_score: 100
+  min_comments: 20
+
+rss:
+  max_new_per_feed: 5
+  feeds:
+    - name: openai
+      url: https://openai.com/news/rss.xml
+    - name: google_ai
+      url: https://blog.google/innovation-and-ai/technology/ai/rss/
+    - name: deepmind
+      url: https://deepmind.google/blog/rss.xml
+    # Anthropic 无官方 RSS；使用社区维护镜像，可随时在本文件替换
+    - name: anthropic
+      url: https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml
+    - name: huggingface
+      url: https://huggingface.co/blog/feed.xml
+    # 中国 AI：量子位 + 关键词白名单（未命中不入选）
+    - name: qbitai
+      url: https://www.qbitai.com/feed
+      keywords:
+        - MiniMax
+        - 海螺
+        - Seedance
+        - Seed
+        - 即梦
+        - 豆包
+        - 字节
+        - 月之暗面
+        - Kimi
+        - 智谱
+        - GLM
+        - 通义
+        - 千问
+        - Qwen
+        - 文心
+        - 快手
+        - 可灵
+        - 商汤
+        - 百川
+        - DeepSeek
+        - 深度求索
+        - 阶跃
+        - StepFun
+        - 零一万物
+        - 面壁
+        - 昆仑万维
+        - 腾讯混元
+        - 混元
+        - 阿里
+        - 华为盘古
+        - 盘古
+        - 讯飞
+        - 星火
+
+filter:
+  cooldown_hours: 24
+
+http:
+  timeout_seconds: 30
+  user_agent: ai_hot/0.1 (+local; personal hotspot monitor)
+
+ollama:
+  base_url: http://127.0.0.1:11434
+  model: qwen3:4b-instruct
+  timeout_seconds: 300

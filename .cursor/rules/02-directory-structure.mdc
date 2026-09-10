@@ -1,0 +1,12 @@
+---
+description: 项目目录大概结构与各模块职责
+alwaysApply: true
+---
+
+# 目录结构规范
+
+- 代码组织严格归位，禁止随意新建顶层目录：
+  - `src/`：业务源码核心
+  - `tests/`：单元与集成测试套件
+  - `docs/` 或 `practices/`：项目文档与实践规范
+  - `.cursor/rules/`：AI 行为与工作流约束规则

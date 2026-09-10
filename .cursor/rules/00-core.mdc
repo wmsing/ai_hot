@@ -1,0 +1,20 @@
+---
+description: ai_hot 本地运行命令与技术栈约定
+alwaysApply: true
+---
+# ai_hot Local Rules
+
+## Commands
+- Run: `python -m src.main`
+- Test: `pytest`
+- Typecheck: `mypy src`
+- Lint: `ruff check src && ruff format --check src`
+
+## Style & Constraints
+- Python 3.10+，使用 snake_case，强制类型注解 (type hints)。
+- 数据模型使用 Pydantic，禁止随意传递散装 dict。
+- 改动代码后必须在交付前跑通：`ruff check` + `mypy` + `pytest`。
+
+## Off-limits (项目私有禁区)
+- 严禁擅自动改 `.env*`、生产密钥、硬编码 API Key。
+- 严禁擅自修改已对外暴露的公共函数/API 签名。

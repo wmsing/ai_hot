@@ -1,0 +1,12 @@
+---
+description: 常用命令执行与验收规范（dev / test / lint）
+alwaysApply: true
+---
+
+# 项目运行命令规范
+
+- 修改或交付代码前，必须执行验证：
+  - 本地启动：`dev`
+  - 自动化测试：`test`
+  - 代码检查：`lint` / `typecheck`
+- 出现报错必须立即修复，禁止带错继续开发。

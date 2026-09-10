@@ -1,0 +1,40 @@
+---
+description: Git 提交、分支与版本管理规范（Conventional Commits & Trunk-based）
+alwaysApply: true
+---
+
+# Git 提交与工作流规范
+
+## 1. 提交信息规范 (Conventional Commits)
+格式必须严格为：`<type>: <subject>` 或 `<type>(<scope>): <subject>`
+
+- `feat`: 新增业务功能
+- `fix`: 修复 Bug
+- `chore`: 构建配置、依赖维护、辅助工具与环境调整（如 `.gitignore`、`.env.example`）
+- `docs`: 文档与规则变更（如 README、`.cursor/rules/`）
+- `refactor`: 重构（无业务逻辑变更的代码结构优化）
+- `test`: 增加或修改测试用例
+- `style`: 代码格式调整（不改变逻辑）
+
+## 2. 提交准则
+- 提交必须小而聚焦，严禁无差别的 `git add .`。
+- 新项目首推提交顺序：
+  1. `.gitignore` 与 `.env.example`（`chore`）
+  2. Cursor rules 与项目元配置（`docs` / `chore`）
+  3. 业务源码与测试（`feat` / `test`）
+- 严禁提交 `.env`、生产密钥及临时/缓存文件。
+
+## 3. 分支命名规范 (Branch Naming)
+格式必须严格为：`<type>/<short-description>`（全小写，连字符 `-` 分隔）
+
+- 主分支：`main`（仅保存稳定可发布代码，严禁直接在上面暴力开发）。
+- 功能分支：`feat/<feature-name>`（例：`feat/avatar-pipeline`）。
+- 修复分支：`fix/<bug-name>`（例：`fix/memory-leak`）。
+- 维护分支：`chore/<task-name>`（例：`chore/upgrade-deps`）。
+- 文档/规则分支：`docs/<topic>`（例：`docs/git-rules`）。
+
+## 4. 合并与交付门禁 (Merge & PR Gate)
+- 禁止强推：严禁向 `main` 分支执行 `git push -f`。
+- 质量门禁：合并或交付前必须全绿通过 `pytest` + `mypy` + `ruff`。
+- 合并策略：功能分支合入 `main` 时推荐使用 **Squash and Merge**，保持主干历史为纯净单点提交。
+- 版本打标：遵循 SemVer 规范，打标签格式为 `vX.Y.Z`（例：`v0.1.0`）。
