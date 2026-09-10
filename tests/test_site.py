@@ -144,7 +144,7 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "partner.example" not in home
     assert 'href="about.html"' in home
     assert 'href="arena.html"' in home
-    assert ">Leaderboard<" in home
+    assert ">AI Models<" in home
     assert 'href="privacy.html"' in home
     assert 'class="why"' not in home
     assert "hn score>=100" not in home
@@ -152,7 +152,16 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "2026-09-10 01:00 UTC" in home
     assert 'class="item-thumb"' in home
     assert "https://cdn.example/cover.webp" in home
+    assert 'class="day-nav"' in home
+    assert "Previous day" in home
+    assert 'href="archive/2026-09-09/index.html"' in home
+    assert 'class="day-nav-muted">Next day' in home
+    older = (out / "archive" / "2026-09-09" / "index.html").read_text(encoding="utf-8")
+    assert "Next day" in older
+    assert 'href="../../index.html"' in older
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
+    assert "前一天" in zh_home
+    assert "后一天" in zh_home
     assert "AI 热点摘要" in zh_home
     assert "更新" in zh_home
     assert 'href="../favicon.svg"' in zh_home

@@ -96,13 +96,16 @@ def build_site(
         _write(output_dir / "zh" / "index.html", _render_empty_home("zh", cfg))
         return
 
-    for day_files in days:
+    for idx, day_files in enumerate(days):
         day_s = day_files.day.isoformat()
         en_doc = _load_doc(day_files.en)
         zh_doc = _load_doc(day_files.zh)
         has_zh = zh_doc is not None
         has_en = en_doc is not None
         is_latest = day_files.day == latest.day
+        # days 按新→旧；newer=更近一天，older=更早一天
+        newer_day = days[idx - 1].day if idx > 0 else None
+        older_day = days[idx + 1].day if idx + 1 < len(days) else None
 
         if en_doc is not None:
             archive_page = _render_digest(
@@ -112,6 +115,9 @@ def build_site(
                 has_other_lang=has_zh,
                 links=_links_digest_archive("en", day_s, has_zh),
                 site=cfg,
+                older_day=older_day,
+                newer_day=newer_day,
+                is_home=False,
             )
             _write(output_dir / "archive" / day_s / "index.html", archive_page)
             if is_latest:
@@ -122,6 +128,9 @@ def build_site(
                     has_other_lang=has_zh,
                     links=_links_digest_home("en", day_s, has_zh),
                     site=cfg,
+                    older_day=older_day,
+                    newer_day=None,
+                    is_home=True,
                 )
                 _write(output_dir / "index.html", home_page)
         elif is_latest:
@@ -138,6 +147,9 @@ def build_site(
                 has_other_lang=has_en,
                 links=_links_digest_archive("zh", day_s, has_en),
                 site=cfg,
+                older_day=older_day,
+                newer_day=newer_day,
+                is_home=False,
             )
             _write(
                 output_dir / "zh" / "archive" / day_s / "index.html",
@@ -151,6 +163,9 @@ def build_site(
                     has_other_lang=has_en,
                     links=_links_digest_home("zh", day_s, has_en),
                     site=cfg,
+                    older_day=older_day,
+                    newer_day=None,
+                    is_home=True,
                 )
                 _write(output_dir / "zh" / "index.html", home_page)
         elif is_latest:
@@ -312,11 +327,11 @@ def _lang_nav(lang: str, other_href: str) -> str:
 
 def _main_nav(lang: str, links: PageLinks, *, include_archive: bool = True) -> str:
     if lang == "en":
-        home_l, arena_l, archive_l = "Home", "Leaderboard", "Archive"
+        home_l, arena_l, archive_l = "Home", "AI Models", "Archive"
         about_l, privacy_l = "About", "Privacy"
         nav_label = "Primary"
     else:
-        home_l, arena_l, archive_l = "首页", "排行榜", "归档"
+        home_l, arena_l, archive_l = "首页", "AI 模型榜", "归档"
         about_l, privacy_l = "关于", "隐私"
         nav_label = "主导航"
     parts = [
@@ -399,6 +414,10 @@ def _render_digest(
     has_other_lang: bool,
     links: PageLinks,
     site: SiteConfig,
+    older_day: date | None = None,
+    newer_day: date | None = None,
+    is_home: bool = False,
+    newer_is_latest: bool = False,
 ) -> str:
     del has_other_lang  # encoded in links.lang_other
     day_s = day.isoformat()
@@ -420,6 +439,14 @@ def _render_digest(
             else '<p class="muted">暂无条目。</p>'
         )
 
+    day_nav = _day_nav(
+        lang,
+        older_day=older_day,
+        newer_day=newer_day,
+        is_home=is_home,
+        newer_is_latest=newer_is_latest,
+    )
+
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
@@ -436,6 +463,7 @@ def _render_digest(
   <div class="day-bar">
     <h1>{escape(day_s)}</h1>
     <p class="meta">{meta}</p>
+    {day_nav}
   </div>
 </header>
 <main class="feed">
@@ -445,6 +473,64 @@ def _render_digest(
 </div>
 """,
     )
+
+
+def _day_nav(
+    lang: str,
+    *,
+    older_day: date | None,
+    newer_day: date | None,
+    is_home: bool,
+    newer_is_latest: bool,
+) -> str:
+    """前一天=更早归档；后一天=更新归档（首页为最新则无后一天）。"""
+    if lang == "en":
+        older_l, newer_l = "← Previous day", "Next day →"
+    else:
+        older_l, newer_l = "← 前一天", "后一天 →"
+
+    older_href = _day_href(
+        target=older_day,
+        is_home=is_home,
+        link_home=False,
+    )
+    newer_href = _day_href(
+        target=newer_day,
+        is_home=is_home,
+        link_home=newer_is_latest,
+    )
+
+    older_html = (
+        f'<a class="day-nav-link" href="{escape(older_href)}">{escape(older_l)}</a>'
+        if older_href
+        else f'<span class="day-nav-muted">{escape(older_l)}</span>'
+    )
+    newer_html = (
+        f'<a class="day-nav-link" href="{escape(newer_href)}">{escape(newer_l)}</a>'
+        if newer_href
+        else f'<span class="day-nav-muted">{escape(newer_l)}</span>'
+    )
+    nav_label = "Day navigation" if lang == "en" else "日期导航"
+    return (
+        f'<nav class="day-nav" aria-label="{escape(nav_label)}">'
+        f'{older_html}<span class="day-nav-gap"></span>{newer_html}</nav>'
+    )
+
+
+def _day_href(
+    *,
+    target: date | None,
+    is_home: bool,
+    link_home: bool,
+) -> str | None:
+    if target is None:
+        return None
+    day_s = target.isoformat()
+    if is_home:
+        return f"archive/{day_s}/index.html"
+    if link_home:
+        return "../../index.html"
+    return f"../{day_s}/index.html"
 
 
 def _board_title(board: str, lang: str) -> str:
@@ -563,22 +649,23 @@ def _render_arena_page(
 ) -> str:
     if lang == "en":
         links = _links_root("en", lang_other="zh/arena.html")
-        heading = "Leaderboard"
+        heading = "AI Models"
         intro = (
-            "Arena AI leaderboards (community mirror), refreshed on each site build. "
-            "Dates in titles are Arena's last update (scores keep changing). "
+            "Arena AI model & agent rankings (community mirror), refreshed on each "
+            "site build. Dates in titles are Arena's last update "
+            "(scores keep changing). "
             "Media boards show Elo; Agent shows Net Improvement."
         )
-        empty = "Leaderboard data is unavailable right now."
+        empty = "AI model ranking data is unavailable right now."
     else:
         links = _links_root("zh", lang_other="../arena.html")
-        heading = "排行榜"
+        heading = "AI 模型榜"
         intro = (
-            "Arena AI 排行榜（社区镜像），站点每次构建时刷新。"
+            "Arena AI 模型与 Agent 排行（社区镜像），站点每次构建时刷新。"
             "标题中的日期为 Arena 侧最近更新日（分数会持续变动）。"
             "媒体榜为评分（Elo）；Agent 榜展示净提升（Net Improvement）。"
         )
-        empty = "当前暂无排行榜数据。"
+        empty = "当前暂无 AI 模型榜数据。"
 
     if boards:
         body = "\n".join(_render_arena_board_section(b, lang) for b in boards)
@@ -1165,6 +1252,27 @@ a:focus-visible {
   margin: 0;
   color: var(--muted);
   font-size: 0.95rem;
+}
+.day-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+.day-nav-gap { flex: 1; }
+.day-nav-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.day-nav-link:hover { text-decoration: underline; }
+.day-nav-muted {
+  color: var(--muted);
+  opacity: 0.55;
 }
 .page-title { margin-bottom: 1.25rem; }
 .arena {
