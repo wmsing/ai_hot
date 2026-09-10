@@ -774,14 +774,10 @@ def _render_home_timeline(
     page0 = items[:HOME_PAGE_SIZE]
     has_more = total > HOME_PAGE_SIZE
     if lang == "en":
-        heading = "Latest"
-        meta = f"{total} highlights · newest first"
         load_l = "Load more"
         feed_base = "feed/en"
         script_src = "feed.js"
     else:
-        heading = "最新"
-        meta = f"共 {total} 条 · 新在前"
         load_l = "加载更多"
         feed_base = "../feed/zh"
         script_src = "../feed.js"
@@ -830,10 +826,6 @@ def _render_home_timeline(
     {_brand_sub(lang)}
   </div>
   {_main_nav(lang, links)}
-  <div class="day-bar">
-    <h1>{escape(heading)}</h1>
-    <p class="meta">{escape(meta)}</p>
-  </div>
 </header>
 <main class="feed" id="feed">
   {items_html}

@@ -130,7 +130,6 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "Newer" in home
     assert 'class="item"' in home
     assert 'class="badge"' in home
-    assert 'class="day-bar"' in home
     assert 'class="site-header"' in home
     assert 'class="item-index"' in home
     assert "Outfit" in home
@@ -157,8 +156,9 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "https://cdn.example/cover.webp" in home
     assert 'class="day-nav"' not in home
     assert "Previous day" not in home
-    assert ">Latest<" in home
-    assert "1 highlights · newest first" in home
+    assert ">Latest<" not in home
+    assert "highlights · newest first" not in home
+    assert 'class="day-bar"' not in home
     assert 'class="feed-day-sticky"' in home
     assert 'data-day="2026-09-10"' in home
     assert 'id="load-more"' not in home
@@ -173,7 +173,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "发布时间（UTC）" not in zh_home
     assert "前一天" not in zh_home
     assert "后一天" not in zh_home
-    assert ">最新<" in zh_home
+    assert ">最新<" not in zh_home
+    assert "条 · 新在前" not in zh_home
     assert 'class="feed-day-sticky"' in zh_home
     assert "AI 热点摘要" in zh_home
     assert "更新" in zh_home
@@ -238,7 +239,7 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
     build_site(content_dir=content, output_dir=out)
 
     home = (out / "index.html").read_text(encoding="utf-8")
-    assert "35 highlights · newest first" in home
+    assert "highlights · newest first" not in home
     assert 'id="load-more"' in home
     assert 'data-feed-base="feed/en"' in home
     assert 'data-next="1"' in home
@@ -253,6 +254,7 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
     assert "Title" in data["html"]
 
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
+    assert "条 · 新在前" not in zh_home
     assert 'data-feed-base="../feed/zh"' in zh_home
     assert (out / "feed" / "zh" / "1.json").is_file()
 
