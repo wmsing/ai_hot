@@ -145,6 +145,9 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     styles = (out / "styles.css").read_text(encoding="utf-8")
     assert ".site-nav" in styles
     assert "position: sticky" in styles
+    assert "rgba(15, 23, 42, 0.8)" in styles
+    assert "blur(12px)" in styles
+    assert "rgba(255, 255, 255, 0.08)" in styles
     assert ".read-progress" in styles
     assert "#0d0f17" in styles
     assert "body::before" in styles
@@ -167,7 +170,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "meta-text" in styles
     assert "#64748b" in styles
     assert "9999px" in styles
-    assert "0.875rem" in styles
+    assert "0.95rem" in styles
+    assert "1.2rem" in styles
+    assert "linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent)" in styles
+    assert ".feed-day-sticky::after" in styles
     assert "cursor: pointer" in styles
     assert "translateY(-4px)" in styles
     assert "rgba(99, 102, 241, 0.5)" in styles
@@ -206,6 +212,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="label">摘要<' not in home
     assert 'class="item-read"' in home
     assert ">Read article<" in home
+    assert "content: \" →\"" in styles or 'content: " →"' in styles
+    assert ".item:has(.item-read)" in styles
     assert "<h2><a " not in home
     assert 'class="item-thumb"' in home
     assert "https://cdn.example/cover.webp" in home
