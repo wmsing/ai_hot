@@ -133,6 +133,9 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="item"' in home
     assert 'class="badge"' in home
     assert 'class="site-header"' in home
+    styles = (out / "styles.css").read_text(encoding="utf-8")
+    assert ".site-nav" in styles
+    assert "position: sticky" in styles
     assert 'class="item-index"' in home
     assert "Outfit" in home
     assert "Literata" in home

@@ -1660,6 +1660,9 @@ a:focus-visible {
   line-height: 1.5;
 }
 .site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   gap: 0.9rem 1.35rem;
@@ -1667,7 +1670,9 @@ a:focus-visible {
   justify-content: space-between;
   margin: 0 0 1.75rem;
   padding: 0.95rem 1.1rem;
-  background: var(--bg-elev);
+  background: color-mix(in srgb, var(--bg-elev) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--line);
   border-radius: calc(var(--radius) - 2px);
   box-shadow: var(--shadow);
@@ -1768,7 +1773,7 @@ a:focus-visible {
 }
 .feed-day-sticky {
   position: sticky;
-  top: 0;
+  top: 4.75rem;
   z-index: 3;
   margin: 1.35rem 0 0.65rem;
   padding: 0.55rem 0.1rem 0.5rem;
@@ -2039,6 +2044,9 @@ code {
   .site-nav {
     align-items: flex-start;
     padding: 0.85rem 0.95rem;
+  }
+  .feed-day-sticky {
+    top: 5.75rem;
   }
 }
 """.strip()
