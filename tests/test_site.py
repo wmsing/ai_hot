@@ -579,4 +579,6 @@ def test_build_site_copies_bgm_and_ducks(tmp_path: Path) -> None:
     feed_js = (out / "feed.js").read_text(encoding="utf-8")
     assert "site-bgm" in feed_js
     assert "BGM_DUCK" in feed_js
+    assert "0.035" in feed_js
+    assert "SPEECH_VOL" in feed_js
     assert "ensureBgm" in feed_js

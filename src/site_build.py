@@ -957,7 +957,8 @@ def _feed_js() -> str:
   var labelStop = isZh ? "停" : "Stop";
   var labelNow = isZh ? "第 " : "#";
   var labelNowSuffix = isZh ? " 条" : "";
-  var BGM_DUCK = 0.12;
+  var BGM_DUCK = 0.035;
+  var SPEECH_VOL = 1;
 
   var ensureBgm = function () {
     if (!bgm) return;
@@ -1054,6 +1055,7 @@ def _feed_js() -> str:
     }
     setPlayingUi(item, true);
     focusItem(item);
+    audio.volume = SPEECH_VOL;
     ensureBgm();
     var p = audio.play();
     if (p && typeof p.catch === "function") {
