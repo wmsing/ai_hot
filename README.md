@@ -21,7 +21,10 @@ python -m src.main --llm openrouter && python -m src.translate && python -m src.
 python -m src.main --llm nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.translate --model nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.publish
 
 # update content + publish
-python -m src.main --llm openrouter && python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
+python -m src.main --llm openrouter && python -m src.translate --model nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
+
+# update content + publish local
+python -m src.main --llm openrouter && LLM_PROVIDER=ollama python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
 ```
 
 ## 快速开始

@@ -292,10 +292,11 @@ def test_digest_includes_summary(tmp_path: Path) -> None:
     assert "summary: A short blurb about the news." in path.read_text(encoding="utf-8")
 
 
-def test_resolve_llm_model() -> None:
+def test_resolve_llm_model(monkeypatch: pytest.MonkeyPatch) -> None:
     from src.llm import resolve_llm_model
     from src.models import AppConfig, OllamaConfig, OpenRouterConfig
 
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
     cfg = AppConfig(
         ollama=OllamaConfig(model="qwen3:4b-instruct"),
         openrouter=OpenRouterConfig(model="openrouter/free"),
@@ -553,7 +554,12 @@ def test_translate_digest_file_mocked(
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     src = tmp_path / "digest.md"
     dst = tmp_path / "digest.zh.md"
-    src.write_text("# Hello\n\n- url: https://x.com\n", encoding="utf-8")
+    src.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+        "Selected: 1\n\n## 1. Hello\n\n- source: `hn`\n"
+        "- url: https://x.com\n- summary: Hello body\n",
+        encoding="utf-8",
+    )
     cfg = AppConfig(
         paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
         ollama=OllamaConfig(model="qwen3:4b-instruct"),
@@ -564,12 +570,110 @@ def test_translate_digest_file_mocked(
         assert isinstance(llm, LlmRuntime)
         assert llm.provider == "ollama"
         assert llm.model == "qwen3:4b-instruct"
-        return "# 你好\n\n- url: https://x.com\n"
+        return (
+            "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+            "Selected: 1\n\n## 1. 你好\n\n- source: `hn`\n"
+            "- url: https://x.com\n- summary: 你好正文\n"
+        )
 
     monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
     out = translate_digest_file(cfg)
     assert out == dst
-    assert "你好" in dst.read_text(encoding="utf-8")
+    text = dst.read_text(encoding="utf-8")
+    assert "你好" in text
+    assert "https://x.com" in text
+
+
+def test_translate_digest_file_incremental_reuses_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    src.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+        "Selected: 2\n\n"
+        "## 1. Old EN\n\n- source: `hn`\n- url: https://a.example/old\n"
+        "- summary: old en summary\n\n"
+        "## 2. New EN\n\n- source: `hn`\n- url: https://a.example/new\n"
+        "- summary: new en summary\n",
+        encoding="utf-8",
+    )
+    dst.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. 旧中文\n\n- source: `hn`\n- url: https://a.example/old\n"
+        "- summary: 旧摘要\n",
+        encoding="utf-8",
+    )
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct"),
+    )
+    seen: list[str] = []
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        seen.append(text)
+        assert "https://a.example/new" in text
+        assert "https://a.example/old" not in text
+        assert isinstance(llm, LlmRuntime)
+        return (
+            "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+            "Selected: 1\n\n"
+            "## 1. 新中文\n\n- source: `hn`\n- url: https://a.example/new\n"
+            "- summary: 新摘要\n"
+        )
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg)
+    assert len(seen) == 1
+    out = dst.read_text(encoding="utf-8")
+    assert "旧中文" in out
+    assert "旧摘要" in out
+    assert "新中文" in out
+    assert "新摘要" in out
+    assert out.index("旧中文") < out.index("新中文")
+
+
+def test_translate_digest_file_no_llm_when_all_reused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    body = (
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T02:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. Same\n\n- source: `hn`\n- url: https://a.example/same\n"
+        "- summary: same en\n"
+    )
+    src.write_text(body, encoding="utf-8")
+    dst.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. 已译\n\n- source: `hn`\n- url: https://a.example/same\n"
+        "- summary: 已译摘要\n",
+        encoding="utf-8",
+    )
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct"),
+    )
+
+    def _boom(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        raise AssertionError("should not call LLM when all URLs reused")
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _boom)
+    translate_digest_file(cfg)
+    out = dst.read_text(encoding="utf-8")
+    assert "已译" in out
+    assert "已译摘要" in out
 
 
 def test_translate_digest_file_model_override(
@@ -580,7 +684,12 @@ def test_translate_digest_file_model_override(
 
     src = tmp_path / "digest.md"
     dst = tmp_path / "digest.zh.md"
-    src.write_text("# Hi\n", encoding="utf-8")
+    src.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+        "Selected: 1\n\n## 1. Hi\n\n- source: `hn`\n"
+        "- url: https://y.com\n- summary: hi\n",
+        encoding="utf-8",
+    )
     cfg = AppConfig(
         paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
         ollama=OllamaConfig(model="qwen3:4b-instruct"),
@@ -594,7 +703,11 @@ def test_translate_digest_file_model_override(
         assert isinstance(llm, LlmRuntime)
         seen.append(llm.model)
         assert llm.provider == "openrouter"
-        return "# 嗨\n"
+        return (
+            "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+            "Selected: 1\n\n## 1. 嗨\n\n- source: `hn`\n"
+            "- url: https://y.com\n- summary: 嗨\n"
+        )
 
     monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
     translate_digest_file(cfg, model="nvidia/nemotron-3-ultra-550b-a55b:free")

@@ -1,13 +1,20 @@
-"""调用 LLM，把 digest 译成中文 Markdown。"""
+"""调用 LLM，把 digest 译成中文 Markdown（按 URL 增量）。"""
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import settings
+from src.digest import (
+    format_digest_markdown,
+    load_hot_items,
+    parse_hot_items,
+    write_digest,
+)
 from src.llm import build_llm_runtime, resolve_provider, runtime_from_ollama
-from src.models import AppConfig, LlmRuntime, OllamaConfig
+from src.models import AppConfig, HotItem, LlmRuntime, OllamaConfig
 from src.ollama_client import llm_chat
 
 logger = logging.getLogger(__name__)
@@ -27,17 +34,31 @@ def translate_markdown(text: str, llm: LlmRuntime | OllamaConfig) -> str:
 
 
 def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Path:
-    """读英文 digest，写出中文版路径。
+    """读英文 digest，增量写出中文版。
 
+    已有 digest.zh.md 中同 URL 条目复用 title/summary，只翻译新增 URL。
     model 非空时覆盖 config 默认模型；含 `/` 或 `:free` 时走 openrouter。
     """
     src = Path(config.paths.digest_path)
     dst = Path(config.paths.digest_zh_path)
     if not src.is_file():
         raise FileNotFoundError(f"missing {src}; run `python -m src.main` first")
-    english = src.read_text(encoding="utf-8")
-    if not english.strip():
+
+    generated_at, en_items = load_hot_items(src)
+    if not en_items and not src.read_text(encoding="utf-8").strip():
         raise ValueError(f"digest is empty: {src}")
+    if generated_at is None:
+        generated_at = datetime.now(timezone.utc)
+
+    _, zh_items = load_hot_items(dst)
+    zh_by_url = {item.url: item for item in zh_items if item.url.strip()}
+
+    need: list[HotItem] = []
+    for item in en_items:
+        prev = zh_by_url.get(item.url)
+        if prev is None or not _usable_zh(prev):
+            need.append(item)
+
     provider = resolve_provider(model, config)
     runtime = build_llm_runtime(
         config,
@@ -46,13 +67,66 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
         api_key=settings.openrouter_api_key,
     )
     logger.info(
-        "translating digest provider=%s model=%s chars=%s",
+        "translating digest provider=%s model=%s en=%s reuse=%s new=%s",
         runtime.provider,
         runtime.model,
-        len(english),
+        len(en_items),
+        len(en_items) - len(need),
+        len(need),
     )
-    chinese = translate_markdown(english, runtime)
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_text(chinese + "\n", encoding="utf-8")
-    logger.info("wrote %s", dst)
+
+    translated_by_url: dict[str, HotItem] = {}
+    if need:
+        english_chunk = format_digest_markdown(need, generated_at=generated_at)
+        chinese_chunk = translate_markdown(english_chunk, runtime)
+        _, translated_items = parse_hot_items(chinese_chunk)
+        translated_by_url = _align_translated(need, translated_items)
+
+    final: list[HotItem] = []
+    for item in en_items:
+        if item.url in translated_by_url:
+            final.append(translated_by_url[item.url])
+            continue
+        prev = zh_by_url.get(item.url)
+        if prev is not None and _usable_zh(prev):
+            final.append(
+                item.model_copy(
+                    update={
+                        "title": prev.title,
+                        "summary": prev.summary,
+                    }
+                )
+            )
+        else:
+            final.append(item)
+
+    write_digest(dst, final, generated_at=generated_at)
+    logger.info("wrote %s (items=%s)", dst, len(final))
     return dst
+
+
+def _usable_zh(item: HotItem) -> bool:
+    return bool(item.title.strip())
+
+
+def _align_translated(
+    need: list[HotItem],
+    translated: list[HotItem],
+) -> dict[str, HotItem]:
+    """按 URL 对齐；URL 丢失时按 need 顺序回退。"""
+    by_url = {item.url: item for item in translated if item.url.strip()}
+    out: dict[str, HotItem] = {}
+    for index, item in enumerate(need):
+        hit = by_url.get(item.url)
+        if hit is None and index < len(translated):
+            hit = translated[index]
+        if hit is None:
+            out[item.url] = item
+            continue
+        out[item.url] = item.model_copy(
+            update={
+                "title": hit.title.strip() or item.title,
+                "summary": hit.summary if hit.summary else item.summary,
+            }
+        )
+    return out

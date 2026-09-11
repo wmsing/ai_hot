@@ -44,6 +44,13 @@ def load_hot_items(path: str | Path) -> tuple[datetime | None, list[HotItem]]:
     text = out.read_text(encoding="utf-8")
     if not text.strip():
         return None, []
+    return parse_hot_items(text)
+
+
+def parse_hot_items(text: str) -> tuple[datetime | None, list[HotItem]]:
+    """从 digest Markdown 文本解析 (generated_at, items)。"""
+    if not text.strip():
+        return None, []
     doc = parse_digest_markdown(text)
     generated_at = _parse_generated_at(doc.generated_at)
     items = [_digest_item_to_hot(item) for item in doc.items]
@@ -62,15 +69,12 @@ def format_score_line(score: int | None, comments: int | None) -> str | None:
     return " | ".join(bits)
 
 
-def write_digest(
-    path: str | Path,
+def format_digest_markdown(
     items: list[HotItem],
     *,
     generated_at: datetime,
-) -> None:
-    """写入 digest（整文件重写；调用方负责当日累计合并）。不写 why。"""
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
+) -> str:
+    """格式化 digest Markdown（不写盘）。"""
     lines = [
         "# ai_hot digest",
         "",
@@ -108,7 +112,22 @@ def write_digest(
                 ]
             )
             lines.extend(block)
-    out.write_text("\n".join(lines), encoding="utf-8")
+    return "\n".join(lines)
+
+
+def write_digest(
+    path: str | Path,
+    items: list[HotItem],
+    *,
+    generated_at: datetime,
+) -> None:
+    """写入 digest（整文件重写；调用方负责当日累计合并）。不写 why。"""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        format_digest_markdown(items, generated_at=generated_at),
+        encoding="utf-8",
+    )
 
 
 def _parse_generated_at(raw: str) -> datetime | None:
