@@ -498,6 +498,8 @@ def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
     )
     assert 'data-audio="/audio/zh/2026-09-10/001.mp3"' in zh_day
     assert 'class="item-speak"' in zh_day
+    assert 'item-speak-play' in zh_day
+    assert 'aria-label="播放"' in zh_day
     assert 'id="podcast-dock"' in zh_day
     assert 'id="podcast-mode"' in zh_day
 
@@ -513,10 +515,13 @@ def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
     assert "podcast-mode" in feed_js
     assert "scrollIntoView" in feed_js
     assert "item-speak" in feed_js
+    assert "setSpeakBtn" in feed_js
 
     styles = (out / "styles.css").read_text(encoding="utf-8")
     assert ".podcast-dock" in styles
     assert ".item.is-playing" in styles
+    assert ".item-speak-icon" in styles
+    assert "margin-left: auto" in styles
 
 
 def test_build_site_prefers_content_audio(tmp_path: Path) -> None:
@@ -554,6 +559,7 @@ def test_build_site_podcast_en_audio(tmp_path: Path) -> None:
     en_day = (out / "archive" / "2026-09-10" / "index.html").read_text(encoding="utf-8")
     assert 'data-audio="/audio/en/2026-09-10/001.mp3"' in en_day
     assert 'class="item-speak"' in en_day
+    assert 'aria-label="Play"' in en_day
     assert ">Listen<" in en_day
     zh_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
         encoding="utf-8"
@@ -572,6 +578,8 @@ def test_build_site_copies_bgm_and_ducks(tmp_path: Path) -> None:
     out = tmp_path / "public"
     build_site(content_dir=content, output_dir=out, audio_dirs=[audio_root])
 
+    assert (out / "audio" / "bgm.mp3").is_file()
+    # 假 mp3 无法 ffmpeg 时原样拷贝
     assert (out / "audio" / "bgm.mp3").read_bytes() == b"bgm-bytes"
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert 'id="site-bgm"' in zh_home
@@ -579,6 +587,8 @@ def test_build_site_copies_bgm_and_ducks(tmp_path: Path) -> None:
     feed_js = (out / "feed.js").read_text(encoding="utf-8")
     assert "site-bgm" in feed_js
     assert "BGM_DUCK" in feed_js
-    assert "0.035" in feed_js
+    assert "0.22" in feed_js
+    assert "wireBgmGraph" in feed_js
+    assert "createGain" in feed_js
     assert "SPEECH_VOL" in feed_js
     assert "ensureBgm" in feed_js

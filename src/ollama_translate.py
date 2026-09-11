@@ -37,6 +37,7 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
     """读英文 digest，增量写出中文版。
 
     已有 digest.zh.md 中同 URL 条目复用 title/summary，只翻译新增 URL。
+    新增条目按 ollama.translate_batch_size 分批调用 LLM，避免大包超时。
     model 非空时覆盖 config 默认模型；含 `/` 或 `:free` 时走 openrouter。
     """
     src = Path(config.paths.digest_path)
@@ -66,21 +67,32 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
         model=model,
         api_key=settings.openrouter_api_key,
     )
+    batch_size = max(1, int(config.ollama.translate_batch_size))
     logger.info(
-        "translating digest provider=%s model=%s en=%s reuse=%s new=%s",
+        "translating digest provider=%s model=%s en=%s reuse=%s new=%s batch=%s",
         runtime.provider,
         runtime.model,
         len(en_items),
         len(en_items) - len(need),
         len(need),
+        batch_size,
     )
 
     translated_by_url: dict[str, HotItem] = {}
     if need:
-        english_chunk = format_digest_markdown(need, generated_at=generated_at)
-        chinese_chunk = translate_markdown(english_chunk, runtime)
-        _, translated_items = parse_hot_items(chinese_chunk)
-        translated_by_url = _align_translated(need, translated_items)
+        total_batches = (len(need) + batch_size - 1) // batch_size
+        for batch_i, start in enumerate(range(0, len(need), batch_size), start=1):
+            batch = need[start : start + batch_size]
+            logger.info(
+                "translate batch %s/%s size=%s",
+                batch_i,
+                total_batches,
+                len(batch),
+            )
+            english_chunk = format_digest_markdown(batch, generated_at=generated_at)
+            chinese_chunk = translate_markdown(english_chunk, runtime)
+            _, translated_items = parse_hot_items(chinese_chunk)
+            translated_by_url.update(_align_translated(batch, translated_items))
 
     final: list[HotItem] = []
     for item in en_items:

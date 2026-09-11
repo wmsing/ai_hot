@@ -165,7 +165,9 @@ class HttpConfig(BaseModel):
 class OllamaConfig(BaseModel):
     base_url: str = "http://127.0.0.1:11434"
     model: str = "qwen3:4b-instruct"
-    timeout_seconds: float = 300.0
+    timeout_seconds: float = 600.0
+    # 增量翻译每批条数；过大易 ReadTimeout / 占满 RAM
+    translate_batch_size: int = 8
 
 
 class OpenRouterConfig(BaseModel):

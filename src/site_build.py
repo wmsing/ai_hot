@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -776,14 +777,45 @@ def _copy_speak_audio(
     return available
 
 
+def _attenuate_bgm_file(src: Path, dest: Path, *, db: float = -20.0) -> bool:
+    """用 ffmpeg 压低垫乐响度；失败返回 False。"""
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(src),
+                "-af",
+                f"volume={db}dB",
+                "-codec:a",
+                "libmp3lame",
+                "-q:a",
+                "5",
+                str(dest),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return False
+    return proc.returncode == 0 and dest.is_file() and dest.stat().st_size > 0
+
+
 def _copy_site_bgm(candidates: list[Path], output_dir: Path) -> bool:
-    """拷贝首个存在的 bgm.mp3 → public/audio/bgm.mp3。"""
+    """拷贝首个存在的 bgm.mp3 → public/audio/bgm.mp3。
+
+    源文件建议已压低响度（content/audio/bgm.mp3）；有 ffmpeg 时再轻压 -6dB。
+    """
     for src in candidates:
         if not src.is_file():
             continue
         dest_dir = output_dir / "audio"
         dest_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest_dir / "bgm.mp3")
+        dest = dest_dir / "bgm.mp3"
+        if not _attenuate_bgm_file(src, dest, db=-6.0):
+            shutil.copy2(src, dest)
         return True
     return False
 
@@ -955,15 +987,59 @@ def _feed_js() -> str:
   var isZh = (root.getAttribute("lang") || "").toLowerCase().indexOf("zh") === 0;
   var labelPlay = isZh ? "播" : "Play";
   var labelStop = isZh ? "停" : "Stop";
+  var labelSpeakPlay = isZh ? "播放" : "Play";
+  var labelSpeakPause = isZh ? "暂停" : "Pause";
   var labelNow = isZh ? "第 " : "#";
   var labelNowSuffix = isZh ? " 条" : "";
-  var BGM_DUCK = 0.035;
+  var BGM_DUCK = 0.22;
   var SPEECH_VOL = 1;
+  var bgmCtx = null;
+  var bgmGain = null;
+  var bgmWired = false;
+
+  var setSpeakBtn = function (btn, playing) {
+    if (!btn) return;
+    btn.setAttribute("aria-pressed", playing ? "true" : "false");
+    btn.setAttribute("aria-label", playing ? labelSpeakPause : labelSpeakPlay);
+    var playIcon = btn.querySelector(".item-speak-play");
+    var pauseIcon = btn.querySelector(".item-speak-pause");
+    if (playIcon) playIcon.hidden = !!playing;
+    if (pauseIcon) pauseIcon.hidden = !playing;
+  };
+
+  var wireBgmGraph = function () {
+    if (!bgm || bgmWired) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      bgmCtx = new AC();
+      bgmGain = bgmCtx.createGain();
+      bgmGain.gain.value = BGM_DUCK;
+      var srcNode = bgmCtx.createMediaElementSource(bgm);
+      srcNode.connect(bgmGain);
+      bgmGain.connect(bgmCtx.destination);
+      bgm.volume = 1;
+      bgmWired = true;
+    } catch (e) {
+      bgmCtx = null;
+      bgmGain = null;
+      bgmWired = false;
+    }
+  };
 
   var ensureBgm = function () {
     if (!bgm) return;
     bgm.loop = true;
-    bgm.volume = BGM_DUCK;
+    wireBgmGraph();
+    if (bgmGain) {
+      bgmGain.gain.value = BGM_DUCK;
+      bgm.volume = 1;
+    } else {
+      bgm.volume = BGM_DUCK;
+    }
+    if (bgmCtx && bgmCtx.state === "suspended") {
+      bgmCtx.resume().catch(function () {});
+    }
     var bp = bgm.play();
     if (bp && typeof bp.catch === "function") {
       bp.catch(function () {});
@@ -1005,8 +1081,7 @@ def _feed_js() -> str:
       el.classList.remove("is-playing");
     });
     document.querySelectorAll(".item-speak").forEach(function (btn) {
-      btn.setAttribute("aria-pressed", "false");
-      btn.textContent = labelPlay;
+      setSpeakBtn(btn, false);
     });
     setFabPlaying(!!playing && !!item);
     if (!item) {
@@ -1015,11 +1090,7 @@ def _feed_js() -> str:
       return;
     }
     item.classList.add("is-playing");
-    var cardBtn = item.querySelector(".item-speak");
-    if (cardBtn) {
-      cardBtn.setAttribute("aria-pressed", playing ? "true" : "false");
-      cardBtn.textContent = playing ? labelStop : labelPlay;
-    }
+    setSpeakBtn(item.querySelector(".item-speak"), playing);
     if (playBtn) playBtn.textContent = playing ? labelStop : labelPlay;
     var idx = item.querySelector(".item-index");
     if (nowEl) {
@@ -1643,13 +1714,13 @@ def _render_item(
         {
             "affiliate": "Affiliate offer",
             "read": "Read article",
-            "speak": "Play",
+            "speak_play": "Play",
         }
         if lang == "en"
         else {
             "affiliate": "联盟推荐",
             "read": "看正文",
-            "speak": "播",
+            "speak_play": "播放",
         }
     )
     title = escape(item.title)
@@ -1710,8 +1781,15 @@ def _render_item(
     action_bits: list[str] = []
     if audio_href:
         action_bits.append(
-            f'<button type="button" class="item-speak" aria-pressed="false">'
-            f"{labels['speak']}</button>"
+            f'<button type="button" class="item-speak" aria-pressed="false" '
+            f'aria-label="{escape(labels["speak_play"])}">'
+            f'<span class="item-speak-icon item-speak-play" aria-hidden="true">'
+            f'<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">'
+            f'<path d="M8 5v14l11-7z"/></svg></span>'
+            f'<span class="item-speak-icon item-speak-pause" aria-hidden="true" hidden>'
+            f'<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">'
+            f'<path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></span>'
+            f"</button>"
         )
     if url:
         action_bits.append(
@@ -2606,6 +2684,7 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  margin-left: auto;
   padding: 0;
   border: none;
   background: none;
@@ -2836,21 +2915,40 @@ code {
   flex-wrap: wrap;
   gap: 0.55rem;
   align-items: center;
+  justify-content: flex-start;
   margin: 0.65rem 0 0;
+  position: relative;
+  z-index: 2;
+}
+.item-read {
+  margin-left: auto;
 }
 .item-speak {
   appearance: none;
   position: relative;
   z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(15, 23, 42, 0.55);
   color: #e2e8f0;
   border-radius: 999px;
-  padding: 0.28rem 0.75rem;
   font: inherit;
-  font-size: 0.82rem;
-  font-weight: 600;
   cursor: pointer;
+}
+.item-speak-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+.item-speak-icon[hidden] {
+  display: none;
+}
+.item-speak-icon svg {
+  display: block;
 }
 .item-speak[aria-pressed="true"] {
   border-color: rgba(99, 102, 241, 0.7);

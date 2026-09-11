@@ -120,7 +120,8 @@ http:
 ollama:
   base_url: http://127.0.0.1:11434
   model: qwen3:4b-instruct
-  timeout_seconds: 300
+  timeout_seconds: 600
+  translate_batch_size: 8
 
 # 默认 LLM；Grok/云端可设 LLM_PROVIDER=openrouter + OPENROUTER_API_KEY
 llm:

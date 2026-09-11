@@ -638,6 +638,47 @@ def test_translate_digest_file_incremental_reuses_url(
     assert out.index("旧中文") < out.index("新中文")
 
 
+def test_translate_digest_file_batches_llm_calls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    blocks = [
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\nSelected: 5\n"
+    ]
+    for i in range(1, 6):
+        blocks.append(
+            f"## {i}. Item {i}\n\n- source: `hn`\n"
+            f"- url: https://ex.example/{i}\n- summary: body {i}\n"
+        )
+    src.write_text("\n".join(blocks), encoding="utf-8")
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct", translate_batch_size=2),
+    )
+    calls: list[str] = []
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        calls.append(text)
+        assert isinstance(llm, LlmRuntime)
+        # 原样回传即可被 parse；标题加 ZH 标记方便断言
+        return text.replace("Item ", "条目 ")
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg)
+    assert len(calls) == 3  # 2+2+1
+    assert "https://ex.example/1" in calls[0]
+    assert "https://ex.example/2" in calls[0]
+    assert "https://ex.example/5" in calls[2]
+    out = dst.read_text(encoding="utf-8")
+    assert "条目 1" in out
+    assert "条目 5" in out
+
+
 def test_translate_digest_file_no_llm_when_all_reused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
