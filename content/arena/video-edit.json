@@ -12,8 +12,8 @@
       "model": "wan3.0",
       "vendor": "Alibaba",
       "license": "proprietary",
-      "score": 1414,
-      "ci": 26,
+      "score": 1414.0,
+      "ci": 26.0,
       "votes": 463
     },
     {
@@ -21,8 +21,8 @@
       "model": "dreamina-seedance-2.5-720p",
       "vendor": "Bytedance",
       "license": "proprietary",
-      "score": 1410,
-      "ci": 26,
+      "score": 1410.0,
+      "ci": 26.0,
       "votes": 429
     },
     {
@@ -30,8 +30,8 @@
       "model": "minimax-h3",
       "vendor": "MiniMax",
       "license": "open",
-      "score": 1392,
-      "ci": 19,
+      "score": 1392.0,
+      "ci": 19.0,
       "votes": 962
     },
     {
@@ -39,8 +39,8 @@
       "model": "gemini-omni-flash",
       "vendor": "Google",
       "license": "proprietary",
-      "score": 1367,
-      "ci": 15,
+      "score": 1367.0,
+      "ci": 15.0,
       "votes": 2109
     },
     {
@@ -48,8 +48,8 @@
       "model": "dreamina-seedance-2.0-720p",
       "vendor": "Bytedance",
       "license": "proprietary",
-      "score": 1365,
-      "ci": 14,
+      "score": 1365.0,
+      "ci": 14.0,
       "votes": 3852
     },
     {
@@ -57,8 +57,8 @@
       "model": "happyhorse-1.0",
       "vendor": "Alibaba-ATH",
       "license": "proprietary",
-      "score": 1307,
-      "ci": 14,
+      "score": 1307.0,
+      "ci": 14.0,
       "votes": 3116
     },
     {
@@ -66,8 +66,8 @@
       "model": "grok-imagine-video",
       "vendor": "SpaceXAI",
       "license": "proprietary",
-      "score": 1258,
-      "ci": 10,
+      "score": 1258.0,
+      "ci": 10.0,
       "votes": 13724
     },
     {
@@ -75,8 +75,8 @@
       "model": "kling-o3-pro",
       "vendor": "KlingAI",
       "license": "proprietary",
-      "score": 1255,
-      "ci": 11,
+      "score": 1255.0,
+      "ci": 11.0,
       "votes": 7540
     },
     {
@@ -84,8 +84,8 @@
       "model": "kling-o1-pro",
       "vendor": "KlingAI",
       "license": "proprietary",
-      "score": 1197,
-      "ci": 10,
+      "score": 1197.0,
+      "ci": 10.0,
       "votes": 10542
     },
     {
@@ -93,8 +93,8 @@
       "model": "runway-gen4-aleph",
       "vendor": "Runway",
       "license": "proprietary",
-      "score": 1182,
-      "ci": 9,
+      "score": 1182.0,
+      "ci": 9.0,
       "votes": 9818
     }
   ]
