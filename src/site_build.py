@@ -734,7 +734,19 @@ def _podcast_dock_html(lang: str) -> str:
 <audio id="site-audio" preload="none"></audio>
 <div class="podcast-dock" id="podcast-dock" hidden>
   <button type="button" class="podcast-mode" id="podcast-mode"
-    aria-pressed="false">伴读</button>
+    aria-pressed="false" aria-label="伴读播放或暂停">
+    <span class="podcast-mode-icon podcast-mode-play" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+    </span>
+    <span class="podcast-mode-icon podcast-mode-pause" aria-hidden="true" hidden>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+        <path d="M6 5h4v14H6zm8 0h4v14h-4z"/>
+      </svg>
+    </span>
+    <span class="podcast-mode-label">伴读</span>
+  </button>
   <div class="podcast-controls" id="podcast-controls" hidden>
     <button type="button" class="podcast-nav" id="podcast-prev"
       aria-label="上一条">上一</button>
@@ -880,6 +892,15 @@ def _feed_js() -> str:
     document.body.classList.add("has-podcast-dock");
   };
 
+  var setFabPlaying = function (playing) {
+    if (!modeBtn) return;
+    modeBtn.setAttribute("aria-pressed", playing ? "true" : "false");
+    var playIcon = modeBtn.querySelector(".podcast-mode-play");
+    var pauseIcon = modeBtn.querySelector(".podcast-mode-pause");
+    if (playIcon) playIcon.hidden = !!playing;
+    if (pauseIcon) pauseIcon.hidden = !playing;
+  };
+
   var setPlayingUi = function (item, playing) {
     document.querySelectorAll(".item.is-playing").forEach(function (el) {
       el.classList.remove("is-playing");
@@ -888,6 +909,7 @@ def _feed_js() -> str:
       btn.setAttribute("aria-pressed", "false");
       btn.textContent = "播";
     });
+    setFabPlaying(!!playing && !!item);
     if (!item) {
       if (playBtn) playBtn.textContent = "播";
       if (nowEl) nowEl.textContent = "";
@@ -978,20 +1000,19 @@ def _feed_js() -> str:
     });
     if (modeBtn) {
       modeBtn.addEventListener("click", function () {
-        podcastOn = !podcastOn;
-        modeBtn.setAttribute("aria-pressed", podcastOn ? "true" : "false");
-        if (controls) controls.hidden = !podcastOn;
-        document.body.classList.toggle("podcast-on", podcastOn);
-        if (podcastOn) {
-          var items = audioItems();
-          if (!items.length) return;
-          var start = currentItem && items.indexOf(currentItem) >= 0
-            ? currentItem
-            : items[0];
-          playItem(start, true);
-        } else {
+        if (audio && !audio.paused && currentItem) {
           pauseAudio();
+          return;
         }
+        podcastOn = true;
+        if (controls) controls.hidden = false;
+        document.body.classList.add("podcast-on");
+        var items = audioItems();
+        if (!items.length) return;
+        var start = currentItem && items.indexOf(currentItem) >= 0
+          ? currentItem
+          : items[0];
+        playItem(start, true);
       });
     }
     if (playBtn) {
@@ -2756,6 +2777,21 @@ code {
   font-weight: 600;
   cursor: pointer;
 }
+.podcast-mode-icon {
+  display: none;
+  line-height: 0;
+}
+.podcast-mode-icon svg {
+  display: block;
+}
+.podcast-mode-label {
+  display: inline;
+}
+@media (min-width: 721px) {
+  .podcast-mode-icon {
+    display: none !important;
+  }
+}
 .podcast-mode[aria-pressed="true"] {
   border-color: rgba(99, 102, 241, 0.75);
   background: rgba(99, 102, 241, 0.3);
@@ -2796,17 +2832,38 @@ body.has-podcast-dock {
     backdrop-filter: none;
   }
   .podcast-mode {
-    width: 3.6rem;
-    height: 3.6rem;
-    padding: 0;
+    width: auto;
+    min-width: 3.6rem;
+    height: auto;
+    padding: 0.55rem 0.7rem 0.45rem;
     border: none;
-    border-radius: 999px;
+    border-radius: 1.15rem;
     background: rgba(99, 102, 241, 0.95);
     color: #f8fafc;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    position: relative;
+    isolation: isolate;
+    overflow: visible;
     box-shadow:
       0 10px 28px rgba(0, 0, 0, 0.45),
       0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .podcast-mode-label {
+    display: block;
+    line-height: 1;
+  }
+  .podcast-mode-icon {
+    display: inline-flex;
+  }
+  .podcast-mode-icon[hidden] {
+    display: none !important;
   }
   .podcast-mode[aria-pressed="true"] {
     background: rgba(79, 70, 229, 1);
@@ -2814,11 +2871,41 @@ body.has-podcast-dock {
       0 10px 28px rgba(99, 102, 241, 0.45),
       0 0 0 2px rgba(165, 180, 252, 0.45);
   }
+  .podcast-mode[aria-pressed="true"]::before,
+  .podcast-mode[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    border: 2px solid rgba(165, 180, 252, 0.55);
+    z-index: -1;
+    pointer-events: none;
+    animation: podcast-ripple 1.8s ease-out infinite;
+  }
+  .podcast-mode[aria-pressed="true"]::after {
+    animation-delay: 0.9s;
+  }
   .podcast-controls {
     display: none;
   }
   .podcast-now {
     display: none;
+  }
+}
+@keyframes podcast-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .podcast-mode[aria-pressed="true"]::before,
+  .podcast-mode[aria-pressed="true"]::after {
+    animation: none;
   }
 }
 """.strip()
