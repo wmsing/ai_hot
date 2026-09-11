@@ -47,6 +47,19 @@ python -m src.digest_en
 # 本地 Ollama（默认 qwen3:4b-instruct）把英文 digest 译成中文
 python -m src.translate
 # 查看：out/digest.zh.md
+
+# 口播稿 + TTS 播放列表（需 edge-tts）
+pip install -e ".[speak]"
+python -m src.speak --script-only          # 只写 out/speak.zh.md
+python -m src.speak                        # 全量：逐条 mp3 + full.mp3 + playlist.m3u
+python -m src.speak --limit 3              # 调试前 3 条
+# 播放：打开 out/audio/zh/<UTC-day>/playlist.m3u
+# 站点伴读（中/英桌面+手机；仅中文页有音频）
+python -m src.speak                        # 写 out/ + 同步 content/audio/zh/<day>/
+python -m src.site_build
+# 电脑浏览器打开（不要用手机局域网 IP）：
+#   http://127.0.0.1:8766/zh/
+# 上线：提交 content/audio 后 push main → Cloudflare 构建会带上伴读
 ```
 
 > 依赖：本机 Ollama 可用。中文源（如量子位）英文化失败时保留原文并打 warning。
@@ -121,7 +134,8 @@ ruff check src && ruff format --check src
 
 ## v1 非目标
 
-推送、Reddit、口播/数字人、发帖（YT/抖音/小红书）、接 ai_host、AdSense。
+推送、Reddit、数字人视频/唇形、发帖（YT/抖音/小红书）、接 ai_host、AdSense。
+口播稿 + TTS 播放列表可用（`python -m src.speak`）。
 联盟 CTA 仅骨架（默认关），不自动匹配商品。
 
 ## 当前扫描源

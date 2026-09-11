@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -18,6 +19,7 @@ from src.site_parse import parse_digest_markdown
 from src.timeutil import parse_published
 
 _DIGEST_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(en|zh)\.md$")
+_ITEM_MP3_RE = re.compile(r"^(\d{3})\.mp3$")
 
 SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
@@ -48,6 +50,9 @@ class TimelineEntry:
 
     group_day: date
     item: DigestItem
+    # 口播 mp3 对齐归档日 + digest 原序号（首页展示 index 可能被重排）
+    source_day: date
+    source_index: int
 
 
 @dataclass(frozen=True)
@@ -69,10 +74,13 @@ def build_site(
     output_dir: Path,
     site: SiteConfig | None = None,
     arena_boards: list[ArenaLeaderboard] | None = None,
+    audio_dir: Path | None = None,
+    audio_dirs: list[Path] | None = None,
 ) -> None:
     """扫描 content_dir，写出完整静态站到 output_dir。
 
     arena_boards 写入独立 Arena 页；首页与归档不嵌入榜单。
+    audio_dirs / audio_dir：speak mp3 根目录（如 content/audio/zh、out/audio/zh）。
     """
     cfg = site if site is not None else SiteConfig()
     boards = arena_boards if arena_boards is not None else []
@@ -84,6 +92,12 @@ def build_site(
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "styles.css").write_text(_stylesheet(), encoding="utf-8")
     (output_dir / "favicon.svg").write_text(_favicon_svg(), encoding="utf-8")
+    roots: list[Path] = []
+    if audio_dirs:
+        roots.extend(audio_dirs)
+    elif audio_dir is not None:
+        roots.append(audio_dir)
+    audio_available = _copy_speak_audio_roots(roots, output_dir, days)
 
     _write(
         output_dir / "archive" / "index.html",
@@ -138,12 +152,14 @@ def build_site(
         lang="en",
         items=en_timeline,
         affiliate_enabled=cfg.affiliate_enabled,
+        audio_available=audio_available,
     )
     _write_feed_json_pages(
         output_dir,
         lang="zh",
         items=zh_timeline,
         affiliate_enabled=cfg.affiliate_enabled,
+        audio_available=audio_available,
     )
 
     if en_timeline:
@@ -155,6 +171,7 @@ def build_site(
                 has_other_lang=bool(zh_timeline),
                 site=cfg,
                 as_of=_latest_generated_at(days, "en"),
+                audio_available=audio_available,
             ),
         )
     else:
@@ -170,6 +187,7 @@ def build_site(
                 has_other_lang=bool(en_timeline),
                 site=cfg,
                 as_of=_latest_generated_at(days, "zh"),
+                audio_available=audio_available,
             ),
         )
     else:
@@ -200,6 +218,7 @@ def build_site(
                 older_day=older_day,
                 newer_day=newer_day,
                 newer_is_latest=newer_is_latest,
+                audio_available=audio_available,
             )
             _write(output_dir / "archive" / day_s / "index.html", archive_page)
             sitemap_urls.append(_abs_url(origin, en_archive_path))
@@ -215,6 +234,7 @@ def build_site(
                 older_day=older_day,
                 newer_day=newer_day,
                 newer_is_latest=newer_is_latest,
+                audio_available=audio_available,
             )
             _write(
                 output_dir / "zh" / "archive" / day_s / "index.html",
@@ -606,7 +626,12 @@ def _timeline_items(days: list[DayFiles], lang: str) -> list[TimelineEntry]:
         for item in doc.items:
             ts = _item_sort_ts(item, day_files.day)
             group_day = _item_group_day(item, day_files.day)
-            entry = TimelineEntry(group_day=group_day, item=item)
+            entry = TimelineEntry(
+                group_day=group_day,
+                item=item,
+                source_day=day_files.day,
+                source_index=item.index,
+            )
             url = item.url.strip()
             if not url:
                 orphans.append((ts, entry))
@@ -622,9 +647,105 @@ def _timeline_items(days: list[DayFiles], lang: str) -> list[TimelineEntry]:
             TimelineEntry(
                 group_day=entry.group_day,
                 item=entry.item.model_copy(update={"index": idx}),
+                source_day=entry.source_day,
+                source_index=entry.source_index,
             )
         )
     return out
+
+
+def _audio_public_href(day: date, index: int) -> str:
+    return f"/audio/zh/{day.isoformat()}/{index:03d}.mp3"
+
+
+def _resolve_audio_href(
+    lang: str,
+    *,
+    source_day: date,
+    source_index: int,
+    audio_available: set[tuple[str, int]],
+) -> str | None:
+    if lang != "zh":
+        return None
+    key = (source_day.isoformat(), source_index)
+    if key not in audio_available:
+        return None
+    return _audio_public_href(source_day, source_index)
+
+
+def _copy_speak_audio_roots(
+    audio_srcs: list[Path],
+    output_dir: Path,
+    days: list[DayFiles],
+) -> set[tuple[str, int]]:
+    """按顺序从多个根目录拷贝；已存在的文件不覆盖。"""
+    available: set[tuple[str, int]] = set()
+    for src in audio_srcs:
+        available |= _copy_speak_audio(src, output_dir, days, skip_existing=True)
+    return available
+
+
+def _copy_speak_audio(
+    audio_src: Path | None,
+    output_dir: Path,
+    days: list[DayFiles],
+    *,
+    skip_existing: bool = False,
+) -> set[tuple[str, int]]:
+    """把 speak mp3 拷到 public/audio/zh/{day}/；返回可用 (day, index)。"""
+    available: set[tuple[str, int]] = set()
+    if audio_src is None or not audio_src.is_dir() or not days:
+        return available
+    latest = days[0].day.isoformat()
+    for day_files in days:
+        day_s = day_files.day.isoformat()
+        src_day = audio_src / day_s
+        files: list[Path] = []
+        if src_day.is_dir():
+            files = sorted(src_day.glob("*.mp3"))
+        elif day_s == latest:
+            files = sorted(
+                p for p in audio_src.glob("*.mp3") if _ITEM_MP3_RE.match(p.name)
+            )
+        if not files:
+            continue
+        dest = output_dir / "audio" / "zh" / day_s
+        dest.mkdir(parents=True, exist_ok=True)
+        for path in files:
+            match = _ITEM_MP3_RE.match(path.name)
+            if match is None:
+                continue
+            index = int(match.group(1))
+            if index <= 0:
+                continue
+            dest_file = dest / path.name
+            if skip_existing and dest_file.is_file():
+                available.add((day_s, index))
+                continue
+            shutil.copy2(path, dest_file)
+            available.add((day_s, index))
+    return available
+
+
+def _podcast_dock_html(lang: str) -> str:
+    if lang != "zh":
+        return ""
+    return """
+<audio id="site-audio" preload="none"></audio>
+<div class="podcast-dock" id="podcast-dock" hidden>
+  <button type="button" class="podcast-mode" id="podcast-mode"
+    aria-pressed="false">伴读</button>
+  <div class="podcast-controls" id="podcast-controls" hidden>
+    <button type="button" class="podcast-nav" id="podcast-prev"
+      aria-label="上一条">上一</button>
+    <button type="button" class="podcast-nav podcast-play" id="podcast-play"
+      aria-label="播放或暂停">播</button>
+    <button type="button" class="podcast-nav" id="podcast-next"
+      aria-label="下一条">下一</button>
+    <span class="podcast-now" id="podcast-now"></span>
+  </div>
+</div>
+""".strip()
 
 
 def _render_day_sticky(day: date) -> str:
@@ -641,6 +762,7 @@ def _render_timeline_html(
     lang: str,
     *,
     affiliate_enabled: bool,
+    audio_available: set[tuple[str, int]],
     prev_day: date | None = None,
 ) -> str:
     bits: list[str] = []
@@ -649,7 +771,20 @@ def _render_timeline_html(
         if entry.group_day != last:
             bits.append(_render_day_sticky(entry.group_day))
             last = entry.group_day
-        bits.append(_render_item(entry.item, lang, affiliate_enabled=affiliate_enabled))
+        audio_href = _resolve_audio_href(
+            lang,
+            source_day=entry.source_day,
+            source_index=entry.source_index,
+            audio_available=audio_available,
+        )
+        bits.append(
+            _render_item(
+                entry.item,
+                lang,
+                affiliate_enabled=affiliate_enabled,
+                audio_href=audio_href,
+            )
+        )
     return "".join(bits)
 
 
@@ -659,6 +794,7 @@ def _write_feed_json_pages(
     lang: str,
     items: list[TimelineEntry],
     affiliate_enabled: bool,
+    audio_available: set[tuple[str, int]],
 ) -> None:
     """page 0 在首页 HTML；从 1 起写 feed/{lang}/{n}.html 分片。"""
     if len(items) <= HOME_PAGE_SIZE:
@@ -673,6 +809,7 @@ def _write_feed_json_pages(
             chunk,
             lang,
             affiliate_enabled=affiliate_enabled,
+            audio_available=audio_available,
             prev_day=prev_day,
         )
         next_page: int | None = page_i + 1 if page_i + 1 < page_count else None
@@ -684,7 +821,7 @@ def _write_feed_json_pages(
 
 
 def _feed_js() -> str:
-    return """
+    return r"""
 (function () {
   var root = document.documentElement;
   var syncNavStickyBottom = function () {
@@ -692,7 +829,6 @@ def _feed_js() -> str:
     if (!nav) return;
     var top = parseFloat(window.getComputedStyle(nav).top);
     if (isNaN(top)) top = 0;
-    // 日期 sticky 与吸顶菜单零间隙贴合
     var bottom = top + nav.getBoundingClientRect().height;
     root.style.setProperty("--nav-sticky-bottom", bottom + "px");
   };
@@ -717,6 +853,182 @@ def _feed_js() -> str:
     updateProgress();
   }
 
+  var audio = document.getElementById("site-audio");
+  var dock = document.getElementById("podcast-dock");
+  var modeBtn = document.getElementById("podcast-mode");
+  var controls = document.getElementById("podcast-controls");
+  var playBtn = document.getElementById("podcast-play");
+  var prevBtn = document.getElementById("podcast-prev");
+  var nextBtn = document.getElementById("podcast-next");
+  var nowEl = document.getElementById("podcast-now");
+  var podcastOn = false;
+  var currentItem = null;
+
+  var audioItems = function () {
+    return Array.prototype.slice.call(document.querySelectorAll(".item[data-audio]"));
+  };
+
+  var refreshDock = function () {
+    if (!dock) return;
+    var items = audioItems();
+    if (!items.length) {
+      dock.hidden = true;
+      document.body.classList.remove("has-podcast-dock");
+      return;
+    }
+    dock.hidden = false;
+    document.body.classList.add("has-podcast-dock");
+  };
+
+  var setPlayingUi = function (item, playing) {
+    document.querySelectorAll(".item.is-playing").forEach(function (el) {
+      el.classList.remove("is-playing");
+    });
+    document.querySelectorAll(".item-speak").forEach(function (btn) {
+      btn.setAttribute("aria-pressed", "false");
+      btn.textContent = "播";
+    });
+    if (!item) {
+      if (playBtn) playBtn.textContent = "播";
+      if (nowEl) nowEl.textContent = "";
+      return;
+    }
+    item.classList.add("is-playing");
+    var cardBtn = item.querySelector(".item-speak");
+    if (cardBtn) {
+      cardBtn.setAttribute("aria-pressed", playing ? "true" : "false");
+      cardBtn.textContent = playing ? "停" : "播";
+    }
+    if (playBtn) playBtn.textContent = playing ? "停" : "播";
+    var idx = item.querySelector(".item-index");
+    if (nowEl) nowEl.textContent = idx ? ("第 " + idx.textContent.trim() + " 条") : "";
+  };
+
+  var focusItem = function (item) {
+    if (!item) return;
+    try {
+      item.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (e) {
+      item.scrollIntoView(true);
+    }
+  };
+
+  var playItem = function (item, fromPodcast) {
+    if (!audio || !item) return;
+    var src = item.getAttribute("data-audio");
+    if (!src) return;
+    if (!fromPodcast) {
+      podcastOn = false;
+      if (modeBtn) modeBtn.setAttribute("aria-pressed", "false");
+      if (controls) controls.hidden = true;
+      document.body.classList.remove("podcast-on");
+    }
+    currentItem = item;
+    if (audio.getAttribute("src") !== src) {
+      audio.setAttribute("src", src);
+      audio.load();
+    }
+    setPlayingUi(item, true);
+    focusItem(item);
+    var p = audio.play();
+    if (p && typeof p.catch === "function") {
+      p.catch(function () {
+        setPlayingUi(item, false);
+      });
+    }
+  };
+
+  var pauseAudio = function () {
+    if (!audio) return;
+    audio.pause();
+    setPlayingUi(currentItem, false);
+  };
+
+  var toggleItem = function (item) {
+    if (!audio || !item) return;
+    if (currentItem === item && !audio.paused) {
+      pauseAudio();
+      return;
+    }
+    playItem(item, podcastOn);
+  };
+
+  var stepPodcast = function (delta) {
+    var items = audioItems();
+    if (!items.length) return;
+    var idx = currentItem ? items.indexOf(currentItem) : -1;
+    var next = items[Math.max(0, Math.min(items.length - 1, idx + delta))];
+    if (!next) next = items[0];
+    playItem(next, true);
+  };
+
+  if (audio && dock) {
+    refreshDock();
+    document.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var speakBtn = t.closest(".item-speak");
+      if (speakBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var card = speakBtn.closest(".item[data-audio]");
+        if (card) toggleItem(card);
+        return;
+      }
+    });
+    if (modeBtn) {
+      modeBtn.addEventListener("click", function () {
+        podcastOn = !podcastOn;
+        modeBtn.setAttribute("aria-pressed", podcastOn ? "true" : "false");
+        if (controls) controls.hidden = !podcastOn;
+        document.body.classList.toggle("podcast-on", podcastOn);
+        if (podcastOn) {
+          var items = audioItems();
+          if (!items.length) return;
+          var start = currentItem && items.indexOf(currentItem) >= 0
+            ? currentItem
+            : items[0];
+          playItem(start, true);
+        } else {
+          pauseAudio();
+        }
+      });
+    }
+    if (playBtn) {
+      playBtn.addEventListener("click", function () {
+        if (!currentItem) {
+          var items = audioItems();
+          if (items[0]) playItem(items[0], podcastOn);
+          return;
+        }
+        if (audio.paused) playItem(currentItem, podcastOn);
+        else pauseAudio();
+      });
+    }
+    if (prevBtn) prevBtn.addEventListener("click", function () { stepPodcast(-1); });
+    if (nextBtn) nextBtn.addEventListener("click", function () { stepPodcast(1); });
+    audio.addEventListener("ended", function () {
+      if (podcastOn) {
+        var items = audioItems();
+        var idx = currentItem ? items.indexOf(currentItem) : -1;
+        if (idx >= 0 && idx + 1 < items.length) {
+          playItem(items[idx + 1], true);
+          return;
+        }
+        podcastOn = false;
+        if (modeBtn) modeBtn.setAttribute("aria-pressed", "false");
+        if (controls) controls.hidden = true;
+        document.body.classList.remove("podcast-on");
+      }
+      setPlayingUi(currentItem, false);
+    });
+    audio.addEventListener("play", function () { setPlayingUi(currentItem, true); });
+    audio.addEventListener("pause", function () {
+      if (audio.ended) return;
+      setPlayingUi(currentItem, false);
+    });
+  }
+
   var btn = document.getElementById("load-more");
   var feed = document.getElementById("feed");
   if (!btn || !feed) return;
@@ -725,7 +1037,6 @@ def _feed_js() -> str:
     var base = btn.getAttribute("data-feed-base");
     if (!next || !base) return;
     btn.disabled = true;
-    // Workers Assets 会把 *.html 规范成无扩展名路径（/feed/en/1）
     fetch(base + "/" + next)
       .then(function (res) {
         if (!res.ok) throw new Error("feed fetch failed");
@@ -744,6 +1055,7 @@ def _feed_js() -> str:
           btn.setAttribute("data-next", more);
           btn.disabled = false;
         }
+        refreshDock();
       })
       .catch(function () {
         btn.disabled = false;
@@ -824,6 +1136,7 @@ def _render_digest(
     older_day: date | None = None,
     newer_day: date | None = None,
     newer_is_latest: bool = False,
+    audio_available: set[tuple[str, int]] | None = None,
 ) -> str:
     day_s = day.isoformat()
     gen = escape(doc.generated_at) if doc.generated_at else "—"
@@ -833,8 +1146,19 @@ def _render_digest(
     else:
         meta = f"生成时间（UTC）：{gen} · 精选：{selected}"
 
+    available = audio_available or set()
     items_html = "".join(
-        _render_item(item, lang, affiliate_enabled=site.affiliate_enabled)
+        _render_item(
+            item,
+            lang,
+            affiliate_enabled=site.affiliate_enabled,
+            audio_href=_resolve_audio_href(
+                lang,
+                source_day=day,
+                source_index=item.index,
+                audio_available=available,
+            ),
+        )
         for item in doc.items
     )
     if not items_html:
@@ -858,6 +1182,7 @@ def _render_digest(
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
 
     script_src = _feed_script_href(links.css)
+    podcast = _podcast_dock_html(lang)
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
@@ -880,6 +1205,7 @@ def _render_digest(
 </main>
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
+{podcast}
 """,
     )
 
@@ -891,6 +1217,7 @@ def _render_home_timeline(
     has_other_lang: bool,
     site: SiteConfig,
     as_of: str = "",
+    audio_available: set[tuple[str, int]] | None = None,
 ) -> str:
     links = _links_digest_home(lang, "", has_other_lang)
     total = len(items)
@@ -903,11 +1230,13 @@ def _render_home_timeline(
         load_l = "加载更多"
         feed_base = "/feed/zh"
     script_src = _feed_script_href(links.css)
+    available = audio_available or set()
 
     items_html = _render_timeline_html(
         page0,
         lang,
         affiliate_enabled=site.affiliate_enabled,
+        audio_available=available,
         prev_day=None,
     )
     if not items_html:
@@ -931,6 +1260,7 @@ def _render_home_timeline(
     en_hl = en_path if lang == "en" or has_other_lang else None
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
     desc = _static_description("home", lang)
+    podcast = _podcast_dock_html(lang)
 
     return _shell(
         title=SITE_NAME_EN,
@@ -950,6 +1280,7 @@ def _render_home_timeline(
 {load_more}
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
+{podcast}
 """,
     )
 
@@ -1167,16 +1498,19 @@ def _render_item(
     lang: str,
     *,
     affiliate_enabled: bool,
+    audio_href: str | None = None,
 ) -> str:
     labels = (
         {
             "affiliate": "Affiliate offer",
             "read": "Read article",
+            "speak": "Play",
         }
         if lang == "en"
         else {
             "affiliate": "联盟推荐",
             "read": "看正文",
+            "speak": "播",
         }
     )
     title = escape(item.title)
@@ -1213,6 +1547,8 @@ def _render_item(
         attrs.append(f'data-source="{escape(source, quote=True)}"')
     if tag_raw:
         attrs.append(f'data-tag="{escape(tag_raw, quote=True)}"')
+    if audio_href:
+        attrs.append(f'data-audio="{escape(audio_href, quote=True)}"')
 
     bits = [
         f"<article {' '.join(attrs)}>",
@@ -1232,13 +1568,20 @@ def _render_item(
     bits.append(f"<h2>{title}</h2>")
     if item.summary:
         bits.append(f'<p class="summary">{escape(item.summary)}</p>')
+    action_bits: list[str] = []
+    if audio_href:
+        action_bits.append(
+            f'<button type="button" class="item-speak" aria-pressed="false">'
+            f"{labels['speak']}</button>"
+        )
     if url:
-        bits.append(
-            f'<p class="item-actions">'
+        action_bits.append(
             f'<a class="item-read" href="{escape(url, quote=True)}" '
             f'target="_blank" rel="noopener noreferrer">'
-            f'{labels["read"]}</a></p>'
+            f"{labels['read']}</a>"
         )
+    if action_bits:
+        bits.append(f'<p class="item-actions">{" ".join(action_bits)}</p>')
     # Why / reason 不对读者展示
     aff = item.affiliate_url.strip()
     if affiliate_enabled and aff:
@@ -2349,6 +2692,135 @@ code {
     gap: 0.95rem;
   }
 }
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  margin: 0.65rem 0 0;
+}
+.item-speak {
+  appearance: none;
+  position: relative;
+  z-index: 3;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.28rem 0.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.item-speak[aria-pressed="true"] {
+  border-color: rgba(99, 102, 241, 0.7);
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+}
+.item.is-playing {
+  outline: 1px solid rgba(99, 102, 241, 0.55);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+}
+.podcast-dock {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: 0;
+  z-index: 40;
+  transform: translateX(-50%);
+  width: min(42rem, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: rgba(10, 12, 20, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-bottom: none;
+  border-radius: 1rem 1rem 0 0;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
+}
+.podcast-mode,
+.podcast-nav {
+  appearance: none;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.9);
+  color: #f8fafc;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.podcast-mode[aria-pressed="true"] {
+  border-color: rgba(99, 102, 241, 0.75);
+  background: rgba(99, 102, 241, 0.3);
+}
+.podcast-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+.podcast-now {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  min-width: 4.5rem;
+}
+body.has-podcast-dock {
+  padding-bottom: 4.5rem;
+}
+@media (max-width: 720px) {
+  body.has-podcast-dock {
+    padding-bottom: 0;
+  }
+  .podcast-dock {
+    left: auto;
+    right: max(0.85rem, env(safe-area-inset-right));
+    bottom: max(0.85rem, env(safe-area-inset-bottom));
+    width: auto;
+    max-width: calc(100vw - 1.7rem);
+    transform: none;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 0.55rem;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .podcast-mode {
+    width: 3.6rem;
+    height: 3.6rem;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.95);
+    color: #f8fafc;
+    font-size: 0.82rem;
+    box-shadow:
+      0 10px 28px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .podcast-mode[aria-pressed="true"] {
+    background: rgba(79, 70, 229, 1);
+    box-shadow:
+      0 10px 28px rgba(99, 102, 241, 0.45),
+      0 0 0 2px rgba(165, 180, 252, 0.45);
+  }
+  .podcast-controls {
+    display: none;
+  }
+  .podcast-now {
+    display: none;
+  }
+}
 """.strip()
 
 
@@ -2371,6 +2843,10 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=output_dir,
         site=config.site,
         arena_boards=boards,
+        audio_dirs=[
+            Path(config.paths.content_audio_dir),
+            Path(config.paths.speak_audio_dir),
+        ],
     )
     home = output_dir / "index.html"
     home_zh = output_dir / "zh" / "index.html"

@@ -192,9 +192,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'href="arena.html"' in home
     assert ">AI Models<" in home
     assert 'href="privacy.html"' in home
-    assert ">Archive<" not in home.split('class="nav-primary">', 1)[1].split(
-        "</div>", 1
-    )[0]
+    assert (
+        ">Archive<"
+        not in home.split('class="nav-primary">', 1)[1].split("</div>", 1)[0]
+    )
     assert 'href="archive/index.html">Archive</a>' in home
     assert 'class="lang-toggle"' in home
     assert ">中文<" in home
@@ -212,7 +213,7 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="label">摘要<' not in home
     assert 'class="item-read"' in home
     assert ">Read article<" in home
-    assert "content: \" →\"" in styles or 'content: " →"' in styles
+    assert 'content: " →"' in styles or 'content: " →"' in styles
     assert ".item:has(.item-read)" in styles
     assert "<h2><a " not in home
     assert 'class="item-thumb"' in home
@@ -263,9 +264,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "更新" in zh_home
     assert 'href="../favicon.svg"' in zh_home
     assert "当前未启用联盟链接" in zh_home
-    assert ">归档<" not in zh_home.split('class="nav-primary">', 1)[1].split(
-        "</div>", 1
-    )[0]
+    assert (
+        ">归档<"
+        not in zh_home.split('class="nav-primary">', 1)[1].split("</div>", 1)[0]
+    )
     assert 'href="archive/index.html">归档</a>' in zh_home
 
     archive_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
@@ -476,3 +478,61 @@ def test_build_site_affiliate_enabled(tmp_path: Path) -> None:
     assert "https://partner.example/offer" in home
     disclosure = (out / "disclosure.html").read_text(encoding="utf-8")
     assert "commission" in disclosure
+
+
+def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    audio = tmp_path / "audio"
+    day_dir = audio / "2026-09-10"
+    day_dir.mkdir(parents=True)
+    (day_dir / "001.mp3").write_bytes(b"ID3fake")
+    out = tmp_path / "public"
+    build_site(content_dir=content, output_dir=out, audio_dirs=[audio])
+
+    copied = out / "audio" / "zh" / "2026-09-10" / "001.mp3"
+    assert copied.is_file()
+
+    zh_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'data-audio="/audio/zh/2026-09-10/001.mp3"' in zh_day
+    assert 'class="item-speak"' in zh_day
+    assert 'id="podcast-dock"' in zh_day
+    assert 'id="podcast-mode"' in zh_day
+
+    en_day = (out / "archive" / "2026-09-10" / "index.html").read_text(encoding="utf-8")
+    assert "data-audio=" not in en_day
+    assert "podcast-dock" not in en_day
+
+    zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
+    assert 'data-audio="/audio/zh/2026-09-10/001.mp3"' in zh_home
+    assert 'id="podcast-mode"' in zh_home
+
+    feed_js = (out / "feed.js").read_text(encoding="utf-8")
+    assert "podcast-mode" in feed_js
+    assert "scrollIntoView" in feed_js
+    assert "item-speak" in feed_js
+
+    styles = (out / "styles.css").read_text(encoding="utf-8")
+    assert ".podcast-dock" in styles
+    assert ".item.is-playing" in styles
+
+
+def test_build_site_prefers_content_audio(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    content_audio = tmp_path / "content_audio" / "2026-09-10"
+    content_audio.mkdir(parents=True)
+    (content_audio / "001.mp3").write_bytes(b"from-content")
+    out_audio = tmp_path / "out_audio" / "2026-09-10"
+    out_audio.mkdir(parents=True)
+    (out_audio / "001.mp3").write_bytes(b"from-out-should-not-win")
+    public = tmp_path / "public"
+    build_site(
+        content_dir=content,
+        output_dir=public,
+        audio_dirs=[content_audio.parent, out_audio.parent],
+    )
+    data = (public / "audio" / "zh" / "2026-09-10" / "001.mp3").read_bytes()
+    assert data == b"from-content"

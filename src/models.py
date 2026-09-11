@@ -56,9 +56,20 @@ class PathsConfig(BaseModel):
     sqlite_path: str = "data/ai_hot.db"
     digest_path: str = "out/digest.md"
     digest_zh_path: str = "out/digest.zh.md"
+    speak_zh_path: str = "out/speak.zh.md"
+    speak_audio_dir: str = "out/audio/zh"
+    # 可进 git；site_build / Cloudflare 部署读这里
+    content_audio_dir: str = "content/audio/zh"
     content_digests_dir: str = "content/digests"
     arena_cache_dir: str = "content/arena"
     site_output_dir: str = "public"
+
+
+class SpeakConfig(BaseModel):
+    """口播 TTS（edge-tts）。"""
+
+    voice: str = "zh-CN-YunxiNeural"
+    rate: str = "+0%"
 
 
 class SiteConfig(BaseModel):
@@ -194,3 +205,4 @@ class AppConfig(BaseModel):
     llm: LlmConfig = Field(default_factory=LlmConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
     openrouter: OpenRouterConfig = Field(default_factory=OpenRouterConfig)
+    speak: SpeakConfig = Field(default_factory=SpeakConfig)
