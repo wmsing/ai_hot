@@ -11,6 +11,7 @@ from html import escape
 from pathlib import Path
 
 from src.config import load_app_config
+from src.digest import _parse_score_line
 from src.leaderboard import fetch_arena_boards
 from src.models import ArenaLeaderboard, DigestDocument, DigestItem, SiteConfig
 from src.site_parse import parse_digest_markdown
@@ -360,10 +361,27 @@ def _lang_nav(lang: str, other_href: str) -> str:
             f'hreflang="{"zh-Hans" if lang == "en" else "en"}">{label}</a>'
         )
     else:
-        inner = (
-            f'<span class="lang-toggle muted" aria-disabled="true">{label}</span>'
-        )
+        inner = f'<span class="lang-toggle muted" aria-disabled="true">{label}</span>'
     return f'<div class="lang-switch">{inner}</div>'
+
+
+def _chrome_brand_nav(
+    lang: str,
+    links: PageLinks,
+    *,
+    as_of: str | None = None,
+) -> str:
+    """品牌头 + sticky 导航（nav 必须在 header 外，否则吸顶只撑过标题高度）。"""
+    return (
+        '<header class="site-header">'
+        '<div class="brand-block">'
+        f'<p class="brand"><a href="{escape(links.brand_home)}">'
+        f"{escape(SITE_NAME_EN)}</a></p>"
+        f"{_brand_sub(lang, as_of=as_of)}"
+        "</div>"
+        "</header>"
+        f"{_main_nav(lang, links)}"
+    )
 
 
 def _main_nav(lang: str, links: PageLinks) -> str:
@@ -668,6 +686,37 @@ def _write_feed_json_pages(
 def _feed_js() -> str:
     return """
 (function () {
+  var root = document.documentElement;
+  var syncNavStickyBottom = function () {
+    var nav = document.querySelector(".site-nav");
+    if (!nav) return;
+    var top = parseFloat(window.getComputedStyle(nav).top);
+    if (isNaN(top)) top = 0;
+    // 日期 sticky 与吸顶菜单零间隙贴合
+    var bottom = top + nav.getBoundingClientRect().height;
+    root.style.setProperty("--nav-sticky-bottom", bottom + "px");
+  };
+  if (document.querySelector(".feed-day-sticky")) {
+    document.body.classList.add("has-day-sticky");
+  }
+  syncNavStickyBottom();
+  window.addEventListener("resize", syncNavStickyBottom);
+
+  var bar = document.querySelector(".read-progress");
+  if (bar) {
+    var updateProgress = function () {
+      var doc = document.documentElement;
+      var max = doc.scrollHeight - window.innerHeight;
+      var p = max > 0 ? window.scrollY / max : 0;
+      if (p < 0) p = 0;
+      if (p > 1) p = 1;
+      bar.style.setProperty("--p", String(p));
+    };
+    window.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateProgress);
+    updateProgress();
+  }
+
   var btn = document.getElementById("load-more");
   var feed = document.getElementById("feed");
   if (!btn || !feed) return;
@@ -706,6 +755,22 @@ def _feed_js() -> str:
 
 def _favicon_href(css_href: str) -> str:
     return css_href.replace("styles.css", "favicon.svg")
+
+
+def _feed_script_href(css_href: str) -> str:
+    return css_href.replace("styles.css", "feed.js")
+
+
+def _heat_level(score_line: str) -> int:
+    """0=无分；1=<150；2=150–299；3=≥300。"""
+    score, _ = _parse_score_line(score_line)
+    if score is None:
+        return 0
+    if score < 150:
+        return 1
+    if score < 300:
+        return 2
+    return 3
 
 
 def _contact_blurb(lang: str, site: SiteConfig) -> str:
@@ -770,6 +835,7 @@ def _render_digest(
     en_hl = en_path if lang == "en" or has_other_lang else None
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
 
+    script_src = _feed_script_href(links.css)
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
@@ -777,20 +843,16 @@ def _render_digest(
         description=_digest_description(lang, day, selected),
         canonical=_abs_url(origin, canonical_path),
         hreflang=_hreflang_pairs(en_path=en_hl, zh_path=zh_hl, origin=origin),
+        extra_scripts=f'<script src="{escape(script_src)}" defer></script>',
         body=f"""
+<div class="read-progress" aria-hidden="true"></div>
 <div class="site">
-<header class="site-header">
-  <div class="brand-block">
-    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang)}
-  </div>
-  {_main_nav(lang, links)}
+{_chrome_brand_nav(lang, links)}
   <div class="day-bar">
     <h1>{escape(day_s)}</h1>
     <p class="meta">{meta}</p>
     {day_nav}
   </div>
-</header>
 <main class="feed">
   {items_html}
 </main>
@@ -815,11 +877,10 @@ def _render_home_timeline(
     if lang == "en":
         load_l = "Load more"
         feed_base = "/feed/en"
-        script_src = "feed.js"
     else:
         load_l = "加载更多"
         feed_base = "/feed/zh"
-        script_src = "../feed.js"
+    script_src = _feed_script_href(links.css)
 
     items_html = _render_timeline_html(
         page0,
@@ -858,14 +919,9 @@ def _render_home_timeline(
         hreflang=_hreflang_pairs(en_path=en_hl, zh_path=zh_hl, origin=origin),
         extra_scripts=f'<script src="{escape(script_src)}" defer></script>',
         body=f"""
+<div class="read-progress" aria-hidden="true"></div>
 <div class="site">
-<header class="site-header">
-  <div class="brand-block">
-    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang, as_of=as_of or None)}
-  </div>
-  {_main_nav(lang, links)}
-</header>
+{_chrome_brand_nav(lang, links, as_of=as_of or None)}
 <main class="feed" id="feed">
   {items_html}
 </main>
@@ -1072,15 +1128,9 @@ def _render_arena_page(
         hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
-<header class="site-header">
-  <div class="brand-block">
-    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang)}
-  </div>
-  {_main_nav(lang, links)}
+{_chrome_brand_nav(lang, links)}
   <h1 class="page-title">{escape(heading)}</h1>
   <p class="meta arena-page-intro">{escape(intro)}</p>
-</header>
 <main class="feed arena-page">
   {body}
 </main>
@@ -1119,9 +1169,11 @@ def _render_item(
         title_html = title
 
     meta_bits: list[str] = []
-    if item.source:
-        meta_bits.append(f'<span class="badge">{escape(item.source)}</span>')
-    tag_disp = _display_tag(item.tag, lang)
+    source = item.source.strip()
+    if source:
+        meta_bits.append(f'<span class="badge badge-source">{escape(source)}</span>')
+    tag_raw = item.tag.strip()
+    tag_disp = _display_tag(tag_raw, lang)
     if tag_disp:
         meta_bits.append(f'<span class="badge badge-tag">{escape(tag_disp)}</span>')
     published_disp = _display_published(item.published)
@@ -1133,8 +1185,20 @@ def _render_item(
     if score_disp:
         meta_bits.append(f"<span>{escape(score_disp)}</span>")
 
+    heat = _heat_level(item.score_line)
+    stagger_i = max(0, min(max(item.index, 1) - 1, 12))
+    attrs = [
+        'class="item"',
+        f'data-heat="{heat}"',
+        f'style="--i: {stagger_i}"',
+    ]
+    if source:
+        attrs.append(f'data-source="{escape(source, quote=True)}"')
+    if tag_raw:
+        attrs.append(f'data-tag="{escape(tag_raw, quote=True)}"')
+
     bits = [
-        '<article class="item">',
+        f"<article {' '.join(attrs)}>",
         f'<span class="item-index" aria-hidden="true">{item.index:02d}</span>',
         '<div class="item-body">',
     ]
@@ -1248,14 +1312,8 @@ def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> 
         hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
-<header class="site-header">
-  <div class="brand-block">
-    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang)}
-  </div>
-  {_main_nav(lang, links)}
+{_chrome_brand_nav(lang, links)}
   <h1 class="page-title">{heading}</h1>
-</header>
 <main class="feed">{lis}</main>
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
@@ -1284,14 +1342,8 @@ def _static_page_shell(
         hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
-<header class="site-header">
-  <div class="brand-block">
-    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang)}
-  </div>
-  {_main_nav(lang, links)}
+{_chrome_brand_nav(lang, links)}
   <h1 class="page-title">{heading}</h1>
-</header>
 <main class="prose">{body_text}</main>
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
@@ -1445,13 +1497,7 @@ def _render_empty_home(
         hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
-<header class="site-header">
-  <div class="brand-block">
-    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang)}
-  </div>
-  {_main_nav(lang, links)}
-</header>
+{_chrome_brand_nav(lang, links)}
 <main class="feed"><p class="muted">{escape(msg)}</p></main>
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
@@ -1482,16 +1528,10 @@ def _render_missing_home(
         hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
         body=f"""
 <div class="site">
-<header class="site-header">
-  <div class="brand-block">
-    <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang)}
-  </div>
-  {_main_nav(lang, links)}
+{_chrome_brand_nav(lang, links)}
   <div class="day-bar">
     <h1>{escape(day_s)}</h1>
   </div>
-</header>
 <main class="feed"><p class="muted">{escape(msg)}</p></main>
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
@@ -1537,8 +1577,7 @@ def _shell(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(title)}</title>
   <meta name="description" content="{escape(desc)}">
-  <meta name="theme-color" content="#eef3f0" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0f1613" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#0d0f17">
   <meta property="og:title" content="{escape(title)}">
   <meta property="og:description" content="{escape(desc)}">
   <meta property="og:type" content="website">
@@ -1567,37 +1606,24 @@ def _favicon_svg() -> str:
 
 
 def _stylesheet() -> str:
-    # Taste soft + ink green (墨绿); dials VARIANCE 5 / MOTION 3 / DENSITY 2
+    # Dark glow field (indigo + pink radials); dials VARIANCE 5 / MOTION 3 / DENSITY 2
     return """
 :root {
-  --bg: #eef3f0;
-  --bg-elev: #f7faf8;
-  --ink: #14201b;
-  --muted: #5a6b63;
-  --accent: #1a3c32;
-  --accent-hot: #245246;
-  --line: #d2ddd6;
-  --focus: #1a3c32;
-  --shadow: 0 8px 28px rgba(20, 32, 27, 0.07);
+  --bg: #0d0f17;
+  --bg-elev: rgba(255, 255, 255, 0.05);
+  --ink: #f4f6fb;
+  --muted: rgba(244, 246, 251, 0.68);
+  --accent: #a5b4fc;
+  --accent-hot: #c4b5fd;
+  --line: rgba(255, 255, 255, 0.12);
+  --focus: #a5b4fc;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --radius: 16px;
   --font-display: "Outfit", "Avenir Next", sans-serif;
   --font-body: "Literata", "Palatino Linotype", serif;
   --font-ui: "Source Sans 3", "Segoe UI", sans-serif;
   --pad: clamp(1.5rem, 5vw, 2.5rem);
   --max: 44rem;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1613;
-    --bg-elev: #17201c;
-    --ink: #e4ebe7;
-    --muted: #95a59d;
-    --accent: #7eb39f;
-    --accent-hot: #96c7b4;
-    --line: #2a3832;
-    --focus: #7eb39f;
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  }
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -1606,20 +1632,50 @@ body {
   min-height: 100vh;
   font-family: var(--font-ui);
   font-size: 1.0625rem;
-  background:
-    radial-gradient(
-      ellipse 90% 55% at 50% -20%,
-      color-mix(in srgb, var(--accent) 12%, transparent),
-      transparent 60%
-    ),
-    var(--bg);
+  background-color: var(--bg);
   color: var(--ink);
   line-height: 1.7;
+  overflow-x: hidden;
+  position: relative;
+}
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+}
+body::before {
+  top: -10%;
+  left: -10%;
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.4) 0%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  filter: blur(80px);
+}
+body::after {
+  bottom: -10%;
+  right: -10%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(
+    circle,
+    rgba(236, 72, 153, 0.3) 0%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  filter: blur(100px);
 }
 .site {
   margin: 0 auto;
   max-width: var(--max);
   padding: var(--pad) var(--pad) 4rem;
+  position: relative;
+  z-index: 0;
 }
 a {
   color: var(--accent);
@@ -1634,10 +1690,12 @@ a:focus-visible {
   border-radius: 4px;
 }
 .site-header {
-  margin-bottom: 2rem;
+  margin-bottom: 0;
+}
+.brand-block {
+  margin-bottom: 1.35rem;
   animation: soft-in 0.7s ease both;
 }
-.brand-block { margin-bottom: 1.35rem; }
 .brand {
   font-family: var(--font-display);
   font-size: clamp(2.45rem, 7vw, 3.25rem);
@@ -1661,7 +1719,7 @@ a:focus-visible {
 }
 .site-nav {
   position: sticky;
-  top: 0;
+  top: 2px;
   z-index: 5;
   display: flex;
   flex-wrap: wrap;
@@ -1678,6 +1736,12 @@ a:focus-visible {
   box-shadow: var(--shadow);
   font-size: 1rem;
   font-weight: 500;
+}
+body.has-day-sticky .site-nav {
+  margin-bottom: 0;
+  border-radius: calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
 }
 .nav-primary {
   display: flex;
@@ -1778,14 +1842,16 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 }
 .feed-day-sticky {
   position: sticky;
-  top: 4.75rem;
+  top: var(--nav-sticky-bottom, 3.75rem);
   z-index: 3;
-  margin: 1.35rem 0 0.65rem;
-  padding: 0.55rem 0.1rem 0.5rem;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 1.1rem 0.5rem;
+  background: color-mix(in srgb, var(--bg-elev) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: none;
   border-bottom: 1px solid var(--line);
+  border-radius: 0;
   font-family: var(--font-display);
   font-size: 0.92rem;
   font-weight: 600;
@@ -1869,30 +1935,73 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   flex-direction: column;
   gap: 0.95rem;
 }
+.read-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  z-index: 50;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.read-progress::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transform: scaleX(var(--p, 0));
+}
 .item {
+  --source: var(--accent);
   display: grid;
   grid-template-columns: 2.5rem 1fr;
   gap: 0.55rem 0.95rem;
   padding: 1.3rem 1.25rem 1.35rem;
   background: var(--bg-elev);
   border: 1px solid var(--line);
+  border-left: 3px solid var(--source);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  animation: soft-in 0.55s ease both;
+  animation-delay: calc(var(--i, 0) * 45ms);
   transition:
     box-shadow 0.3s ease,
     border-color 0.3s ease,
     transform 0.3s ease;
 }
+.item[data-source="hn"] { --source: #c45c26; }
+.item[data-source="openai"],
+.item[data-source="rss:openai"] { --source: #1a7f64; }
+.item[data-source="google_ai"],
+.item[data-source="rss:google_ai"] { --source: #3b6ea5; }
+.item[data-source="deepmind"],
+.item[data-source="rss:deepmind"] { --source: #2a8f8a; }
+.item[data-source="anthropic"],
+.item[data-source="rss:anthropic"] { --source: #b56a4a; }
+.item[data-source="huggingface"],
+.item[data-source="rss:huggingface"] { --source: #b0891d; }
+.item[data-source="nvidia_ai"],
+.item[data-source="rss:nvidia_ai"] { --source: #4a9a3e; }
+.item[data-source="apple_newsroom"],
+.item[data-source="rss:apple_newsroom"],
+.item[data-source="apple_ml"],
+.item[data-source="rss:apple_ml"] { --source: #6b7280; }
+.item[data-source="qbitai"],
+.item[data-source="rss:qbitai"] { --source: #6b5b8a; }
 .item:hover {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
-  box-shadow: 0 12px 32px rgba(20, 32, 27, 0.09);
+  border-color: color-mix(in srgb, var(--source) 40%, var(--line));
+  border-left-color: var(--source);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   transform: translateY(-2px);
 }
 .item-index {
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--source);
   letter-spacing: -0.02em;
   padding-top: 0.3rem;
   font-variant-numeric: tabular-nums;
@@ -1923,6 +2032,9 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   line-height: 1.4;
   letter-spacing: -0.01em;
 }
+.item[data-heat="1"] h2 { font-weight: 500; }
+.item[data-heat="2"] h2 { font-weight: 600; }
+.item[data-heat="3"] h2 { font-weight: 700; }
 .item h2 a {
   color: var(--ink);
   text-decoration: none;
@@ -1943,16 +2055,24 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   border: none;
   background: color-mix(in srgb, var(--accent) 14%, var(--bg));
   color: var(--accent);
-  border-radius: 999px;
-  padding: 0.16rem 0.6rem;
-  font-size: 0.78rem;
+  border-radius: 0.35rem;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.76rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
+.badge-source {
+  background: color-mix(in srgb, var(--source) 18%, var(--bg));
+  color: color-mix(in srgb, var(--source) 78%, var(--ink));
+}
 .badge-tag {
   background: color-mix(in srgb, var(--ink) 10%, var(--bg));
   color: var(--ink);
+}
+.item[data-tag="paper"] .badge-tag {
+  background: color-mix(in srgb, #5a6f9a 20%, var(--bg));
+  color: color-mix(in srgb, #5a6f9a 70%, var(--ink));
 }
 .summary, .why, .affiliate {
   margin: 0.5rem 0 0;
@@ -2037,9 +2157,10 @@ code {
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .site-header, .day-bar, .arena { animation: none; }
+  .brand-block, .day-bar, .arena, .item { animation: none; }
   .item, .archive-list li { transition: none; }
   .item:hover { transform: none; }
+  .read-progress::after { transition: none; }
 }
 @media (max-width: 480px) {
   .item {
@@ -2049,9 +2170,6 @@ code {
   .site-nav {
     align-items: flex-start;
     padding: 0.85rem 0.95rem;
-  }
-  .feed-day-sticky {
-    top: 5.75rem;
   }
 }
 """.strip()

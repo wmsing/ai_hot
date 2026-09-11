@@ -131,11 +131,21 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "as of 2026-09-10 05" not in home
     assert "Newer" in home
     assert 'class="item"' in home
-    assert 'class="badge"' in home
+    assert "badge-source" in home
+    assert 'data-source="hn"' in home
+    assert 'data-heat="1"' in home
+    assert 'class="read-progress"' in home
+    assert 'src="feed.js"' in home
     assert 'class="site-header"' in home
     styles = (out / "styles.css").read_text(encoding="utf-8")
     assert ".site-nav" in styles
     assert "position: sticky" in styles
+    assert ".read-progress" in styles
+    assert "#0d0f17" in styles
+    assert "body::before" in styles
+    assert "radial-gradient" in styles
+    assert '[data-source="hn"]' in styles
+    assert "--source" in styles
     assert 'class="item-index"' in home
     assert "Outfit" in home
     assert "Literata" in home
@@ -181,6 +191,17 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "Next day" in older
     assert 'href="../../index.html"' in older
     assert 'class="day-nav"' in older
+    assert 'class="read-progress"' in older
+    assert 'src="../../feed.js"' in older
+    assert 'data-source="hn"' in older
+    assert "badge-source" in older
+    feed_js = (out / "feed.js").read_text(encoding="utf-8")
+    assert "read-progress" in feed_js
+    assert "--p" in feed_js
+    assert "--nav-sticky-bottom" in feed_js
+    assert "has-day-sticky" in feed_js
+    assert "--nav-sticky-bottom" in styles
+    assert "has-day-sticky" in styles
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert "发布时间:" in zh_home or "发布时间：" in zh_home
     assert "发布时间（UTC）" not in zh_home
