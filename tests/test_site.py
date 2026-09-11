@@ -132,6 +132,9 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "Newer" in home
     assert 'class="item"' in home
     assert "badge-source" in home
+    assert "meta-tag" in home
+    assert "meta-tag-score" in home
+    assert "meta-tag-comments" in home
     assert 'data-source="hn"' in home
     assert 'data-heat="1"' in home
     assert 'class="read-progress"' in home
@@ -153,11 +156,21 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert '[data-source="hn"]' in styles
     assert "--source" in styles
     assert 'class="item-index"' in home
-    assert "Outfit" in home
-    assert "Source+Sans+3" in home or "Source Sans 3" in home
+    assert "Inter" in home
+    assert "Outfit" not in home
     assert "Literata" not in home
+    assert "Source+Sans+3" not in home
+    assert "#e2e8f0" in styles
+    assert "#94a3b8" in styles
+    assert "meta-tag" in styles
+    assert "9999px" in styles
+    assert "0.95rem" in styles
     assert "cursor: pointer" in styles
     assert "translateY(-4px)" in styles
+    assert "rgba(99, 102, 241, 0.5)" in styles
+    assert "0 0 15px rgba(99, 102, 241, 0.15)" in styles
+    assert "grid-template-columns" in styles
+    assert "auto-fill" in styles
     assert 'property="og:title"' in home
     assert 'rel="icon"' in home
     assert 'href="favicon.svg"' in home

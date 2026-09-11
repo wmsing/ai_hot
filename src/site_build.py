@@ -1171,19 +1171,29 @@ def _render_item(
     meta_bits: list[str] = []
     source = item.source.strip()
     if source:
-        meta_bits.append(f'<span class="badge badge-source">{escape(source)}</span>')
+        meta_bits.append(
+            f'<span class="meta-tag badge-source">{escape(source)}</span>'
+        )
     tag_raw = item.tag.strip()
     tag_disp = _display_tag(tag_raw, lang)
     if tag_disp:
-        meta_bits.append(f'<span class="badge badge-tag">{escape(tag_disp)}</span>')
+        meta_bits.append(f'<span class="meta-tag badge-tag">{escape(tag_disp)}</span>')
     published_disp = _display_published(item.published)
     if published_disp:
         meta_bits.append(
-            f"<span>{escape(labels['published'])}: {escape(published_disp)}</span>"
+            f'<span class="meta-tag meta-tag-time">'
+            f"{escape(labels['published'])}: {escape(published_disp)}</span>"
         )
-    score_disp = _display_score_line(item.score_line)
-    if score_disp:
-        meta_bits.append(f"<span>{escape(score_disp)}</span>")
+    score_val, comments_val = _parse_score_line(item.score_line)
+    if score_val is not None:
+        meta_bits.append(
+            f'<span class="meta-tag meta-tag-score">score={score_val}</span>'
+        )
+    if comments_val is not None:
+        meta_bits.append(
+            f'<span class="meta-tag meta-tag-comments">'
+            f"comments={comments_val}</span>"
+        )
 
     heat = _heat_level(item.score_line)
     stagger_i = max(0, min(max(item.index, 1) - 1, 12))
@@ -1214,7 +1224,7 @@ def _render_item(
         )
     bits.append(f"<h2>{title_html}</h2>")
     if meta_bits:
-        bits.append(f'<p class="item-meta">{" · ".join(meta_bits)}</p>')
+        bits.append(f'<p class="item-meta">{"".join(meta_bits)}</p>')
     if item.summary:
         bits.append(
             f'<p class="summary"><span class="label">{labels["summary"]}</span> '
@@ -1250,15 +1260,6 @@ def _display_tag(raw: str, lang: str) -> str:
     key = text.lower()
     if key == "paper":
         return "论文" if lang == "zh" else "Paper"
-    return text
-
-
-def _display_score_line(raw: str) -> str:
-    text = raw.strip()
-    if not text:
-        return ""
-    if "n/a" in text.lower() and not re.search(r"\d", text):
-        return ""
     return text
 
 
@@ -1555,8 +1556,7 @@ def _shell(
     favicon = _favicon_href(css_href)
     fonts = (
         "https://fonts.googleapis.com/css2?"
-        "family=Outfit:wght@500;600;700&amp;"
-        "family=Source+Sans+3:wght@400;500;600;700&amp;display=swap"
+        "family=Inter:wght@400;500;600;700&amp;display=swap"
     )
     seo_links = ""
     if canonical:
@@ -1610,19 +1610,22 @@ def _stylesheet() -> str:
 :root {
   --bg: #0d0f17;
   --bg-elev: rgba(255, 255, 255, 0.05);
-  --ink: #f4f6fb;
-  --muted: rgba(244, 246, 251, 0.68);
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
   --accent: #a5b4fc;
   --accent-hot: #c4b5fd;
   --line: rgba(255, 255, 255, 0.12);
   --focus: #a5b4fc;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --radius: 16px;
-  --font-display: "Outfit", "Avenir Next", sans-serif;
-  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
-  --font-ui: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    sans-serif;
   --pad: clamp(1.5rem, 5vw, 2.5rem);
-  --max: 44rem;
+  --max: 72rem;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -1868,6 +1871,9 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 .feed-day-sticky + .item {
   margin-top: -0.45rem;
 }
+.feed:has(> .item) > .feed-day-sticky + .item {
+  margin-top: 0;
+}
 .feed-day-sticky time {
   font-variant-numeric: tabular-nums;
 }
@@ -1942,6 +1948,15 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   flex-direction: column;
   gap: 0.95rem;
 }
+.feed:has(> .item) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
+}
+.feed:has(> .item) > .feed-day-sticky {
+  grid-column: 1 / -1;
+}
 .read-progress {
   position: fixed;
   top: 0;
@@ -1966,20 +1981,22 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   display: grid;
   grid-template-columns: 2.5rem 1fr;
   gap: 0.55rem 0.95rem;
-  padding: 1.3rem 1.25rem 1.35rem;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-left: 3px solid var(--source);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
   animation: soft-in 0.55s ease both;
   animation-delay: calc(var(--i, 0) * 45ms);
   transition:
-    box-shadow 0.28s ease,
-    border-color 0.28s ease,
-    transform 0.28s ease,
-    background-color 0.28s ease;
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .item[data-source="hn"] { --source: #c45c26; }
 .item[data-source="openai"],
@@ -2001,13 +2018,13 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 .item[data-source="qbitai"],
 .item[data-source="rss:qbitai"] { --source: #6b5b8a; }
 .item:hover {
-  border-color: color-mix(in srgb, var(--source) 55%, var(--line));
-  border-left-color: var(--source);
-  background: color-mix(in srgb, var(--bg-elev) 70%, rgba(255, 255, 255, 0.08));
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.5),
-    0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
   transform: translateY(-4px);
+  border-color: rgba(99, 102, 241, 0.5);
+  border-left-color: var(--source);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow:
+    0 12px 30px -10px rgba(0, 0, 0, 0.5),
+    0 0 15px rgba(99, 102, 241, 0.15);
 }
 .item:active {
   transform: translateY(-1px);
@@ -2042,17 +2059,18 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 .item-body { min-width: 0; }
 .item h2 {
   font-family: var(--font-body);
-  font-size: clamp(1.22rem, 2.5vw, 1.38rem);
+  font-size: 1.1rem;
   font-weight: 600;
   margin: 0 0 0.55rem;
   line-height: 1.4;
   letter-spacing: -0.01em;
+  color: #ffffff;
 }
 .item[data-heat="1"] h2 { font-weight: 500; }
 .item[data-heat="2"] h2 { font-weight: 600; }
 .item[data-heat="3"] h2 { font-weight: 700; }
 .item h2 a {
-  color: var(--ink);
+  color: #ffffff;
   text-decoration: none;
 }
 .item h2 a:hover { color: var(--accent); }
@@ -2060,52 +2078,70 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.3rem 0.15rem;
-  margin: 0 0 0.75rem;
+  gap: 6px;
+  margin: 0 0 12px;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   font-family: var(--font-ui);
 }
+.meta-tag,
 .badge {
-  display: inline-block;
-  border: none;
-  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
-  color: var(--accent);
-  border-radius: 0.35rem;
-  padding: 0.14rem 0.5rem;
-  font-size: 0.76rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  letter-spacing: 0.01em;
+  font-family: var(--font-ui);
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.2);
 }
 .badge-source {
-  background: color-mix(in srgb, var(--source) 18%, var(--bg));
-  color: color-mix(in srgb, var(--source) 78%, var(--ink));
+  background: color-mix(in srgb, var(--source) 22%, transparent);
+  color: color-mix(in srgb, var(--source) 55%, #ffffff);
+  border-color: color-mix(in srgb, var(--source) 35%, transparent);
 }
 .badge-tag {
-  background: color-mix(in srgb, var(--ink) 10%, var(--bg));
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 .item[data-tag="paper"] .badge-tag {
-  background: color-mix(in srgb, #5a6f9a 20%, var(--bg));
-  color: color-mix(in srgb, #5a6f9a 70%, var(--ink));
+  background: rgba(90, 111, 154, 0.2);
+  color: #c7d2fe;
+  border-color: rgba(90, 111, 154, 0.35);
+}
+.meta-tag-time {
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.meta-tag-score,
+.meta-tag-comments {
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.2);
 }
 .summary, .why, .affiliate {
   margin: 0.5rem 0 0;
   font-family: var(--font-body);
-  font-size: 1.12rem;
-  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: #94a3b8;
 }
 .why {
   color: var(--muted);
-  font-size: 0.98rem;
+  font-size: 0.875rem;
   font-family: var(--font-ui);
 }
 .affiliate {
   margin-top: 0.75rem;
   padding-top: 0.7rem;
   border-top: 1px dashed var(--line);
-  font-size: 0.98rem;
+  font-size: 0.875rem;
   font-family: var(--font-ui);
   color: var(--muted);
 }
@@ -2236,6 +2272,10 @@ code {
   .item {
     grid-template-columns: 1.8rem 1fr;
     padding: 1.05rem 1rem 1.1rem;
+  }
+  .feed:has(> .item) {
+    grid-template-columns: 1fr;
+    gap: 0.95rem;
   }
 }
 """.strip()
