@@ -153,6 +153,7 @@ def build_site(
                 lang="en",
                 has_other_lang=bool(zh_timeline),
                 site=cfg,
+                as_of=_latest_generated_at(days, "en"),
             ),
         )
     else:
@@ -167,6 +168,7 @@ def build_site(
                 lang="zh",
                 has_other_lang=bool(en_timeline),
                 site=cfg,
+                as_of=_latest_generated_at(days, "zh"),
             ),
         )
     else:
@@ -423,8 +425,39 @@ def _footer(lang: str, links: PageLinks, site: SiteConfig) -> str:
     )
 
 
-def _brand_sub(lang: str) -> str:
+def _format_tagline_as_of(raw: str) -> str:
+    """digest generated_at → `YYYY-MM-DD`（UTC）；解析失败返回空。"""
+    text = raw.strip()
+    if not text:
+        return ""
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc)
+    return f"{dt.year:04d}-{dt.month:02d}-{dt.day:02d}"
+
+
+def _latest_generated_at(days: list[DayFiles], lang: str) -> str:
+    """取最新一日 digest 的 generated_at，格式化为 tagline 用。"""
+    for day_files in days:
+        path = day_files.en if lang == "en" else day_files.zh
+        doc = _load_doc(path)
+        if doc is not None and doc.generated_at:
+            formatted = _format_tagline_as_of(doc.generated_at)
+            if formatted:
+                return formatted
+    return ""
+
+
+def _brand_sub(lang: str, *, as_of: str | None = None) -> str:
     tagline = SITE_TAGLINE_ZH if lang == "zh" else SITE_TAGLINE_EN
+    if as_of:
+        if lang == "zh":
+            tagline = f"{tagline} 截至 {as_of}"
+        else:
+            tagline = f"{tagline} · as of {as_of}"
     return f'<p class="tagline">{escape(tagline)}</p>'
 
 
@@ -773,6 +806,7 @@ def _render_home_timeline(
     lang: str,
     has_other_lang: bool,
     site: SiteConfig,
+    as_of: str = "",
 ) -> str:
     links = _links_digest_home(lang, "", has_other_lang)
     total = len(items)
@@ -828,7 +862,7 @@ def _render_home_timeline(
 <header class="site-header">
   <div class="brand-block">
     <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
-    {_brand_sub(lang)}
+    {_brand_sub(lang, as_of=as_of or None)}
   </div>
   {_main_nav(lang, links)}
 </header>

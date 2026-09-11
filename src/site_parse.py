@@ -73,7 +73,10 @@ def parse_digest_markdown(text: str) -> DigestDocument:
             generated_at = line.split(":", 1)[1].strip()
             continue
         if line.startswith("生成时间"):
-            generated_at = line.split("：", 1)[-1].split(":", 1)[-1].strip()
+            if "：" in line:
+                generated_at = line.split("：", 1)[1].strip()
+            else:
+                generated_at = line.split(":", 1)[1].strip()
             continue
         if line.lower().startswith("selected:"):
             selected = _parse_int(line.split(":", 1)[1].strip())

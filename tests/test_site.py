@@ -62,6 +62,7 @@ def test_parse_digest_en() -> None:
 def test_parse_digest_zh() -> None:
     doc = parse_digest_markdown(_ZH_DIGEST)
     assert doc.selected == 1
+    assert doc.generated_at == "2026-09-10T05:00:00+00:00"
     assert len(doc.items) == 1
     item = doc.items[0]
     assert item.title == "示例标题"
@@ -126,6 +127,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     home = (out / "index.html").read_text(encoding="utf-8")
     assert "AI Hot Digest" in home
     assert "Daily AI highlights" in home
+    assert "as of 2026-09-10" in home
+    assert "as of 2026-09-10 05" not in home
     assert "Newer" in home
     assert 'class="item"' in home
     assert 'class="badge"' in home
@@ -175,13 +178,21 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert ">最新<" not in zh_home
     assert "条 · 新在前" not in zh_home
     assert 'class="feed-day-sticky"' in zh_home
-    assert "AI 热点摘要" in zh_home
+    assert "AI 热点摘要 截至 2026-09-10" in zh_home
+    assert "截至 2026-09-10 05" not in zh_home
     assert "更新" in zh_home
     assert 'href="../favicon.svg"' in zh_home
     assert "当前未启用联盟链接" in zh_home
 
+    archive_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert '<p class="tagline">AI 热点摘要</p>' in archive_day
+    assert "截至" not in archive_day.split('class="tagline">', 1)[1].split("</p>", 1)[0]
+
     about = (out / "about.html").read_text(encoding="utf-8")
     assert "personally maintained project" in about
+    assert "as of" not in about.split('class="tagline">', 1)[1].split("</p>", 1)[0]
     privacy = (out / "privacy.html").read_text(encoding="utf-8")
     assert "static site" in privacy.lower() or "static" in privacy
     disclosure = (out / "disclosure.html").read_text(encoding="utf-8")
