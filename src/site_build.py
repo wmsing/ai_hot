@@ -15,7 +15,7 @@ from src.digest import _parse_score_line
 from src.leaderboard import fetch_arena_boards
 from src.models import ArenaLeaderboard, DigestDocument, DigestItem, SiteConfig
 from src.site_parse import parse_digest_markdown
-from src.timeutil import format_published, parse_published
+from src.timeutil import parse_published
 
 _DIGEST_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(en|zh)\.md$")
 
@@ -763,7 +763,7 @@ def _feed_script_href(css_href: str) -> str:
 
 def _heat_level(score_line: str) -> int:
     """0=无分；1=<150；2=150–299；3=≥300。"""
-    score, _ = _parse_score_line(score_line)
+    score, _ = _parse_item_scores(score_line)
     if score is None:
         return 0
     if score < 150:
@@ -771,6 +771,28 @@ def _heat_level(score_line: str) -> int:
     if score < 300:
         return 2
     return 3
+
+
+_SCORE_ZH_RE = re.compile(
+    r"评分=(?P<score>n/a|\d+)(?:\s*\|\s*评论数=(?P<comments>n/a|\d+))?",
+)
+
+
+def _parse_item_scores(raw: str) -> tuple[int | None, int | None]:
+    """兼容 EN `score=` 与 ZH `评分=` 行。"""
+    score, comments = _parse_score_line(raw)
+    if score is not None or comments is not None:
+        return score, comments
+    match = _SCORE_ZH_RE.search(raw.strip())
+    if not match:
+        return None, None
+    score_s = match.group("score")
+    comments_s = match.group("comments")
+    score_out = None if score_s is None or score_s.lower() == "n/a" else int(score_s)
+    comments_out = (
+        None if comments_s is None or comments_s.lower() == "n/a" else int(comments_s)
+    )
+    return score_out, comments_out
 
 
 def _contact_blurb(lang: str, site: SiteConfig) -> str:
@@ -1148,52 +1170,37 @@ def _render_item(
 ) -> str:
     labels = (
         {
-            "summary": "Summary",
             "affiliate": "Affiliate offer",
-            "published": "Published",
+            "read": "Read article",
         }
         if lang == "en"
         else {
-            "summary": "摘要",
             "affiliate": "联盟推荐",
-            "published": "发布时间",
+            "read": "看正文",
         }
     )
     title = escape(item.title)
-    if item.url.strip():
-        title_html = (
-            f'<a href="{escape(item.url.strip(), quote=True)}" '
-            f'target="_blank" rel="noopener noreferrer">{title}</a>'
-        )
-    else:
-        title_html = title
+    url = item.url.strip()
 
-    meta_bits: list[str] = []
+    header_bits: list[str] = []
     source = item.source.strip()
     if source:
-        meta_bits.append(
-            f'<span class="meta-tag badge-source">{escape(source)}</span>'
+        header_bits.append(
+            f'<span class="badge badge-primary badge-source">{escape(source)}</span>'
         )
     tag_raw = item.tag.strip()
     tag_disp = _display_tag(tag_raw, lang)
     if tag_disp:
-        meta_bits.append(f'<span class="meta-tag badge-tag">{escape(tag_disp)}</span>')
-    published_disp = _display_published(item.published)
-    if published_disp:
-        meta_bits.append(
-            f'<span class="meta-tag meta-tag-time">'
-            f"{escape(labels['published'])}: {escape(published_disp)}</span>"
-        )
-    score_val, comments_val = _parse_score_line(item.score_line)
-    if score_val is not None:
-        meta_bits.append(
-            f'<span class="meta-tag meta-tag-score">score={score_val}</span>'
-        )
-    if comments_val is not None:
-        meta_bits.append(
-            f'<span class="meta-tag meta-tag-comments">'
-            f"comments={comments_val}</span>"
-        )
+        header_bits.append(f'<span class="badge badge-tag">{escape(tag_disp)}</span>')
+    score_val, comments_val = _parse_item_scores(item.score_line)
+    meta_text = _format_meta_text(
+        lang,
+        published=item.published,
+        score=score_val,
+        comments=comments_val,
+    )
+    if meta_text:
+        header_bits.append(f'<span class="meta-text">{escape(meta_text)}</span>')
 
     heat = _heat_level(item.score_line)
     stagger_i = max(0, min(max(item.index, 1) - 1, 12))
@@ -1214,21 +1221,23 @@ def _render_item(
     ]
     img = item.image_url.strip()
     if img:
-        href = escape(item.url.strip() or img, quote=True)
         src = escape(img, quote=True)
         bits.append(
-            f'<a class="item-thumb" href="{href}" '
-            f'target="_blank" rel="noopener noreferrer">'
+            f'<div class="item-thumb">'
             f'<img src="{src}" alt="" loading="lazy" '
-            f'referrerpolicy="no-referrer" decoding="async" /></a>'
+            f'referrerpolicy="no-referrer" decoding="async" /></div>'
         )
-    bits.append(f"<h2>{title_html}</h2>")
-    if meta_bits:
-        bits.append(f'<p class="item-meta">{"".join(meta_bits)}</p>')
+    if header_bits:
+        bits.append(f'<div class="item-meta">{"".join(header_bits)}</div>')
+    bits.append(f"<h2>{title}</h2>")
     if item.summary:
+        bits.append(f'<p class="summary">{escape(item.summary)}</p>')
+    if url:
         bits.append(
-            f'<p class="summary"><span class="label">{labels["summary"]}</span> '
-            f"{escape(item.summary)}</p>"
+            f'<p class="item-actions">'
+            f'<a class="item-read" href="{escape(url, quote=True)}" '
+            f'target="_blank" rel="noopener noreferrer">'
+            f'{labels["read"]}</a></p>'
         )
     # Why / reason 不对读者展示
     aff = item.affiliate_url.strip()
@@ -1242,14 +1251,36 @@ def _render_item(
     return "\n".join(bits)
 
 
-def _display_published(raw: str) -> str:
+def _meta_day(raw: str) -> str:
+    """元信息用短日期 YYYY-MM-DD（UTC）。"""
     text = raw.strip()
     if not text or text.lower() == "n/a":
         return ""
     dt = parse_published(text)
     if dt is None:
-        return text
-    return format_published(dt)
+        return text.split()[0] if text.split() else text
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).date().isoformat()
+
+
+def _format_meta_text(
+    lang: str,
+    *,
+    published: str,
+    score: int | None,
+    comments: int | None,
+) -> str:
+    """次要元信息：2026-09-10 · 134 pts · 131 comments。"""
+    bits: list[str] = []
+    day = _meta_day(published)
+    if day:
+        bits.append(day)
+    if score is not None:
+        bits.append(f"{score} pts" if lang == "en" else f"{score} 分")
+    if comments is not None:
+        bits.append(f"{comments} comments" if lang == "en" else f"{comments} 评论")
+    return " · ".join(bits)
 
 
 def _display_tag(raw: str, lang: str) -> str:
@@ -1989,7 +2020,6 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  cursor: pointer;
   animation: soft-in 0.55s ease both;
   animation-delay: calc(var(--i, 0) * 45ms);
   transition:
@@ -2032,13 +2062,13 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 }
 .item-index {
   font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--source);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #38bdf8;
   letter-spacing: -0.02em;
   padding-top: 0.3rem;
   font-variant-numeric: tabular-nums;
-  opacity: 0.85;
+  opacity: 0.7;
 }
 .item-thumb {
   display: block;
@@ -2069,22 +2099,42 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 .item[data-heat="1"] h2 { font-weight: 500; }
 .item[data-heat="2"] h2 { font-weight: 600; }
 .item[data-heat="3"] h2 { font-weight: 700; }
-.item h2 a {
-  color: #ffffff;
-  text-decoration: none;
+.item-actions {
+  margin: 14px 0 0;
 }
-.item h2 a:hover { color: var(--accent); }
+.item-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.45rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.item-read:hover {
+  color: #ffffff;
+  background: rgba(99, 102, 241, 0.28);
+  border-color: rgba(129, 140, 248, 0.55);
+}
 .item-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 0.75rem;
+  gap: 8px;
+  margin: 0 0 0.65rem;
   font-family: var(--font-ui);
 }
-.meta-tag,
 .badge {
   display: inline-flex;
   align-items: center;
@@ -2099,6 +2149,7 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   color: #a5b4fc;
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
+.badge-primary,
 .badge-source {
   background: color-mix(in srgb, var(--source) 22%, transparent);
   color: color-mix(in srgb, var(--source) 55%, #ffffff);
@@ -2114,23 +2165,18 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   color: #c7d2fe;
   border-color: rgba(90, 111, 154, 0.35);
 }
-.meta-tag-time {
-  background: rgba(255, 255, 255, 0.06);
-  color: #94a3b8;
-  border-color: rgba(255, 255, 255, 0.1);
-}
-.meta-tag-score,
-.meta-tag-comments {
-  background: rgba(99, 102, 241, 0.12);
-  color: #a5b4fc;
-  border-color: rgba(99, 102, 241, 0.2);
+.meta-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.01em;
 }
 .summary, .why, .affiliate {
-  margin: 0.5rem 0 0;
+  margin: 12px 0 0;
   font-family: var(--font-body);
-  font-size: 0.95rem;
-  line-height: 1.65;
-  color: #94a3b8;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #e2e8f0;
 }
 .why {
   color: var(--muted);

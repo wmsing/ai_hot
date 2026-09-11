@@ -132,9 +132,11 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "Newer" in home
     assert 'class="item"' in home
     assert "badge-source" in home
-    assert "meta-tag" in home
-    assert "meta-tag-score" in home
-    assert "meta-tag-comments" in home
+    assert "badge-primary" in home
+    assert "meta-text" in home
+    assert "pts" in home
+    assert "comments" in home
+    assert "meta-tag-score" not in home
     assert 'data-source="hn"' in home
     assert 'data-heat="1"' in home
     assert 'class="read-progress"' in home
@@ -162,9 +164,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "Source+Sans+3" not in home
     assert "#e2e8f0" in styles
     assert "#94a3b8" in styles
-    assert "meta-tag" in styles
+    assert "meta-text" in styles
+    assert "#64748b" in styles
     assert "9999px" in styles
-    assert "0.95rem" in styles
+    assert "0.875rem" in styles
     assert "cursor: pointer" in styles
     assert "translateY(-4px)" in styles
     assert "rgba(99, 102, 241, 0.5)" in styles
@@ -194,9 +197,16 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="why"' not in home
     assert "hn score>=100" not in home
     assert "score=n/a" not in home
-    assert "2026-09-10 01:00 UTC" in home
-    assert "Published:" in home
+    assert "2026-09-10" in home
+    assert "120 pts" in home or "134 pts" in home
+    assert "Published:" not in home
     assert "Published (UTC)" not in home
+    assert "Hello summary" in home
+    assert 'class="label">Summary<' not in home
+    assert 'class="label">摘要<' not in home
+    assert 'class="item-read"' in home
+    assert ">Read article<" in home
+    assert "<h2><a " not in home
     assert 'class="item-thumb"' in home
     assert "https://cdn.example/cover.webp" in home
     assert 'class="day-nav"' not in home
@@ -225,7 +235,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "--nav-sticky-bottom" in styles
     assert "has-day-sticky" in styles
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
-    assert "发布时间:" in zh_home or "发布时间：" in zh_home
+    assert "分" in zh_home
+    assert "评论" in zh_home
+    assert "发布时间:" not in zh_home
+    assert "发布时间：" not in zh_home
     assert "发布时间（UTC）" not in zh_home
     assert "前一天" not in zh_home
     assert "后一天" not in zh_home
@@ -233,6 +246,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "条 · 新在前" not in zh_home
     assert 'class="feed-day-sticky"' in zh_home
     assert "AI 热点摘要 截至 2026-09-10" in zh_home
+    assert ">看正文<" in zh_home
+    assert "<h2><a " not in zh_home
     assert "截至 2026-09-10 05" not in zh_home
     assert 'class="lang-toggle"' in zh_home
     assert ">EN<" in zh_home
