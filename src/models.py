@@ -1,6 +1,7 @@
 """领域数据模型。"""
 
 from datetime import datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -20,6 +21,8 @@ class HotItem(BaseModel):
     summary: str | None = None
     image_url: str | None = None
     published_at: datetime | None = None
+    # 展示标签，如 paper → 站点 EN: Paper / ZH: 论文
+    tag: str = ""
     reason: str = ""
     fetched_at: datetime = Field(default_factory=utc_now)
 
@@ -29,6 +32,8 @@ class FeedConfig(BaseModel):
     url: HttpUrl
     # 非空则标题/摘要须命中至少一词（大小写不敏感）；空=不过滤
     keywords: list[str] = Field(default_factory=list)
+    # 写入条目的展示标签（如 paper）
+    tag: str = ""
 
 
 class HnConfig(BaseModel):
@@ -124,6 +129,7 @@ class DigestItem(BaseModel):
     published: str = ""
     score_line: str = ""
     summary: str = ""
+    tag: str = ""
     reason: str = ""
     affiliate_url: str = ""
     image_url: str = ""
@@ -149,6 +155,31 @@ class OllamaConfig(BaseModel):
     timeout_seconds: float = 300.0
 
 
+class OpenRouterConfig(BaseModel):
+    base_url: str = "https://openrouter.ai/api/v1"
+    model: str = "openrouter/free"
+    timeout_seconds: float = 120.0
+    app_title: str = "ai_hot"
+
+
+class LlmConfig(BaseModel):
+    """默认 LLM 后端；可被 LLM_PROVIDER / --llm openrouter 覆盖。"""
+
+    provider: Literal["ollama", "openrouter"] = "ollama"
+
+
+class LlmRuntime(BaseModel):
+    """一次调用的解析结果（provider + 端点 + 模型）。"""
+
+    provider: Literal["ollama", "openrouter"]
+    model: str
+    base_url: str
+    timeout_seconds: float = 300.0
+    api_key: str = ""
+    http_referer: str = ""
+    app_title: str = "ai_hot"
+
+
 class AppConfig(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     site: SiteConfig = Field(default_factory=SiteConfig)
@@ -157,4 +188,6 @@ class AppConfig(BaseModel):
     rss: RssConfig = Field(default_factory=RssConfig)
     filter: FilterConfig = Field(default_factory=FilterConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
+    llm: LlmConfig = Field(default_factory=LlmConfig)
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
+    openrouter: OpenRouterConfig = Field(default_factory=OpenRouterConfig)

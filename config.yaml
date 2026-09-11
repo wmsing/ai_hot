@@ -55,6 +55,13 @@ rss:
     # NVIDIA：Newsroom「AI Platforms / Deployment」（避免 blogs 全站混入游戏）
     - name: nvidia_ai
       url: https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml
+    # Apple：发布会 / 新闻稿
+    - name: apple_newsroom
+      url: https://www.apple.com/newsroom/rss-feed.rss
+    # Apple ML Research（论文）
+    - name: apple_ml
+      url: https://machinelearning.apple.com/rss.xml
+      tag: paper
     # 中国 AI：量子位 + 关键词白名单（未命中不入选）
     - name: qbitai
       url: https://www.qbitai.com/feed
@@ -104,3 +111,13 @@ ollama:
   base_url: http://127.0.0.1:11434
   model: qwen3:4b-instruct
   timeout_seconds: 300
+
+# 默认 LLM；Grok/云端可设 LLM_PROVIDER=openrouter + OPENROUTER_API_KEY
+llm:
+  provider: ollama  # ollama | openrouter
+
+openrouter:
+  base_url: https://openrouter.ai/api/v1
+  model: openrouter/free
+  timeout_seconds: 120
+  app_title: ai_hot

@@ -228,6 +228,7 @@ def test_fetch_http_error_skips_board(monkeypatch: pytest.MonkeyPatch) -> None:
         == []
     )
 
+
 def test_fetch_multi_boards(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Resp:
         def __init__(self, payload: dict[str, object]) -> None:

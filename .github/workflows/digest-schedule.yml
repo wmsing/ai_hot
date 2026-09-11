@@ -1,0 +1,66 @@
+# 港时 07:00 / 12:00 / 21:00 = UTC 23:00 / 04:00 / 13:00
+name: Digest schedule (OpenRouter)
+
+on:
+  schedule:
+    - cron: "0 23,4,13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Restore SQLite cache
+        uses: actions/cache@v4
+        with:
+          path: data/ai_hot.db
+          key: ai-hot-sqlite-${{ github.run_id }}
+          restore-keys: |
+            ai-hot-sqlite-
+
+      - name: Restore today's digest into out/
+        run: |
+          DAY=$(date -u +%Y-%m-%d)
+          mkdir -p out data
+          if [ -f "content/digests/${DAY}.en.md" ]; then
+            cp "content/digests/${DAY}.en.md" out/digest.md
+            echo "restored out/digest.md from content/digests/${DAY}.en.md"
+          else
+            echo "no prior en digest for ${DAY}"
+          fi
+          if [ -f "content/digests/${DAY}.zh.md" ]; then
+            cp "content/digests/${DAY}.zh.md" out/digest.zh.md
+            echo "restored out/digest.zh.md from content/digests/${DAY}.zh.md"
+          fi
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run digest + publish + push
+        env:
+          LLM_PROVIDER: openrouter
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python -m src.main --llm openrouter && python -m src.translate && python -m src.publish
+          DAY=$(date -u +%Y-%m-%d)
+          git add content/digests
+          if git diff --staged --quiet; then
+            echo "no digest changes; skip commit"
+          else
+            git commit -m "content: archive digest $DAY"
+            git push
+          fi

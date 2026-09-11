@@ -1,4 +1,4 @@
-"""把 digest.md 中残留中文 title/summary 译成英文（本地 Ollama）。"""
+"""把 digest.md 中残留中文 title/summary 译成英文。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ from pathlib import Path
 
 from src.config import load_app_config, settings
 from src.digest import load_hot_items, write_digest
-from src.models import AppConfig, HotItem, OllamaConfig
+from src.llm import build_llm_runtime
+from src.models import AppConfig, HotItem, LlmRuntime, OllamaConfig
 from src.ollama_client import translate_item_to_english
 from src.textutil import contains_cjk
 
@@ -26,7 +27,7 @@ def needs_english_fields(item: HotItem) -> bool:
 
 
 def translate_cjk_fields_to_english(
-    items: list[HotItem], ollama: OllamaConfig
+    items: list[HotItem], llm: LlmRuntime | OllamaConfig
 ) -> list[HotItem]:
     """仅翻译含汉字的条目；失败则保留原文并打 warning。"""
     out: list[HotItem] = []
@@ -35,7 +36,7 @@ def translate_cjk_fields_to_english(
             out.append(item)
             continue
         try:
-            title_en, summary_en = translate_item_to_english(item, ollama)
+            title_en, summary_en = translate_item_to_english(item, llm)
             updates: dict[str, str | None] = {"title": title_en}
             if summary_en is not None:
                 updates["summary"] = summary_en
@@ -53,16 +54,19 @@ def rewrite_digest_english(config: AppConfig) -> tuple[Path, int]:
     if not items and not path.is_file():
         raise FileNotFoundError(f"digest not found: {path}")
 
+    runtime = build_llm_runtime(config, api_key=settings.openrouter_api_key)
     to_fix = sum(1 for item in items if needs_english_fields(item))
-    translated = translate_cjk_fields_to_english(items, config.ollama)
+    translated = translate_cjk_fields_to_english(items, runtime)
     now = datetime.now(timezone.utc)
     write_digest(path, translated, generated_at=now)
     remaining = sum(1 for item in translated if needs_english_fields(item))
     logger.info(
-        "digest_en path=%s candidates=%s remaining_cjk=%s",
+        "digest_en path=%s candidates=%s remaining_cjk=%s provider=%s model=%s",
         path,
         to_fix,
         remaining,
+        runtime.provider,
+        runtime.model,
     )
     return path, to_fix
 
@@ -74,8 +78,10 @@ def main() -> int:
     )
     config = load_app_config()
     path, n = rewrite_digest_english(config)
+    runtime = build_llm_runtime(config, api_key=settings.openrouter_api_key)
     print(
-        f"[ai_hot] digest_en → {path} (tried={n}, model={config.ollama.model}); "
+        f"[ai_hot] digest_en → {path} (tried={n}, "
+        f"provider={runtime.provider}, model={runtime.model}); "
         "re-run: python -m src.translate && python -m src.publish"
     )
     return 0

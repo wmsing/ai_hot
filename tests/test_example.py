@@ -293,11 +293,72 @@ def test_digest_includes_summary(tmp_path: Path) -> None:
 
 
 def test_resolve_llm_model() -> None:
-    from src.pipeline import resolve_llm_model
+    from src.llm import resolve_llm_model
+    from src.models import AppConfig, OllamaConfig, OpenRouterConfig
 
-    assert resolve_llm_model(None, "qwen3:4b-instruct") is None
-    assert resolve_llm_model("qwen", "qwen3:4b-instruct") == "qwen3:4b-instruct"
-    assert resolve_llm_model("qwen3:8b", "qwen3:4b-instruct") == "qwen3:8b"
+    cfg = AppConfig(
+        ollama=OllamaConfig(model="qwen3:4b-instruct"),
+        openrouter=OpenRouterConfig(model="openrouter/free"),
+    )
+    assert resolve_llm_model(None, cfg) is None
+    assert resolve_llm_model("qwen", cfg) == "qwen3:4b-instruct"
+    assert resolve_llm_model("qwen3:8b", cfg) == "qwen3:8b"
+    assert resolve_llm_model("openrouter", cfg) == "openrouter/free"
+
+
+def test_resolve_provider_openrouter_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.llm import resolve_provider
+    from src.models import AppConfig
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    assert resolve_provider("openrouter", AppConfig()) == "openrouter"
+    assert resolve_provider("qwen", AppConfig()) == "ollama"
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    assert resolve_provider("qwen", AppConfig()) == "openrouter"
+
+
+def test_openrouter_content_parse() -> None:
+    from src.ollama_client import _openrouter_content
+
+    assert (
+        _openrouter_content({"choices": [{"message": {"content": "  hello  "}}]})
+        == "hello"
+    )
+    assert _openrouter_content({"choices": []}) == ""
+
+
+def test_write_digest_tag(tmp_path: Path) -> None:
+    path = tmp_path / "digest.md"
+    write_digest(
+        path,
+        [
+            HotItem(
+                source="rss:apple_ml",
+                title="A Paper",
+                url="https://example.com/p",
+                tag="paper",
+                summary="About ML",
+                reason="r",
+            )
+        ],
+        generated_at=datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "- tag: paper" in text
+    from src.digest import load_hot_items
+
+    _, items = load_hot_items(path)
+    assert items[0].tag == "paper"
+
+
+def test_display_tag_paper() -> None:
+    from src.site_build import _display_tag
+
+    assert _display_tag("paper", "en") == "Paper"
+    assert _display_tag("paper", "zh") == "论文"
+    assert _display_tag("", "en") == ""
 
 
 def test_contains_cjk() -> None:

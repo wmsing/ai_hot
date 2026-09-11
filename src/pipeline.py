@@ -5,27 +5,19 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from src.config import settings
 from src.digest import load_hot_items, merge_by_url, same_utc_day, write_digest
 from src.digest_en import translate_cjk_fields_to_english
 from src.http_client import build_client
 from src.keywords import matched_keyword, passes_keywords
-from src.models import AppConfig, FeedConfig, HotItem, OllamaConfig
+from src.llm import build_llm_runtime, resolve_llm_model, resolve_provider
+from src.models import AppConfig, FeedConfig, HotItem, LlmRuntime
 from src.ollama_client import summarize_item
 from src.sources.hn import fetch_hn_candidates
 from src.sources.rss import fetch_rss_candidates
 from src.storage import ItemStore
 
 logger = logging.getLogger(__name__)
-
-
-def resolve_llm_model(flag: str | None, default_model: str) -> str | None:
-    """解析 --llm：None=模式A；qwen/空=用默认模型；其它=显式模型名。"""
-    if flag is None:
-        return None
-    normalized = flag.strip().lower()
-    if normalized in {"", "qwen", "1", "true", "yes", "on"}:
-        return default_model
-    return flag.strip()
 
 
 def _feed_by_source(config: AppConfig, source: str) -> FeedConfig | None:
@@ -41,15 +33,28 @@ def _feed_by_source(config: AppConfig, source: str) -> FeedConfig | None:
 def run_once(
     config: AppConfig,
     *,
+    llm_flag: str | None = None,
     llm_model: str | None = None,
 ) -> list[HotItem]:
     """执行一次巡检，返回当日累计 digest 条目。
 
     llm_model 为 None → 模式 A（RSS/AskHN 原生简介）。
-    有值 → 模式 B（对本轮新条目用 Ollama 生成简介）。
+    有值 → 模式 B（对本轮新条目用 LLM 生成简介）。
     同 UTC 日会与已有 digest.md 按 URL 合并（旧在前、新追加）。
+    llm_flag 用于解析 provider（如 openrouter）；可与 llm_model 一并传入。
     """
     now = datetime.now(timezone.utc)
+    provider = resolve_provider(llm_flag, config)
+    if llm_model is None and llm_flag is not None:
+        llm_model = resolve_llm_model(llm_flag, config, provider=provider)
+    # 模式 A 仍可能要用 LLM 做中文→英；model=None 时用 provider 默认模型
+    runtime = build_llm_runtime(
+        config,
+        provider=provider,
+        model=llm_model,
+        api_key=settings.openrouter_api_key,
+    )
+
     store = ItemStore(config.paths.sqlite_path)
     selected: list[HotItem] = []
     try:
@@ -83,11 +88,10 @@ def run_once(
             selected.append(item)
 
         if llm_model:
-            ollama = config.ollama.model_copy(update={"model": llm_model})
-            selected = _enrich_with_llm(selected, ollama)
+            selected = _enrich_with_llm(selected, runtime)
 
-        # digest.md 默认英文：含汉字的 title/summary 用 Ollama 译成英文
-        selected = translate_cjk_fields_to_english(selected, config.ollama)
+        # digest.md 默认英文：含汉字的 title/summary 用 LLM 译成英文
+        selected = translate_cjk_fields_to_english(selected, runtime)
 
         for item in selected:
             store.upsert_seen(item, now=now)
@@ -99,9 +103,11 @@ def run_once(
 
         write_digest(config.paths.digest_path, selected, generated_at=now)
         logger.info(
-            "selected=%s llm=%s digest=%s",
+            "selected=%s llm=%s provider=%s model=%s digest=%s",
             len(selected),
             llm_model or "off",
+            runtime.provider,
+            runtime.model,
             config.paths.digest_path,
         )
         return selected
@@ -109,11 +115,11 @@ def run_once(
         store.close()
 
 
-def _enrich_with_llm(items: list[HotItem], ollama: OllamaConfig) -> list[HotItem]:
+def _enrich_with_llm(items: list[HotItem], llm: LlmRuntime) -> list[HotItem]:
     enriched: list[HotItem] = []
     for item in items:
         try:
-            blurb = summarize_item(item, ollama)
+            blurb = summarize_item(item, llm)
             enriched.append(item.model_copy(update={"summary": blurb}))
         except Exception as exc:
             logger.warning("llm summarize failed source=%s err=%s", item.source, exc)

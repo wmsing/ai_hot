@@ -57,6 +57,7 @@ def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
                     summary=_entry_summary(entry),
                     image_url=_entry_image(entry),
                     published_at=from_rss_entry(entry),
+                    tag=(feed.tag or "").strip(),
                     reason=f"rss_new feed={feed.name}",
                 )
             )

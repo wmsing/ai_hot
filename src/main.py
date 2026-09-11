@@ -7,7 +7,8 @@ import logging
 import sys
 
 from src.config import load_app_config, settings
-from src.pipeline import resolve_llm_model, run_once
+from src.llm import resolve_llm_model, resolve_provider
+from src.pipeline import run_once
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -17,7 +18,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         nargs="?",
         const="qwen",
         default=None,
-        help="Enable LLM summaries (mode B). Example: --llm qwen",
+        help=(
+            "Enable LLM summaries (mode B). "
+            "Examples: --llm qwen | --llm openrouter | --llm openrouter/free"
+        ),
     )
     return parser.parse_args(argv)
 
@@ -29,9 +33,13 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     config = load_app_config()
-    llm_model = resolve_llm_model(args.llm, config.ollama.model)
-    selected = run_once(config, llm_model=llm_model)
-    mode = f"llm={llm_model}" if llm_model else "llm=off(A)"
+    provider = resolve_provider(args.llm, config)
+    llm_model = resolve_llm_model(args.llm, config, provider=provider)
+    selected = run_once(config, llm_flag=args.llm, llm_model=llm_model)
+    if llm_model:
+        mode = f"llm={llm_model} provider={provider}"
+    else:
+        mode = f"llm=off(A) provider={provider}"
     print(
         f"[ai_hot] env={settings.app_env} selected={len(selected)} "
         f"{mode} digest={config.paths.digest_path}"

@@ -23,6 +23,8 @@ class Settings(BaseModel):
     app_env: str = Field(default="development")
     log_level: str = Field(default="INFO")
     api_key: str = Field(default="")
+    openrouter_api_key: str = Field(default="")
+    llm_provider: str = Field(default="")
 
 
 def load_settings() -> Settings:
@@ -30,6 +32,8 @@ def load_settings() -> Settings:
         app_env=os.getenv("APP_ENV", "development"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         api_key=os.getenv("API_KEY", ""),
+        openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+        llm_provider=os.getenv("LLM_PROVIDER", ""),
     )
 
 

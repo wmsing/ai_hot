@@ -627,8 +627,7 @@ def _write_feed_json_pages(
         next_page: int | None = page_i + 1 if page_i + 1 < page_count else None
         next_attr = "" if next_page is None else str(next_page)
         html = (
-            f'<div class="feed-chunk" data-next="{escape(next_attr)}">'
-            f"{inner}</div>\n"
+            f'<div class="feed-chunk" data-next="{escape(next_attr)}">{inner}</div>\n'
         )
         _write(feed_dir / f"{page_i}.html", html)
 
@@ -1088,6 +1087,9 @@ def _render_item(
     meta_bits: list[str] = []
     if item.source:
         meta_bits.append(f'<span class="badge">{escape(item.source)}</span>')
+    tag_disp = _display_tag(item.tag, lang)
+    if tag_disp:
+        meta_bits.append(f'<span class="badge badge-tag">{escape(tag_disp)}</span>')
     published_disp = _display_published(item.published)
     if published_disp:
         meta_bits.append(
@@ -1140,6 +1142,17 @@ def _display_published(raw: str) -> str:
     if dt is None:
         return text
     return format_published(dt)
+
+
+def _display_tag(raw: str, lang: str) -> str:
+    """paper → Paper / 论文；其它 tag 原样（ZH 未知则原样）。"""
+    text = raw.strip()
+    if not text:
+        return ""
+    key = text.lower()
+    if key == "paper":
+        return "论文" if lang == "zh" else "Paper"
+    return text
 
 
 def _display_score_line(raw: str) -> str:
@@ -1895,6 +1908,10 @@ a:focus-visible {
   font-weight: 600;
   letter-spacing: 0.02em;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+.badge-tag {
+  background: color-mix(in srgb, var(--ink) 10%, var(--bg));
+  color: var(--ink);
 }
 .summary, .why, .affiliate {
   margin: 0.5rem 0 0;

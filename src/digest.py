@@ -98,6 +98,9 @@ def write_digest(
                 block.append(f"- {score_line}")
             if item.image_url and item.image_url.strip():
                 block.append(f"- image: {item.image_url.strip()}")
+            tag = (item.tag or "").strip()
+            if tag:
+                block.append(f"- tag: {tag}")
             block.extend(
                 [
                     f"- summary: {summary}",
@@ -138,6 +141,7 @@ def _digest_item_to_hot(item: DigestItem) -> HotItem:
         summary=summary_out,
         image_url=item.image_url.strip() or None,
         published_at=published_at,
+        tag=(item.tag or "").strip(),
         reason=item.reason,
     )
 

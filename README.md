@@ -8,12 +8,16 @@ website: https://ai-hot.tonysingwm.workers.dev/
 ## Deploy
 ```bash
 source .venv/bin/activate
-# only update content
-
+# only update content（本机 Ollama）
 python -m src.main --llm qwen && python -m src.translate && python -m src.publish
 
+# Grok / 云端：OpenRouter free（不依赖本机睡眠与 Ollama）
+# export LLM_PROVIDER=openrouter
+# export OPENROUTER_API_KEY=sk-or-...
+python -m src.main --llm openrouter && python -m src.translate && python -m src.publish
+
 # update content + publish
-python -m src.main --llm qwen && python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
+python -m src.main --llm openrouter && python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
 ```
 
 ## 快速开始
@@ -39,10 +43,11 @@ python -m src.translate
 ```
 
 > 依赖：本机 Ollama 可用。中文源（如量子位）英文化失败时保留原文并打 warning。
-> 落地到 24h 机器后用 cron（每小时）：
+> 云端定时（推荐）：GitHub Actions `digest-schedule.yml`，港时 **07:00 / 12:00 / 21:00**（UTC `0 23,4,13 * * *`），走 OpenRouter；需 Repo Secret `OPENROUTER_API_KEY`。可在 Actions 里手动 Run workflow。
+> 本机 24h 备选 cron（港时同点，换成本机路径）：
 
 ```bash
-0 * * * * cd /path/to/ai_hot && .venv/bin/python -m src.main >> /tmp/ai_hot.log 2>&1
+0 7,12,21 * * * cd /path/to/ai_hot && .venv/bin/python -m src.main --llm openrouter && .venv/bin/python -m src.translate && .venv/bin/python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push >> /tmp/ai_hot.log 2>&1
 ```
 
 
@@ -92,7 +97,7 @@ git push
 ## 配置
 
 - 业务阈值 / RSS / 站点：`config.yaml`（可进 git）
-- 密钥 / 环境：`.env`（勿提交）
+- 密钥 / 环境：`.env`（勿提交）；Repo Secret `OPENROUTER_API_KEY` 供 Actions 定时；本地可设 `LLM_PROVIDER=openrouter`
 - 静态站含 About / Privacy / Disclosure；`site.affiliate_enabled` 已开。PartnerStack 前请在 `config.yaml` 填 `owner_name` / `contact_email` 后重新部署。
 - Anthropic 无官方 RSS，当前用社区镜像，可在 `config.yaml` 替换
 
@@ -126,6 +131,8 @@ ruff check src && ruff format --check src
 | RSS | Anthropic News（社区镜像） | [https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml](https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml) |
 | RSS | Hugging Face Blog    | [https://huggingface.co/blog/feed.xml](https://huggingface.co/blog/feed.xml)                                                                                                             |
 | RSS | NVIDIA AI Platforms  | [https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml](https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml)                                                         |
+| RSS | Apple Newsroom       | [https://www.apple.com/newsroom/rss-feed.rss](https://www.apple.com/newsroom/rss-feed.rss)                                                                                                 |
+| RSS | Apple ML Research    | [https://machinelearning.apple.com/rss.xml](https://machinelearning.apple.com/rss.xml)（展示 tag：`Paper` / `论文`）                                                                        |
 | RSS | 量子位（关键词过滤）           | [https://www.qbitai.com/feed](https://www.qbitai.com/feed)                                                                                                                               |
 
 
