@@ -31,9 +31,18 @@ def test_format_speak_document_intro_and_gaps() -> None:
             DigestItem(index=2, title="乙。", summary="摘要乙"),
         ]
     )
-    text = format_speak_document(doc)
+    text = format_speak_document(doc, lang="zh")
     assert text.startswith("今日 AI 热点共 2 条。\n\n")
     assert "甲。\n摘要甲。" in text
     assert "乙。\n摘要乙。" in text
     assert "第1条" not in text
     assert text.endswith("\n")
+
+
+def test_format_speak_document_en_intro() -> None:
+    doc = DigestDocument(
+        items=[DigestItem(index=1, title="Hello", summary="World")]
+    )
+    text = format_speak_document(doc, lang="en")
+    assert text.startswith("Today's AI highlights: 1 items.")
+    assert "Hello.\nWorld." in text

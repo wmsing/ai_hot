@@ -50,15 +50,15 @@ python -m src.translate
 
 # 口播稿 + TTS 播放列表（需 edge-tts）
 pip install -e ".[speak]"
-python -m src.speak --script-only          # 只写 out/speak.zh.md
-python -m src.speak                        # 全量：逐条 mp3 + full.mp3 + playlist.m3u
-python -m src.speak --limit 3              # 调试前 3 条
-# 播放：打开 out/audio/zh/<UTC-day>/playlist.m3u
-# 站点伴读（中/英桌面+手机；仅中文页有音频）
-python -m src.speak                        # 写 out/ + 同步 content/audio/zh/<day>/
+python -m src.speak --lang zh --script-only   # out/speak.zh.md
+python -m src.speak --lang en                 # EN TTS → content/audio/en/<day>/
+python -m src.speak --lang zh                 # ZH TTS → content/audio/zh/<day>/
+python -m src.speak --limit 3                 # 调试前 3 条
+# 播放：打开 out/audio/<lang>/<UTC-day>/playlist.m3u
+# 站点伴读（中/英桌面+手机）；垫乐：content/audio/bgm.mp3（口播时自动压低）
 python -m src.site_build
 # 电脑浏览器打开（不要用手机局域网 IP）：
-#   http://127.0.0.1:8766/zh/
+#   http://127.0.0.1:8766/zh/  或  http://127.0.0.1:8766/
 # 上线：提交 content/audio 后 push main → Cloudflare 构建会带上伴读
 ```
 

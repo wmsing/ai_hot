@@ -503,7 +503,7 @@ def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
 
     en_day = (out / "archive" / "2026-09-10" / "index.html").read_text(encoding="utf-8")
     assert "data-audio=" not in en_day
-    assert "podcast-dock" not in en_day
+    # dock HTML 可存在；无音频时 JS 会保持 hidden
 
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert 'data-audio="/audio/zh/2026-09-10/001.mp3"' in zh_home
@@ -536,3 +536,47 @@ def test_build_site_prefers_content_audio(tmp_path: Path) -> None:
     )
     data = (public / "audio" / "zh" / "2026-09-10" / "001.mp3").read_bytes()
     assert data == b"from-content"
+
+
+def test_build_site_podcast_en_audio(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    en_audio = tmp_path / "en_audio" / "2026-09-10"
+    en_audio.mkdir(parents=True)
+    (en_audio / "001.mp3").write_bytes(b"en-audio")
+    out = tmp_path / "public"
+    build_site(
+        content_dir=content,
+        output_dir=out,
+        audio_dirs_by_lang={"en": [en_audio.parent], "zh": []},
+    )
+    assert (out / "audio" / "en" / "2026-09-10" / "001.mp3").is_file()
+    en_day = (out / "archive" / "2026-09-10" / "index.html").read_text(encoding="utf-8")
+    assert 'data-audio="/audio/en/2026-09-10/001.mp3"' in en_day
+    assert 'class="item-speak"' in en_day
+    assert ">Listen<" in en_day
+    zh_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "data-audio=" not in zh_day
+
+
+def test_build_site_copies_bgm_and_ducks(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    audio_root = tmp_path / "audio"
+    day_dir = audio_root / "2026-09-10"
+    day_dir.mkdir(parents=True)
+    (day_dir / "001.mp3").write_bytes(b"ID3fake")
+    (audio_root / "bgm.mp3").write_bytes(b"bgm-bytes")
+    out = tmp_path / "public"
+    build_site(content_dir=content, output_dir=out, audio_dirs=[audio_root])
+
+    assert (out / "audio" / "bgm.mp3").read_bytes() == b"bgm-bytes"
+    zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
+    assert 'id="site-bgm"' in zh_home
+    assert 'src="/audio/bgm.mp3"' in zh_home
+    feed_js = (out / "feed.js").read_text(encoding="utf-8")
+    assert "site-bgm" in feed_js
+    assert "BGM_DUCK" in feed_js
+    assert "ensureBgm" in feed_js

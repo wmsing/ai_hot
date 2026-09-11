@@ -56,10 +56,11 @@ class PathsConfig(BaseModel):
     sqlite_path: str = "data/ai_hot.db"
     digest_path: str = "out/digest.md"
     digest_zh_path: str = "out/digest.zh.md"
+    speak_en_path: str = "out/speak.md"
     speak_zh_path: str = "out/speak.zh.md"
-    speak_audio_dir: str = "out/audio/zh"
-    # 可进 git；site_build / Cloudflare 部署读这里
-    content_audio_dir: str = "content/audio/zh"
+    # 根目录；实际文件在 {dir}/{en|zh}/{YYYY-MM-DD}/
+    speak_audio_dir: str = "out/audio"
+    content_audio_dir: str = "content/audio"
     content_digests_dir: str = "content/digests"
     arena_cache_dir: str = "content/arena"
     site_output_dir: str = "public"
@@ -69,6 +70,7 @@ class SpeakConfig(BaseModel):
     """口播 TTS（edge-tts）。"""
 
     voice: str = "zh-CN-YunxiNeural"
+    voice_en: str = "en-US-JennyNeural"
     rate: str = "+0%"
 
 

@@ -1,4 +1,4 @@
-"""从 digest.zh.md 生成口播稿 + TTS mp3 播放列表。"""
+"""从 digest(.zh).md 生成口播稿 + TTS mp3 播放列表。"""
 
 from __future__ import annotations
 
@@ -9,11 +9,12 @@ import shutil
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from src.config import load_app_config, settings
 from src.models import AppConfig, DigestDocument
 from src.site_parse import parse_digest_markdown
-from src.speak_script import format_item_speak, format_speak_document
+from src.speak_script import SpeakLang, format_item_speak, format_speak_document
 from src.speak_tts import synthesize
 
 logger = logging.getLogger(__name__)
@@ -22,17 +23,23 @@ _ITEM_MP3_RE = re.compile(r"^(\d{3})\.mp3$")
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build speak script + TTS playlist from digest.zh.md"
+        description="Build speak script + TTS playlist from digest markdown"
+    )
+    parser.add_argument(
+        "--lang",
+        choices=("zh", "en"),
+        default="zh",
+        help="Language (default: zh)",
     )
     parser.add_argument(
         "--input",
         default=None,
-        help="Digest markdown path (default: paths.digest_zh_path)",
+        help="Digest markdown path (default: digest_zh_path / digest_path)",
     )
     parser.add_argument(
         "--script-only",
         action="store_true",
-        help="Write speak.zh.md only; skip TTS",
+        help="Write speak script only; skip TTS",
     )
     parser.add_argument(
         "--limit",
@@ -43,7 +50,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--voice",
         default=None,
-        help="edge-tts voice id (default: speak.voice)",
+        help="edge-tts voice id (default: speak.voice / speak.voice_en)",
     )
     parser.add_argument(
         "--rate",
@@ -67,9 +74,17 @@ def _audio_day(doc: DigestDocument) -> date:
     return datetime.now(timezone.utc).date()
 
 
+def _audio_base(path: Path) -> Path:
+    """兼容旧配置 …/audio/zh → 根目录 …/audio。"""
+    if path.name in {"zh", "en"}:
+        return path.parent
+    return path
+
+
 def run_speak(
     config: AppConfig,
     *,
+    lang: SpeakLang = "zh",
     input_path: str | Path | None = None,
     script_only: bool = False,
     limit: int | None = None,
@@ -77,7 +92,12 @@ def run_speak(
     rate: str | None = None,
 ) -> tuple[Path, Path | None]:
     """写口播稿；非 script_only 时再写逐条 mp3 + full.mp3 + playlist.m3u。"""
-    src = Path(input_path or config.paths.digest_zh_path)
+    if input_path is not None:
+        src = Path(input_path)
+    elif lang == "en":
+        src = Path(config.paths.digest_path)
+    else:
+        src = Path(config.paths.digest_zh_path)
     if not src.is_file():
         raise FileNotFoundError(f"digest not found: {src}")
     text = src.read_text(encoding="utf-8")
@@ -92,29 +112,40 @@ def run_speak(
             items=doc.items[:limit],
         )
 
-    speak_path = Path(config.paths.speak_zh_path)
+    speak_path = Path(
+        config.paths.speak_en_path if lang == "en" else config.paths.speak_zh_path
+    )
     speak_path.parent.mkdir(parents=True, exist_ok=True)
-    script = format_speak_document(doc)
+    script = format_speak_document(doc, lang=lang)
     speak_path.write_text(script, encoding="utf-8")
     logger.info("wrote script %s (%d items)", speak_path, len(doc.items))
 
     if script_only:
         return speak_path, None
 
-    voice_id = voice or config.speak.voice
+    if voice:
+        voice_id = voice
+    elif lang == "en":
+        voice_id = config.speak.voice_en
+    else:
+        voice_id = config.speak.voice
     rate_val = rate or config.speak.rate
     day_s = _audio_day(doc).isoformat()
-    audio_dir = Path(config.paths.speak_audio_dir) / day_s
+    audio_dir = _audio_base(Path(config.paths.speak_audio_dir)) / lang / day_s
     audio_dir.mkdir(parents=True, exist_ok=True)
 
     item_paths: list[Path] = []
-    intro = f"今日 AI 热点共 {len(doc.items)} 条。"
+    intro = (
+        f"Today's AI highlights: {len(doc.items)} items."
+        if lang == "en"
+        else f"今日 AI 热点共 {len(doc.items)} 条。"
+    )
     intro_path = audio_dir / "000_intro.mp3"
     synthesize(intro, intro_path, voice=voice_id, rate=rate_val)
     item_paths.append(intro_path)
 
     for item in doc.items:
-        clip = format_item_speak(item)
+        clip = format_item_speak(item, lang=lang)
         out = audio_dir / f"{item.index:03d}.mp3"
         synthesize(clip, out, voice=voice_id, rate=rate_val)
         item_paths.append(out)
@@ -128,8 +159,7 @@ def run_speak(
     _write_playlist(playlist_path, item_paths)
     logger.info("wrote playlist %s", playlist_path)
 
-    # 站点部署用：只同步条目 mp3 到 content/audio（可进 git）
-    content_day = Path(config.paths.content_audio_dir) / day_s
+    content_day = _audio_base(Path(config.paths.content_audio_dir)) / lang / day_s
     content_day.mkdir(parents=True, exist_ok=True)
     for path in item_paths:
         if not _ITEM_MP3_RE.match(path.name):
@@ -157,8 +187,10 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     config = load_app_config()
+    lang: Literal["en", "zh"] = args.lang
     speak_path, audio_dir = run_speak(
         config,
+        lang=lang,
         input_path=args.input,
         script_only=args.script_only,
         limit=args.limit,
@@ -166,11 +198,11 @@ def main(argv: list[str] | None = None) -> int:
         rate=args.rate,
     )
     if audio_dir is None:
-        print(f"[ai_hot] speak script → {speak_path} (script-only)")
+        print(f"[ai_hot] speak script → {speak_path} (script-only lang={lang})")
     else:
         print(
             f"[ai_hot] speak script → {speak_path}; "
-            f"audio playlist → {audio_dir / 'playlist.m3u'}"
+            f"audio playlist → {audio_dir / 'playlist.m3u'} (lang={lang})"
         )
     return 0
 

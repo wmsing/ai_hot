@@ -76,11 +76,15 @@ def build_site(
     arena_boards: list[ArenaLeaderboard] | None = None,
     audio_dir: Path | None = None,
     audio_dirs: list[Path] | None = None,
+    audio_dirs_by_lang: dict[str, list[Path]] | None = None,
+    bgm_path: Path | None = None,
 ) -> None:
     """扫描 content_dir，写出完整静态站到 output_dir。
 
     arena_boards 写入独立 Arena 页；首页与归档不嵌入榜单。
-    audio_dirs / audio_dir：speak mp3 根目录（如 content/audio/zh、out/audio/zh）。
+    audio_dirs / audio_dir：兼容旧调用（视为 zh）。
+    audio_dirs_by_lang：按语言分别拷贝 mp3 根目录。
+    bgm_path：可选垫乐；缺省时在音频根目录查找 bgm.mp3。
     """
     cfg = site if site is not None else SiteConfig()
     boards = arena_boards if arena_boards is not None else []
@@ -97,7 +101,37 @@ def build_site(
         roots.extend(audio_dirs)
     elif audio_dir is not None:
         roots.append(audio_dir)
-    audio_available = _copy_speak_audio_roots(roots, output_dir, days)
+    # tests 仍可传 audio_dirs 当作 zh；正式构建传 audio_dirs_by_lang
+    audio_available: dict[str, set[tuple[str, int]]] = {
+        "zh": set(),
+        "en": set(),
+    }
+    if audio_dirs_by_lang is not None:
+        for lang_key, lang_roots in audio_dirs_by_lang.items():
+            audio_available[lang_key] = _copy_speak_audio_roots(
+                lang_roots, output_dir, days, lang=lang_key
+            )
+    elif roots:
+        audio_available["zh"] = _copy_speak_audio_roots(
+            roots, output_dir, days, lang="zh"
+        )
+
+    bgm_candidates: list[Path] = []
+    if bgm_path is not None:
+        bgm_candidates.append(bgm_path)
+    scan_roots: list[Path] = list(roots)
+    if audio_dirs_by_lang is not None:
+        for lang_roots in audio_dirs_by_lang.values():
+            scan_roots.extend(lang_roots)
+    seen_bgm: set[Path] = set()
+    for root in scan_roots:
+        for candidate in (root / "bgm.mp3", root.parent / "bgm.mp3"):
+            resolved = candidate.resolve() if candidate.exists() else candidate
+            if resolved in seen_bgm:
+                continue
+            seen_bgm.add(resolved)
+            bgm_candidates.append(candidate)
+    has_bgm = _copy_site_bgm(bgm_candidates, output_dir)
 
     _write(
         output_dir / "archive" / "index.html",
@@ -172,6 +206,7 @@ def build_site(
                 site=cfg,
                 as_of=_latest_generated_at(days, "en"),
                 audio_available=audio_available,
+                has_bgm=has_bgm,
             ),
         )
     else:
@@ -188,6 +223,7 @@ def build_site(
                 site=cfg,
                 as_of=_latest_generated_at(days, "zh"),
                 audio_available=audio_available,
+                has_bgm=has_bgm,
             ),
         )
     else:
@@ -219,6 +255,7 @@ def build_site(
                 newer_day=newer_day,
                 newer_is_latest=newer_is_latest,
                 audio_available=audio_available,
+                has_bgm=has_bgm,
             )
             _write(output_dir / "archive" / day_s / "index.html", archive_page)
             sitemap_urls.append(_abs_url(origin, en_archive_path))
@@ -235,6 +272,7 @@ def build_site(
                 newer_day=newer_day,
                 newer_is_latest=newer_is_latest,
                 audio_available=audio_available,
+                has_bgm=has_bgm,
             )
             _write(
                 output_dir / "zh" / "archive" / day_s / "index.html",
@@ -654,8 +692,8 @@ def _timeline_items(days: list[DayFiles], lang: str) -> list[TimelineEntry]:
     return out
 
 
-def _audio_public_href(day: date, index: int) -> str:
-    return f"/audio/zh/{day.isoformat()}/{index:03d}.mp3"
+def _audio_public_href(lang: str, day: date, index: int) -> str:
+    return f"/audio/{lang}/{day.isoformat()}/{index:03d}.mp3"
 
 
 def _resolve_audio_href(
@@ -663,25 +701,35 @@ def _resolve_audio_href(
     *,
     source_day: date,
     source_index: int,
-    audio_available: set[tuple[str, int]],
+    audio_available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]],
 ) -> str | None:
-    if lang != "zh":
+    if lang not in {"zh", "en"}:
         return None
+    if isinstance(audio_available, dict):
+        bucket = audio_available.get(lang, set())
+    else:
+        if lang != "zh":
+            return None
+        bucket = audio_available
     key = (source_day.isoformat(), source_index)
-    if key not in audio_available:
+    if key not in bucket:
         return None
-    return _audio_public_href(source_day, source_index)
+    return _audio_public_href(lang, source_day, source_index)
 
 
 def _copy_speak_audio_roots(
     audio_srcs: list[Path],
     output_dir: Path,
     days: list[DayFiles],
+    *,
+    lang: str = "zh",
 ) -> set[tuple[str, int]]:
     """按顺序从多个根目录拷贝；已存在的文件不覆盖。"""
     available: set[tuple[str, int]] = set()
     for src in audio_srcs:
-        available |= _copy_speak_audio(src, output_dir, days, skip_existing=True)
+        available |= _copy_speak_audio(
+            src, output_dir, days, lang=lang, skip_existing=True
+        )
     return available
 
 
@@ -690,9 +738,10 @@ def _copy_speak_audio(
     output_dir: Path,
     days: list[DayFiles],
     *,
+    lang: str = "zh",
     skip_existing: bool = False,
 ) -> set[tuple[str, int]]:
-    """把 speak mp3 拷到 public/audio/zh/{day}/；返回可用 (day, index)。"""
+    """把 speak mp3 拷到 public/audio/{lang}/{day}/；返回可用 (day, index)。"""
     available: set[tuple[str, int]] = set()
     if audio_src is None or not audio_src.is_dir() or not days:
         return available
@@ -709,7 +758,7 @@ def _copy_speak_audio(
             )
         if not files:
             continue
-        dest = output_dir / "audio" / "zh" / day_s
+        dest = output_dir / "audio" / lang / day_s
         dest.mkdir(parents=True, exist_ok=True)
         for path in files:
             match = _ITEM_MP3_RE.match(path.name)
@@ -727,14 +776,41 @@ def _copy_speak_audio(
     return available
 
 
-def _podcast_dock_html(lang: str) -> str:
-    if lang != "zh":
+def _copy_site_bgm(candidates: list[Path], output_dir: Path) -> bool:
+    """拷贝首个存在的 bgm.mp3 → public/audio/bgm.mp3。"""
+    for src in candidates:
+        if not src.is_file():
+            continue
+        dest_dir = output_dir / "audio"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest_dir / "bgm.mp3")
+        return True
+    return False
+
+
+def _podcast_dock_html(lang: str, *, has_bgm: bool = False) -> str:
+    if lang == "zh":
+        mode_label = "伴读"
+        prev_l, play_l, next_l = "上一", "播", "下一"
+        prev_a, play_a, next_a = "上一条", "播放或暂停", "下一条"
+        mode_a = "伴读播放或暂停"
+    elif lang == "en":
+        mode_label = "Listen"
+        prev_l, play_l, next_l = "Prev", "Play", "Next"
+        prev_a, play_a, next_a = "Previous", "Play or pause", "Next"
+        mode_a = "Listen play or pause"
+    else:
         return ""
-    return """
+    bgm = (
+        '<audio id="site-bgm" src="/audio/bgm.mp3" loop preload="none"></audio>\n'
+        if has_bgm
+        else ""
+    )
+    return f"""
 <audio id="site-audio" preload="none"></audio>
-<div class="podcast-dock" id="podcast-dock" hidden>
+{bgm}<div class="podcast-dock" id="podcast-dock" hidden>
   <button type="button" class="podcast-mode" id="podcast-mode"
-    aria-pressed="false" aria-label="伴读播放或暂停">
+    aria-pressed="false" aria-label="{escape(mode_a)}">
     <span class="podcast-mode-icon podcast-mode-play" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
         <path d="M8 5v14l11-7z"/>
@@ -745,15 +821,15 @@ def _podcast_dock_html(lang: str) -> str:
         <path d="M6 5h4v14H6zm8 0h4v14h-4z"/>
       </svg>
     </span>
-    <span class="podcast-mode-label">伴读</span>
+    <span class="podcast-mode-label">{escape(mode_label)}</span>
   </button>
   <div class="podcast-controls" id="podcast-controls" hidden>
     <button type="button" class="podcast-nav" id="podcast-prev"
-      aria-label="上一条">上一</button>
+      aria-label="{escape(prev_a)}">{escape(prev_l)}</button>
     <button type="button" class="podcast-nav podcast-play" id="podcast-play"
-      aria-label="播放或暂停">播</button>
+      aria-label="{escape(play_a)}">{escape(play_l)}</button>
     <button type="button" class="podcast-nav" id="podcast-next"
-      aria-label="下一条">下一</button>
+      aria-label="{escape(next_a)}">{escape(next_l)}</button>
     <span class="podcast-now" id="podcast-now"></span>
   </div>
 </div>
@@ -774,7 +850,7 @@ def _render_timeline_html(
     lang: str,
     *,
     affiliate_enabled: bool,
-    audio_available: set[tuple[str, int]],
+    audio_available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]],
     prev_day: date | None = None,
 ) -> str:
     bits: list[str] = []
@@ -806,7 +882,7 @@ def _write_feed_json_pages(
     lang: str,
     items: list[TimelineEntry],
     affiliate_enabled: bool,
-    audio_available: set[tuple[str, int]],
+    audio_available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]],
 ) -> None:
     """page 0 在首页 HTML；从 1 起写 feed/{lang}/{n}.html 分片。"""
     if len(items) <= HOME_PAGE_SIZE:
@@ -866,6 +942,7 @@ def _feed_js() -> str:
   }
 
   var audio = document.getElementById("site-audio");
+  var bgm = document.getElementById("site-bgm");
   var dock = document.getElementById("podcast-dock");
   var modeBtn = document.getElementById("podcast-mode");
   var controls = document.getElementById("podcast-controls");
@@ -875,6 +952,27 @@ def _feed_js() -> str:
   var nowEl = document.getElementById("podcast-now");
   var podcastOn = false;
   var currentItem = null;
+  var isZh = (root.getAttribute("lang") || "").toLowerCase().indexOf("zh") === 0;
+  var labelPlay = isZh ? "播" : "Play";
+  var labelStop = isZh ? "停" : "Stop";
+  var labelNow = isZh ? "第 " : "#";
+  var labelNowSuffix = isZh ? " 条" : "";
+  var BGM_DUCK = 0.12;
+
+  var ensureBgm = function () {
+    if (!bgm) return;
+    bgm.loop = true;
+    bgm.volume = BGM_DUCK;
+    var bp = bgm.play();
+    if (bp && typeof bp.catch === "function") {
+      bp.catch(function () {});
+    }
+  };
+
+  var stopBgm = function () {
+    if (!bgm) return;
+    bgm.pause();
+  };
 
   var audioItems = function () {
     return Array.prototype.slice.call(document.querySelectorAll(".item[data-audio]"));
@@ -907,11 +1005,11 @@ def _feed_js() -> str:
     });
     document.querySelectorAll(".item-speak").forEach(function (btn) {
       btn.setAttribute("aria-pressed", "false");
-      btn.textContent = "播";
+      btn.textContent = labelPlay;
     });
     setFabPlaying(!!playing && !!item);
     if (!item) {
-      if (playBtn) playBtn.textContent = "播";
+      if (playBtn) playBtn.textContent = labelPlay;
       if (nowEl) nowEl.textContent = "";
       return;
     }
@@ -919,11 +1017,15 @@ def _feed_js() -> str:
     var cardBtn = item.querySelector(".item-speak");
     if (cardBtn) {
       cardBtn.setAttribute("aria-pressed", playing ? "true" : "false");
-      cardBtn.textContent = playing ? "停" : "播";
+      cardBtn.textContent = playing ? labelStop : labelPlay;
     }
-    if (playBtn) playBtn.textContent = playing ? "停" : "播";
+    if (playBtn) playBtn.textContent = playing ? labelStop : labelPlay;
     var idx = item.querySelector(".item-index");
-    if (nowEl) nowEl.textContent = idx ? ("第 " + idx.textContent.trim() + " 条") : "";
+    if (nowEl) {
+      nowEl.textContent = idx
+        ? (labelNow + idx.textContent.trim() + labelNowSuffix)
+        : "";
+    }
   };
 
   var focusItem = function (item) {
@@ -952,10 +1054,12 @@ def _feed_js() -> str:
     }
     setPlayingUi(item, true);
     focusItem(item);
+    ensureBgm();
     var p = audio.play();
     if (p && typeof p.catch === "function") {
       p.catch(function () {
         setPlayingUi(item, false);
+        stopBgm();
       });
     }
   };
@@ -963,16 +1067,8 @@ def _feed_js() -> str:
   var pauseAudio = function () {
     if (!audio) return;
     audio.pause();
+    stopBgm();
     setPlayingUi(currentItem, false);
-  };
-
-  var toggleItem = function (item) {
-    if (!audio || !item) return;
-    if (currentItem === item && !audio.paused) {
-      pauseAudio();
-      return;
-    }
-    playItem(item, podcastOn);
   };
 
   var stepPodcast = function (delta) {
@@ -982,6 +1078,15 @@ def _feed_js() -> str:
     var next = items[Math.max(0, Math.min(items.length - 1, idx + delta))];
     if (!next) next = items[0];
     playItem(next, true);
+  };
+
+  var toggleItem = function (item) {
+    if (!audio || !item) return;
+    if (currentItem === item && !audio.paused) {
+      pauseAudio();
+      return;
+    }
+    playItem(item, podcastOn);
   };
 
   if (audio && dock) {
@@ -1041,6 +1146,7 @@ def _feed_js() -> str:
         if (controls) controls.hidden = true;
         document.body.classList.remove("podcast-on");
       }
+      stopBgm();
       setPlayingUi(currentItem, false);
     });
     audio.addEventListener("play", function () { setPlayingUi(currentItem, true); });
@@ -1157,7 +1263,10 @@ def _render_digest(
     older_day: date | None = None,
     newer_day: date | None = None,
     newer_is_latest: bool = False,
-    audio_available: set[tuple[str, int]] | None = None,
+    audio_available: dict[str, set[tuple[str, int]]]
+    | set[tuple[str, int]]
+    | None = None,
+    has_bgm: bool = False,
 ) -> str:
     day_s = day.isoformat()
     gen = escape(doc.generated_at) if doc.generated_at else "—"
@@ -1167,7 +1276,9 @@ def _render_digest(
     else:
         meta = f"生成时间（UTC）：{gen} · 精选：{selected}"
 
-    available = audio_available or set()
+    available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]] = (
+        audio_available or {}
+    )
     items_html = "".join(
         _render_item(
             item,
@@ -1203,7 +1314,7 @@ def _render_digest(
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
 
     script_src = _feed_script_href(links.css)
-    podcast = _podcast_dock_html(lang)
+    podcast = _podcast_dock_html(lang, has_bgm=has_bgm)
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
@@ -1238,7 +1349,10 @@ def _render_home_timeline(
     has_other_lang: bool,
     site: SiteConfig,
     as_of: str = "",
-    audio_available: set[tuple[str, int]] | None = None,
+    audio_available: dict[str, set[tuple[str, int]]]
+    | set[tuple[str, int]]
+    | None = None,
+    has_bgm: bool = False,
 ) -> str:
     links = _links_digest_home(lang, "", has_other_lang)
     total = len(items)
@@ -1251,7 +1365,9 @@ def _render_home_timeline(
         load_l = "加载更多"
         feed_base = "/feed/zh"
     script_src = _feed_script_href(links.css)
-    available = audio_available or set()
+    available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]] = (
+        audio_available or {}
+    )
 
     items_html = _render_timeline_html(
         page0,
@@ -1281,7 +1397,7 @@ def _render_home_timeline(
     en_hl = en_path if lang == "en" or has_other_lang else None
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
     desc = _static_description("home", lang)
-    podcast = _podcast_dock_html(lang)
+    podcast = _podcast_dock_html(lang, has_bgm=has_bgm)
 
     return _shell(
         title=SITE_NAME_EN,
@@ -2925,15 +3041,22 @@ def main(argv: list[str] | None = None) -> int:
         cache_dir=Path(config.paths.arena_cache_dir),
     )
     output_dir = Path(config.paths.site_output_dir).resolve()
+
+    def _audio_base(path: Path) -> Path:
+        return path.parent if path.name in {"zh", "en"} else path
+
+    content_audio = _audio_base(Path(config.paths.content_audio_dir))
+    speak_audio = _audio_base(Path(config.paths.speak_audio_dir))
     build_site(
         content_dir=Path(config.paths.content_digests_dir),
         output_dir=output_dir,
         site=config.site,
         arena_boards=boards,
-        audio_dirs=[
-            Path(config.paths.content_audio_dir),
-            Path(config.paths.speak_audio_dir),
-        ],
+        audio_dirs_by_lang={
+            "zh": [content_audio / "zh", speak_audio / "zh"],
+            "en": [content_audio / "en", speak_audio / "en"],
+        },
+        bgm_path=content_audio / "bgm.mp3",
     )
     home = output_dir / "index.html"
     home_zh = output_dir / "zh" / "index.html"
