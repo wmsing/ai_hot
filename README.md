@@ -51,8 +51,9 @@ python -m src.translate
 # 口播稿 + TTS 播放列表（需 edge-tts）
 pip install -e ".[speak]"
 python -m src.speak --lang zh --script-only   # out/speak.zh.md
-python -m src.speak --lang en                 # EN TTS → content/audio/en/<day>/
-python -m src.speak --lang zh                 # ZH TTS → content/audio/zh/<day>/
+python -m src.speak --lang en                 # EN TTS → content/audio/en/<day>/（已有 mp3 跳过）
+python -m src.speak --lang zh                 # ZH TTS → content/audio/zh/<day>/（只补缺）
+python -m src.speak --lang zh --force         # 强制全量重生成
 python -m src.speak --limit 3                 # 调试前 3 条
 # 播放：打开 out/audio/<lang>/<UTC-day>/playlist.m3u
 # 站点伴读（中/英桌面+手机）；垫乐：content/audio/bgm.mp3（口播时自动压低）

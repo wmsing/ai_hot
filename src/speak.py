@@ -57,6 +57,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help='Speech rate, e.g. "+0%%" or "+10%%" (default: speak.rate)',
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate all mp3 even if files already exist",
+    )
     return parser.parse_args(argv)
 
 
@@ -81,6 +86,41 @@ def _audio_base(path: Path) -> Path:
     return path
 
 
+def _mp3_ready(path: Path) -> bool:
+    return path.is_file() and path.stat().st_size > 0
+
+
+def _ensure_mp3(
+    *,
+    text: str,
+    out_path: Path,
+    content_path: Path | None,
+    voice: str,
+    rate: str,
+    force: bool,
+    label: str,
+) -> bool:
+    """保证 out_path 有可用 mp3。返回是否新合成。
+
+    优先复用 out；否则复用 content（并拷到 out）；否则 TTS。
+    """
+    if not force and _mp3_ready(out_path):
+        logger.info("skip existing %s (%s)", label, out_path)
+        return False
+    if (
+        not force
+        and content_path is not None
+        and _mp3_ready(content_path)
+    ):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(content_path, out_path)
+        logger.info("reuse content %s → %s", label, out_path)
+        return False
+    synthesize(text, out_path, voice=voice, rate=rate)
+    logger.info("tts %s → %s", label, out_path)
+    return True
+
+
 def run_speak(
     config: AppConfig,
     *,
@@ -90,8 +130,12 @@ def run_speak(
     limit: int | None = None,
     voice: str | None = None,
     rate: str | None = None,
+    force: bool = False,
 ) -> tuple[Path, Path | None]:
-    """写口播稿；非 script_only 时再写逐条 mp3 + full.mp3 + playlist.m3u。"""
+    """写口播稿；非 script_only 时再写逐条 mp3 + full.mp3 + playlist.m3u。
+
+    默认跳过已有非空 mp3（out 或 content），只补缺；--force 全量重生成。
+    """
     if input_path is not None:
         src = Path(input_path)
     elif lang == "en":
@@ -133,41 +177,72 @@ def run_speak(
     day_s = _audio_day(doc).isoformat()
     audio_dir = _audio_base(Path(config.paths.speak_audio_dir)) / lang / day_s
     audio_dir.mkdir(parents=True, exist_ok=True)
+    content_day = _audio_base(Path(config.paths.content_audio_dir)) / lang / day_s
+    content_day.mkdir(parents=True, exist_ok=True)
 
     item_paths: list[Path] = []
+    made_new = 0
     intro = (
         f"Today's AI highlights: {len(doc.items)} items."
         if lang == "en"
         else f"今日 AI 热点共 {len(doc.items)} 条。"
     )
     intro_path = audio_dir / "000_intro.mp3"
-    synthesize(intro, intro_path, voice=voice_id, rate=rate_val)
+    if _ensure_mp3(
+        text=intro,
+        out_path=intro_path,
+        content_path=None,
+        voice=voice_id,
+        rate=rate_val,
+        force=force,
+        label="intro",
+    ):
+        made_new += 1
     item_paths.append(intro_path)
 
     for item in doc.items:
         clip = format_item_speak(item, lang=lang)
-        out = audio_dir / f"{item.index:03d}.mp3"
-        synthesize(clip, out, voice=voice_id, rate=rate_val)
+        name = f"{item.index:03d}.mp3"
+        out = audio_dir / name
+        if _ensure_mp3(
+            text=clip,
+            out_path=out,
+            content_path=content_day / name,
+            voice=voice_id,
+            rate=rate_val,
+            force=force,
+            label=f"item {item.index}",
+        ):
+            made_new += 1
         item_paths.append(out)
-        logger.info("tts item %d → %s", item.index, out)
 
     full_path = audio_dir / "full.mp3"
-    synthesize(script, full_path, voice=voice_id, rate=rate_val)
-    logger.info("wrote full %s", full_path)
+    # full 是整稿 TTS：缺文件或本轮有新 clip 时重生成，避免旧 full 缺新条
+    force_full = force or made_new > 0 or not _mp3_ready(full_path)
+    if force_full:
+        synthesize(script, full_path, voice=voice_id, rate=rate_val)
+        logger.info("wrote full %s", full_path)
+    else:
+        logger.info("skip existing full %s", full_path)
 
     playlist_path = audio_dir / "playlist.m3u"
     _write_playlist(playlist_path, item_paths)
     logger.info("wrote playlist %s", playlist_path)
 
-    content_day = _audio_base(Path(config.paths.content_audio_dir)) / lang / day_s
-    content_day.mkdir(parents=True, exist_ok=True)
     for path in item_paths:
         if not _ITEM_MP3_RE.match(path.name):
             continue
         if int(path.stem) <= 0:
             continue
-        shutil.copy2(path, content_day / path.name)
-    logger.info("synced site audio → %s", content_day)
+        dest = content_day / path.name
+        if force or not _mp3_ready(dest) or path.stat().st_mtime > dest.stat().st_mtime:
+            shutil.copy2(path, dest)
+    logger.info(
+        "synced site audio → %s (new_tts=%s force=%s)",
+        content_day,
+        made_new,
+        force,
+    )
 
     return speak_path, audio_dir
 
@@ -196,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
         voice=args.voice,
         rate=args.rate,
+        force=args.force,
     )
     if audio_dir is None:
         print(f"[ai_hot] speak script → {speak_path} (script-only lang={lang})")

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from src.models import DigestDocument, DigestItem
+from pathlib import Path
+
+import pytest
+
+from src.models import AppConfig, DigestDocument, DigestItem, PathsConfig
+from src.speak import run_speak
 from src.speak_script import format_item_speak, format_speak_document
 
 
@@ -46,3 +51,80 @@ def test_format_speak_document_en_intro() -> None:
     text = format_speak_document(doc, lang="en")
     assert text.startswith("Today's AI highlights: 1 items.")
     assert "Hello.\nWorld." in text
+
+
+def test_run_speak_skips_existing_mp3(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digest = tmp_path / "digest.zh.md"
+    digest.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T12:00:00+00:00\n"
+        "Selected: 2\n\n"
+        "## 1. 一\n\n- source: `hn`\n- url: https://a.example/1\n"
+        "- summary: 摘要一\n\n"
+        "## 2. 二\n\n- source: `hn`\n- url: https://a.example/2\n"
+        "- summary: 摘要二\n",
+        encoding="utf-8",
+    )
+    content_day = tmp_path / "content_audio" / "zh" / "2026-09-11"
+    content_day.mkdir(parents=True)
+    (content_day / "001.mp3").write_bytes(b"EXISTING-1")
+    out_audio = tmp_path / "out_audio"
+    speak_path = tmp_path / "speak.zh.md"
+    cfg = AppConfig(
+        paths=PathsConfig(
+            digest_zh_path=str(digest),
+            speak_zh_path=str(speak_path),
+            speak_audio_dir=str(out_audio),
+            content_audio_dir=str(tmp_path / "content_audio"),
+        )
+    )
+    calls: list[str] = []
+
+    def _fake_synthesize(text: str, path: Path, **_kwargs: object) -> None:
+        calls.append(path.name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(f"NEW-{path.name}".encode())
+
+    monkeypatch.setattr("src.speak.synthesize", _fake_synthesize)
+    run_speak(cfg, lang="zh")
+
+    assert "001.mp3" not in calls
+    assert "002.mp3" in calls
+    assert (out_audio / "zh" / "2026-09-11" / "001.mp3").read_bytes() == b"EXISTING-1"
+    assert (content_day / "002.mp3").is_file()
+
+
+def test_run_speak_force_regenerates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digest = tmp_path / "digest.zh.md"
+    digest.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T12:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. 一\n\n- source: `hn`\n- url: https://a.example/1\n"
+        "- summary: 摘要一\n",
+        encoding="utf-8",
+    )
+    content_day = tmp_path / "content_audio" / "zh" / "2026-09-11"
+    content_day.mkdir(parents=True)
+    (content_day / "001.mp3").write_bytes(b"OLD")
+    cfg = AppConfig(
+        paths=PathsConfig(
+            digest_zh_path=str(digest),
+            speak_zh_path=str(tmp_path / "speak.zh.md"),
+            speak_audio_dir=str(tmp_path / "out_audio"),
+            content_audio_dir=str(tmp_path / "content_audio"),
+        )
+    )
+    calls: list[str] = []
+
+    def _fake_synthesize(text: str, path: Path, **_kwargs: object) -> None:
+        calls.append(path.name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"FORCED")
+
+    monkeypatch.setattr("src.speak.synthesize", _fake_synthesize)
+    run_speak(cfg, lang="zh", force=True)
+    assert "001.mp3" in calls
+    assert (content_day / "001.mp3").read_bytes() == b"FORCED"
