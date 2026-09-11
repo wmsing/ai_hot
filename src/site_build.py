@@ -1556,8 +1556,7 @@ def _shell(
     fonts = (
         "https://fonts.googleapis.com/css2?"
         "family=Outfit:wght@500;600;700&amp;"
-        "family=Literata:opsz,wght@7..72,400;600&amp;"
-        "family=Source+Sans+3:wght@400;500;600&amp;display=swap"
+        "family=Source+Sans+3:wght@400;500;600;700&amp;display=swap"
     )
     seo_links = ""
     if canonical:
@@ -1620,8 +1619,8 @@ def _stylesheet() -> str:
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --radius: 16px;
   --font-display: "Outfit", "Avenir Next", sans-serif;
-  --font-body: "Literata", "Palatino Linotype", serif;
-  --font-ui: "Source Sans 3", "Segoe UI", sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-ui: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --pad: clamp(1.5rem, 5vw, 2.5rem);
   --max: 44rem;
 }
@@ -1645,6 +1644,7 @@ body::after {
   border-radius: 50%;
   pointer-events: none;
   z-index: -1;
+  transform: translateZ(0);
 }
 body::before {
   top: -10%;
@@ -1848,8 +1848,8 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   position: sticky;
   top: var(--nav-sticky-bottom, 3.75rem);
   z-index: 3;
-  margin: 0 0 0.65rem;
-  padding: 0.55rem 1.1rem 0.5rem;
+  margin: 0;
+  padding: 0.55rem 1.1rem 0.35rem;
   background: color-mix(in srgb, var(--bg-elev) 92%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1864,6 +1864,9 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 }
 .feed-day-sticky:first-child {
   margin-top: 0;
+}
+.feed-day-sticky + .item {
+  margin-top: -0.45rem;
 }
 .feed-day-sticky time {
   font-variant-numeric: tabular-nums;
@@ -1973,9 +1976,10 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   animation: soft-in 0.55s ease both;
   animation-delay: calc(var(--i, 0) * 45ms);
   transition:
-    box-shadow 0.3s ease,
-    border-color 0.3s ease,
-    transform 0.3s ease;
+    box-shadow 0.28s ease,
+    border-color 0.28s ease,
+    transform 0.28s ease,
+    background-color 0.28s ease;
 }
 .item[data-source="hn"] { --source: #c45c26; }
 .item[data-source="openai"],
@@ -1997,10 +2001,17 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 .item[data-source="qbitai"],
 .item[data-source="rss:qbitai"] { --source: #6b5b8a; }
 .item:hover {
-  border-color: color-mix(in srgb, var(--source) 40%, var(--line));
+  border-color: color-mix(in srgb, var(--source) 55%, var(--line));
   border-left-color: var(--source);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--bg-elev) 70%, rgba(255, 255, 255, 0.08));
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+  transform: translateY(-4px);
+}
+.item:active {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 .item-index {
   font-family: var(--font-display);
@@ -2164,10 +2175,39 @@ code {
   html { scroll-behavior: auto; }
   .brand-block, .day-bar, .arena, .item { animation: none; }
   .item, .archive-list li { transition: none; }
-  .item:hover { transform: none; }
+  .item:hover,
+  .item:active { transform: none; }
   .read-progress::after { transition: none; }
 }
 @media (max-width: 720px) {
+  /* 手机端大 blur 易被裁切/淡化：加大光斑、提高不透明度、减弱 blur */
+  body::before {
+    top: -8%;
+    left: -30%;
+    width: min(120vw, 34rem);
+    height: min(120vw, 34rem);
+    background: radial-gradient(
+      circle,
+      rgba(99, 102, 241, 0.65) 0%,
+      rgba(99, 102, 241, 0.22) 42%,
+      rgba(0, 0, 0, 0) 72%
+    );
+    filter: blur(36px);
+  }
+  body::after {
+    bottom: 5%;
+    right: -35%;
+    top: auto;
+    width: min(130vw, 38rem);
+    height: min(130vw, 38rem);
+    background: radial-gradient(
+      circle,
+      rgba(236, 72, 153, 0.55) 0%,
+      rgba(236, 72, 153, 0.18) 45%,
+      rgba(0, 0, 0, 0) 72%
+    );
+    filter: blur(42px);
+  }
   .site-nav,
   body.has-day-sticky .site-nav,
   .feed-day-sticky {

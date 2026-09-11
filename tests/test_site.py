@@ -148,11 +148,16 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert ".item" in styles
     assert "100vw" in styles
     assert "calc(50% - 50vw)" in styles
+    assert "0.65" in styles or "blur(36px)" in styles
+    assert "blur(36px)" in styles
     assert '[data-source="hn"]' in styles
     assert "--source" in styles
     assert 'class="item-index"' in home
     assert "Outfit" in home
-    assert "Literata" in home
+    assert "Source+Sans+3" in home or "Source Sans 3" in home
+    assert "Literata" not in home
+    assert "cursor: pointer" in styles
+    assert "translateY(-4px)" in styles
     assert 'property="og:title"' in home
     assert 'rel="icon"' in home
     assert 'href="favicon.svg"' in home
