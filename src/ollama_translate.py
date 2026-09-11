@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from src.config import settings
-from src.llm import build_llm_runtime, runtime_from_ollama
+from src.llm import build_llm_runtime, resolve_provider, runtime_from_ollama
 from src.models import AppConfig, LlmRuntime, OllamaConfig
 from src.ollama_client import llm_chat
 
@@ -26,8 +26,11 @@ def translate_markdown(text: str, llm: LlmRuntime | OllamaConfig) -> str:
     return llm_chat(system=_SYSTEM, user=text, llm=runtime)
 
 
-def translate_digest_file(config: AppConfig) -> Path:
-    """读英文 digest，写出中文版路径。"""
+def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Path:
+    """读英文 digest，写出中文版路径。
+
+    model 非空时覆盖 config 默认模型；含 `/` 或 `:free` 时走 openrouter。
+    """
     src = Path(config.paths.digest_path)
     dst = Path(config.paths.digest_zh_path)
     if not src.is_file():
@@ -35,7 +38,13 @@ def translate_digest_file(config: AppConfig) -> Path:
     english = src.read_text(encoding="utf-8")
     if not english.strip():
         raise ValueError(f"digest is empty: {src}")
-    runtime = build_llm_runtime(config, api_key=settings.openrouter_api_key)
+    provider = resolve_provider(model, config)
+    runtime = build_llm_runtime(
+        config,
+        provider=provider,
+        model=model,
+        api_key=settings.openrouter_api_key,
+    )
     logger.info(
         "translating digest provider=%s model=%s chars=%s",
         runtime.provider,

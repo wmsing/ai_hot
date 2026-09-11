@@ -5,17 +5,21 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+import httpx
+
 from src.config import settings
 from src.digest import load_hot_items, merge_by_url, same_utc_day, write_digest
 from src.digest_en import translate_cjk_fields_to_english
+from src.fetch_page import fetch_page_snippet
 from src.http_client import build_client
 from src.keywords import matched_keyword, passes_keywords
 from src.llm import build_llm_runtime, resolve_llm_model, resolve_provider
 from src.models import AppConfig, FeedConfig, HotItem, LlmRuntime
-from src.ollama_client import summarize_item
+from src.ollama_client import is_usable_source_summary, summarize_item
 from src.sources.hn import fetch_hn_candidates
 from src.sources.rss import fetch_rss_candidates
 from src.storage import ItemStore
+from src.textutil import truncate
 
 logger = logging.getLogger(__name__)
 
@@ -63,29 +67,37 @@ def run_once(
             candidates.extend(fetch_hn_candidates(client, config.hn))
             candidates.extend(fetch_rss_candidates(client, config.rss))
 
-        rss_new_count: dict[str, int] = {}
-        for item in candidates:
-            feed = _feed_by_source(config, item.source)
-            keywords = feed.keywords if feed else []
-            if not passes_keywords(item, keywords):
-                continue
-            hit = matched_keyword(item, keywords)
-            if hit:
-                item = item.model_copy(update={"reason": f"{item.reason}; kw={hit}"})
-
-            if store.is_seen(
-                item.url,
-                item.title,
-                cooldown_hours=config.filter.cooldown_hours,
-                now=now,
-            ):
-                continue
-            if item.source.startswith("rss:"):
-                count = rss_new_count.get(item.source, 0)
-                if count >= config.rss.max_new_per_feed:
+            rss_new_count: dict[str, int] = {}
+            for item in candidates:
+                feed = _feed_by_source(config, item.source)
+                keywords = feed.keywords if feed else []
+                if not passes_keywords(item, keywords):
                     continue
-                rss_new_count[item.source] = count + 1
-            selected.append(item)
+                hit = matched_keyword(item, keywords)
+                if hit:
+                    item = item.model_copy(
+                        update={"reason": f"{item.reason}; kw={hit}"}
+                    )
+
+                if store.is_seen(
+                    item.url,
+                    item.title,
+                    cooldown_hours=config.filter.cooldown_hours,
+                    now=now,
+                ):
+                    continue
+                if item.source.startswith("rss:"):
+                    count = rss_new_count.get(item.source, 0)
+                    if count >= config.rss.max_new_per_feed:
+                        continue
+                    rss_new_count[item.source] = count + 1
+                selected.append(item)
+
+            selected = _attach_hn_page_snippets(
+                selected,
+                client,
+                max_chars=1200 if llm_model else 280,
+            )
 
         if llm_model:
             selected = _enrich_with_llm(selected, runtime)
@@ -115,11 +127,52 @@ def run_once(
         store.close()
 
 
+def _attach_hn_page_snippets(
+    items: list[HotItem],
+    client: httpx.Client,
+    *,
+    max_chars: int = 280,
+) -> list[HotItem]:
+    """HN 无可用原生摘要时抓目标页片段；失败则保持原样（可为空）。"""
+    out: list[HotItem] = []
+    for item in items:
+        if item.source != "hn":
+            out.append(item)
+            continue
+        existing = (item.summary or "").strip()
+        if existing and is_usable_source_summary(existing, title=item.title):
+            out.append(item)
+            continue
+        snippet = fetch_page_snippet(client, item.url, max_chars=max_chars)
+        if not snippet:
+            out.append(item)
+            continue
+        out.append(item.model_copy(update={"summary": truncate(snippet, max_chars)}))
+    return out
+
+
 def _enrich_with_llm(items: list[HotItem], llm: LlmRuntime) -> list[HotItem]:
     enriched: list[HotItem] = []
     for item in items:
+        existing = (item.summary or "").strip()
+        # RSS 等已有可靠原生简介可跳过；HN 页面片段仍交给 LLM 压成短句
+        if (
+            item.source != "hn"
+            and existing
+            and is_usable_source_summary(existing, title=item.title)
+        ):
+            logger.info(
+                "skip llm summarize; keep source summary source=%s len=%s",
+                item.source,
+                len(existing),
+            )
+            enriched.append(item)
+            continue
         try:
             blurb = summarize_item(item, llm)
+            if not blurb.strip():
+                enriched.append(item)
+                continue
             enriched.append(item.model_copy(update={"summary": blurb}))
         except Exception as exc:
             logger.warning("llm summarize failed source=%s err=%s", item.source, exc)

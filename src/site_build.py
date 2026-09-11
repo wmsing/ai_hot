@@ -22,7 +22,7 @@ SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
 SITE_TAGLINE_ZH = "AI 热点摘要"
 _REPO_ISSUES = "https://github.com/wmsing/ai_hot/issues"
-HOME_PAGE_SIZE = 20
+HOME_PAGE_SIZE = 30
 
 _BOARD_TITLES: dict[str, tuple[str, str]] = {
     "agent": ("Agent", "Agent"),
@@ -1102,6 +1102,7 @@ def _render_item(
     bits = [
         '<article class="item">',
         f'<span class="item-index" aria-hidden="true">{item.index:02d}</span>',
+        '<div class="item-body">',
     ]
     img = item.image_url.strip()
     if img:
@@ -1113,7 +1114,6 @@ def _render_item(
             f'<img src="{src}" alt="" loading="lazy" '
             f'referrerpolicy="no-referrer" decoding="async" /></a>'
         )
-    bits.append('<div class="item-body">')
     bits.append(f"<h2>{title_html}</h2>")
     if meta_bits:
         bits.append(f'<p class="item-meta">{" · ".join(meta_bits)}</p>')
@@ -1839,9 +1839,6 @@ a:focus-visible {
     border-color 0.3s ease,
     transform 0.3s ease;
 }
-.item:has(.item-thumb) {
-  grid-template-columns: 2.5rem 5.75rem 1fr;
-}
 .item:hover {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
   box-shadow: 0 12px 32px rgba(20, 32, 27, 0.09);
@@ -1859,13 +1856,13 @@ a:focus-visible {
 }
 .item-thumb {
   display: block;
-  width: 5.75rem;
-  height: 5.75rem;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 0 0 0.75rem;
   border-radius: 0.55rem;
   overflow: hidden;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--line) 55%, transparent);
-  flex-shrink: 0;
 }
 .item-thumb img {
   display: block;
@@ -2005,13 +2002,6 @@ code {
     grid-template-columns: 1.8rem 1fr;
     padding: 1.05rem 1rem 1.1rem;
   }
-  .item:has(.item-thumb) {
-    grid-template-columns: 1.8rem 4.5rem 1fr;
-  }
-  .item-thumb {
-    width: 4.5rem;
-    height: 4.5rem;
-  }
   .site-nav {
     align-items: flex-start;
     padding: 0.85rem 0.95rem;
@@ -2033,13 +2023,19 @@ def main(argv: list[str] | None = None) -> int:
         config.http,
         cache_dir=Path(config.paths.arena_cache_dir),
     )
+    output_dir = Path(config.paths.site_output_dir).resolve()
     build_site(
         content_dir=Path(config.paths.content_digests_dir),
-        output_dir=Path(config.paths.site_output_dir),
+        output_dir=output_dir,
         site=config.site,
         arena_boards=boards,
     )
-    print(f"[ai_hot] site built → {config.paths.site_output_dir}/")
+    home = output_dir / "index.html"
+    home_zh = output_dir / "zh" / "index.html"
+    print(f"[ai_hot] site built → {output_dir}/")
+    print(f"[ai_hot] open: {home.as_uri()}")
+    if home_zh.is_file():
+        print(f"[ai_hot] open zh: {home_zh.as_uri()}")
     return 0
 
 

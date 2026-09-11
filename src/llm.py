@@ -65,6 +65,7 @@ def build_llm_runtime(
             api_key=key,
             http_referer=config.site.base_url.rstrip("/"),
             app_title=config.openrouter.app_title,
+            fallback_model=config.openrouter.fallback_model,
         )
     return LlmRuntime(
         provider="ollama",

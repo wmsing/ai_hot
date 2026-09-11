@@ -157,7 +157,9 @@ class OllamaConfig(BaseModel):
 
 class OpenRouterConfig(BaseModel):
     base_url: str = "https://openrouter.ai/api/v1"
-    model: str = "openrouter/free"
+    model: str = "inclusionai/ling-3.0-flash-vl:free"
+    # 主模型失败（空 content / HTTP 错）时再试一次；空字符串=不重试
+    fallback_model: str = "openrouter/free"
     timeout_seconds: float = 120.0
     app_title: str = "ai_hot"
 
@@ -178,6 +180,7 @@ class LlmRuntime(BaseModel):
     api_key: str = ""
     http_referer: str = ""
     app_title: str = "ai_hot"
+    fallback_model: str = ""
 
 
 class AppConfig(BaseModel):

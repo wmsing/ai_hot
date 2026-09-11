@@ -329,6 +329,61 @@ def test_openrouter_content_parse() -> None:
     assert _openrouter_content({"choices": []}) == ""
 
 
+def test_openrouter_fallback_on_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.models import LlmRuntime
+    from src.ollama_client import llm_chat
+
+    calls: list[str] = []
+
+    class _Resp:
+        def __init__(self, payload: dict) -> None:
+            self._payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self._payload
+
+    class _Client:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> "_Client":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def post(self, url: str, headers: dict, json: dict) -> _Resp:
+            model = str(json["model"])
+            calls.append(model)
+            if model == "primary:free":
+                return _Resp(
+                    {
+                        "model": "primary:free",
+                        "choices": [{"message": {"content": ""}}],
+                    }
+                )
+            return _Resp(
+                {
+                    "model": "openrouter/free",
+                    "choices": [{"message": {"content": "ok zh"}}],
+                }
+            )
+
+    monkeypatch.setattr("src.ollama_client.httpx.Client", _Client)
+    runtime = LlmRuntime(
+        provider="openrouter",
+        model="primary:free",
+        base_url="https://openrouter.ai/api/v1",
+        api_key="test-key",
+        fallback_model="openrouter/free",
+    )
+    assert llm_chat(system="s", user="u", llm=runtime) == "ok zh"
+    assert calls == ["primary:free", "openrouter/free"]
+
+
 def test_write_digest_tag(tmp_path: Path) -> None:
     path = tmp_path / "digest.md"
     write_digest(
@@ -492,9 +547,10 @@ def test_mock_hn_http() -> None:
 def test_translate_digest_file_mocked(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from src.models import AppConfig, OllamaConfig, PathsConfig
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
     from src.ollama_translate import translate_digest_file
 
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
     src = tmp_path / "digest.md"
     dst = tmp_path / "digest.zh.md"
     src.write_text("# Hello\n\n- url: https://x.com\n", encoding="utf-8")
@@ -503,12 +559,51 @@ def test_translate_digest_file_mocked(
         ollama=OllamaConfig(model="qwen3:4b-instruct"),
     )
 
-    def _fake_translate(text: str, ollama: OllamaConfig) -> str:
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
         assert "Hello" in text
-        assert ollama.model == "qwen3:4b-instruct"
+        assert isinstance(llm, LlmRuntime)
+        assert llm.provider == "ollama"
+        assert llm.model == "qwen3:4b-instruct"
         return "# 你好\n\n- url: https://x.com\n"
 
     monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
     out = translate_digest_file(cfg)
     assert out == dst
     assert "你好" in dst.read_text(encoding="utf-8")
+
+
+def test_translate_digest_file_model_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    src.write_text("# Hi\n", encoding="utf-8")
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct"),
+    )
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+    seen: list[str] = []
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        assert isinstance(llm, LlmRuntime)
+        seen.append(llm.model)
+        assert llm.provider == "openrouter"
+        return "# 嗨\n"
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg, model="nvidia/nemotron-3-ultra-550b-a55b:free")
+    assert seen == ["nvidia/nemotron-3-ultra-550b-a55b:free"]
+
+
+def test_translate_cli_model_flag() -> None:
+    from src.translate import _parse_args
+
+    args = _parse_args(["--model", "nvidia/nemotron-3-ultra-550b-a55b:free"])
+    assert args.model == "nvidia/nemotron-3-ultra-550b-a55b:free"
+    assert _parse_args([]).model is None

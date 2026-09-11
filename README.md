@@ -16,6 +16,10 @@ python -m src.main --llm qwen && python -m src.translate && python -m src.publis
 # export OPENROUTER_API_KEY=sk-or-...
 python -m src.main --llm openrouter && python -m src.translate && python -m src.publish
 
+# custom openrouter free model
+# check: https://openrouter.ai/models?variant=free&order=most-popular
+python -m src.main --llm nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.translate --model nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.publish
+
 # update content + publish
 python -m src.main --llm openrouter && python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
 ```

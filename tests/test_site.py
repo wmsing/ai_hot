@@ -242,13 +242,13 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
     assert 'id="load-more"' in home
     assert 'data-feed-base="/feed/en"' in home
     assert 'data-next="1"' in home
-    assert home.count('class="item"') == 20
+    assert home.count('class="item"') == 30
     assert home.count('class="feed-day-sticky"') == 1
     assert 'data-day="2026-09-10"' in home
     page1 = (out / "feed" / "en" / "1.html").read_text(encoding="utf-8")
     assert 'class="feed-chunk"' in page1
     assert 'data-next=""' in page1
-    assert page1.count('class="item"') == 15
+    assert page1.count('class="item"') == 5
     assert 'class="feed-day-sticky"' not in page1
     assert "Title" in page1
 
