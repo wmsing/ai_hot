@@ -352,46 +352,35 @@ def _clear_dir(path: Path) -> None:
 
 
 def _lang_nav(lang: str, other_href: str) -> str:
-    if lang == "en":
-        if other_href:
-            inner = (
-                '<span class="lang-current">EN</span> · '
-                f'<a href="{escape(other_href)}">中文</a>'
-            )
-        else:
-            inner = (
-                '<span class="lang-current">EN</span> · '
-                '<span class="muted">中文 N/A</span>'
-            )
-    elif other_href:
+    """仅显示对方语言入口：EN 页 →「中文」，中文页 →「EN」。"""
+    label = "中文" if lang == "en" else "EN"
+    if other_href:
         inner = (
-            f'<a href="{escape(other_href)}">EN</a> · '
-            '<span class="lang-current">中文</span>'
+            f'<a href="{escape(other_href)}" class="lang-toggle" '
+            f'hreflang="{"zh-Hans" if lang == "en" else "en"}">{label}</a>'
         )
     else:
         inner = (
-            '<span class="muted">EN N/A</span> · <span class="lang-current">中文</span>'
+            f'<span class="lang-toggle muted" aria-disabled="true">{label}</span>'
         )
     return f'<div class="lang-switch">{inner}</div>'
 
 
-def _main_nav(lang: str, links: PageLinks, *, include_archive: bool = True) -> str:
+def _main_nav(lang: str, links: PageLinks) -> str:
     if lang == "en":
-        home_l, arena_l, archive_l = "Home", "AI Models", "Archive"
+        home_l, arena_l = "Home", "AI Models"
         about_l, privacy_l = "About", "Privacy"
         nav_label = "Primary"
     else:
-        home_l, arena_l, archive_l = "首页", "AI 模型榜", "归档"
+        home_l, arena_l = "首页", "AI 模型榜"
         about_l, privacy_l = "关于", "隐私"
         nav_label = "主导航"
     parts = [
         f'<a href="{escape(links.home)}">{home_l}</a>',
         f'<a href="{escape(links.arena)}">{arena_l}</a>',
+        f'<a href="{escape(links.about)}">{about_l}</a>',
+        f'<a href="{escape(links.privacy)}">{privacy_l}</a>',
     ]
-    if include_archive:
-        parts.append(f'<a href="{escape(links.archive)}">{archive_l}</a>')
-    parts.append(f'<a href="{escape(links.about)}">{about_l}</a>')
-    parts.append(f'<a href="{escape(links.privacy)}">{privacy_l}</a>')
     return (
         f'<nav class="site-nav" aria-label="{nav_label}">'
         f'<div class="nav-primary">{"".join(parts)}</div>'
@@ -414,11 +403,22 @@ def _footer(lang: str, links: PageLinks, site: SiteConfig) -> str:
             else "当前未启用联盟链接。"
         )
     if lang == "en":
-        about_l, privacy_l, disc_l = "About", "Privacy", "Disclosure"
+        archive_l, about_l, privacy_l, disc_l = (
+            "Archive",
+            "About",
+            "Privacy",
+            "Disclosure",
+        )
     else:
-        about_l, privacy_l, disc_l = "关于", "隐私", "披露说明"
+        archive_l, about_l, privacy_l, disc_l = (
+            "归档",
+            "关于",
+            "隐私",
+            "披露说明",
+        )
     return (
         f"{lead} "
+        f'<a href="{escape(links.archive)}">{archive_l}</a> · '
         f'<a href="{escape(links.about)}">{about_l}</a> · '
         f'<a href="{escape(links.privacy)}">{privacy_l}</a> · '
         f'<a href="{escape(links.disclosure)}">{disc_l}</a>.'
@@ -1253,7 +1253,7 @@ def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> 
     <p class="brand"><a href="{escape(links.brand_home)}">{escape(SITE_NAME_EN)}</a></p>
     {_brand_sub(lang)}
   </div>
-  {_main_nav(lang, links, include_archive=False)}
+  {_main_nav(lang, links)}
   <h1 class="page-title">{heading}</h1>
 </header>
 <main class="feed">{lis}</main>
@@ -1694,8 +1694,13 @@ a:focus-visible {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.lang-current { color: var(--ink); font-weight: 600; }
-.lang-switch a { text-decoration: none; }
+.lang-toggle {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+a.lang-toggle:hover { color: var(--accent-hot); }
+.lang-toggle.muted { font-weight: 500; color: var(--muted); }
 .day-bar {
   padding: 1rem 1.15rem;
   background: var(--bg-elev);

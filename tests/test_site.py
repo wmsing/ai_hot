@@ -151,6 +151,14 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'href="arena.html"' in home
     assert ">AI Models<" in home
     assert 'href="privacy.html"' in home
+    assert ">Archive<" not in home.split('class="nav-primary">', 1)[1].split(
+        "</div>", 1
+    )[0]
+    assert 'href="archive/index.html">Archive</a>' in home
+    assert 'class="lang-toggle"' in home
+    assert ">中文<" in home
+    assert "lang-current" not in home
+    assert "EN ·" not in home
     assert 'class="why"' not in home
     assert "hn score>=100" not in home
     assert "score=n/a" not in home
@@ -183,9 +191,16 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="feed-day-sticky"' in zh_home
     assert "AI 热点摘要 截至 2026-09-10" in zh_home
     assert "截至 2026-09-10 05" not in zh_home
+    assert 'class="lang-toggle"' in zh_home
+    assert ">EN<" in zh_home
+    assert "lang-current" not in zh_home
     assert "更新" in zh_home
     assert 'href="../favicon.svg"' in zh_home
     assert "当前未启用联盟链接" in zh_home
+    assert ">归档<" not in zh_home.split('class="nav-primary">', 1)[1].split(
+        "</div>", 1
+    )[0]
+    assert 'href="archive/index.html">归档</a>' in zh_home
 
     archive_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
         encoding="utf-8"
