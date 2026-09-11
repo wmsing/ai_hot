@@ -144,6 +144,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "#0d0f17" in styles
     assert "body::before" in styles
     assert "radial-gradient" in styles
+    assert "cursor: pointer" in styles
+    assert ".item" in styles
+    assert "100vw" in styles
+    assert "calc(50% - 50vw)" in styles
     assert '[data-source="hn"]' in styles
     assert "--source" in styles
     assert 'class="item-index"' in home
