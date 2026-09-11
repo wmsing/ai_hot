@@ -278,9 +278,16 @@ def test_build_site_outputs(tmp_path: Path) -> None:
 
     about = (out / "about.html").read_text(encoding="utf-8")
     assert "personally maintained project" in about
+    assert "Listen" in about
+    assert "AI Models" in about
     assert "as of" not in about.split('class="tagline">', 1)[1].split("</p>", 1)[0]
+    about_zh = (out / "zh" / "about.html").read_text(encoding="utf-8")
+    assert "伴读" in about_zh
     privacy = (out / "privacy.html").read_text(encoding="utf-8")
     assert "static site" in privacy.lower() or "static" in privacy
+    assert "MP3" in privacy
+    privacy_zh = (out / "zh" / "privacy.html").read_text(encoding="utf-8")
+    assert "伴读" in privacy_zh
     disclosure = (out / "disclosure.html").read_text(encoding="utf-8")
     assert "affiliate_enabled" in disclosure
 
