@@ -84,11 +84,7 @@ def resummarize_digest(
         return path, 0
 
     provider = resolve_provider(llm_flag, config)
-    model = (
-        resolve_llm_model(llm_flag, config, provider=provider)
-        if llm_flag
-        else None
-    )
+    model = resolve_llm_model(llm_flag, config, provider=provider) if llm_flag else None
     runtime = build_llm_runtime(
         config,
         provider=provider,

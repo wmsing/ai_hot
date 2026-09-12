@@ -1,6 +1,6 @@
 # ai_hot
 
-个人向 **AI 垂直热点定时巡检**：HN + 官方/镜像 RSS → SQLite 去重 → `out/digest.md`（**UTC 当日累计**：同日只追加新 URL，条数单调不减；跨日重新起篇）。  
+个人向 **AI 垂直热点定时巡检**：HN + Reddit + Google News + 官方/镜像 RSS → SQLite 去重 → `out/digest.md`（**UTC 当日累计**：同日只追加新 URL，条数单调不减；跨日重新起篇）。  
 静态站 **AI Hot Digest**（中文副标题「AI 热点摘要」）经 Cloudflare Workers（静态 Assets）发布。
 
 website: [https://ai-hot.tonysingwm.workers.dev/](https://ai-hot.tonysingwm.workers.dev/)
@@ -31,10 +31,30 @@ python -m src.deep_summarize "${ARGS[@]}" && python -m src.publish && python -m 
 # 全量重打伴读：python -m src.speak --force
 ```
 
+
+
+## 今日热搜
+### 最小：只拉榜
+``` bash
+python -m src.hot_topics_probe --top 30 --save
+```
+
+### 完整：拉榜 → 译标题 + 精写摘要
+``` bash
+python -m src.hot_topics_probe --top 30 --save
+python -m src.deep_summarize --hot-topics --llm qwen
+```
+
+### 只补写
+``` bash
+python -m src.deep_summarize --hot-topics --llm qwen
+```
+
+### 本地预览/建站
 ```bash
-# 本地预览
 python -m src.site_build
 ```
+
 
 ## Deploy
 
@@ -187,9 +207,35 @@ ruff check src && ruff format --check src
 
 ## v1 非目标
 
-推送、Reddit、数字人视频/唇形、发帖（YT/抖音/小红书）、接 ai_host、AdSense。
+推送、数字人视频/唇形、发帖（YT/抖音/小红书）、接 ai_host、AdSense。
 口播稿 + TTS 播放列表可用（`python -m src.speak`）。
 联盟 CTA 仅骨架（默认关），不自动匹配商品。
+
+## 热门话题 Probe（跨源打分）
+
+免费源：HN + Reddit JSON + Google News RSS；（可选）Google Trends 日榜/related、Threads Keyword Search。
+
+```bash
+# 终端查看 Top 20
+python -m src.hot_topics_probe --top 20 --save
+
+# 构建静态站（自动 probe + 写入「今日热搜」页）
+python -m src.site_build
+# 打开 public/zh/hot.html 或 public/hot.html
+
+# 对热搜 Top 5 跑 ADHD 精写（需本地 Ollama 或 OpenRouter）
+python -m src.hot_topics_probe --top 20 --save
+python -m src.deep_summarize --hot-topics --llm qwen
+python -m src.site_build
+
+# 单条热搜 URL
+python -m src.deep_summarize --hot-topics --url 'https://example.com/article' --llm qwen
+```
+
+站点导航 Tab：**今日热搜**（中文）/ **Trending**（英文）。快照默认写入 `content/hot_topics/latest.json`。  
+`config.yaml` → `hot_topics.deep_summarize: true` 时，`site_build` 会自动精写热搜快照（`deep_summarize_top_n: 0` = 全部；设正整数则只精写前 N 条）。
+
+Threads 需 `.env` 的 `THREADS_ACCESS_TOKEN` 且 `config.yaml` 中 `threads.enabled: true`。Trends 失败会自动跳过。
 
 ## 当前扫描源
 
@@ -199,6 +245,8 @@ ruff check src && ruff format --check src
 | 源   | 平台 / 站点              | 入口                                                                                                                                                                                       |
 | --- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | HN  | Hacker News          | Firebase API Top 30（`score≥100` 且 `comments≥20`）                                                                                                                                         |
+| Reddit | r/MachineLearning 等 | 公开 JSON，失败回退 Atom RSS（`top?t=day`，每轮 `max_new_total`） |
+| Google News | AI 中英查询 RSS | `news.google.com/rss/search`（每轮 `max_new_total`） |
 | RSS | OpenAI News          | [https://openai.com/news/rss.xml](https://openai.com/news/rss.xml)                                                                                                                       |
 | RSS | Google AI Blog       | [https://blog.google/innovation-and-ai/technology/ai/rss/](https://blog.google/innovation-and-ai/technology/ai/rss/)                                                                     |
 | RSS | Google DeepMind Blog | [https://deepmind.google/blog/rss.xml](https://deepmind.google/blog/rss.xml)                                                                                                             |
@@ -212,4 +260,4 @@ ruff check src && ruff format --check src
 
 关键词（仅 `qbitai`）：见 `config.yaml` 中该 feed 的 `keywords`（MiniMax / Seedance / Kimi / 通义 等）。
 
-**未扫（后置）：** Reddit、X/Twitter、Seed/MiniMax 官方 HTML、国内热搜、推送渠道。
+**未扫（后置）：** X/Twitter、Seed/MiniMax 官方 HTML、国内热搜、推送渠道。

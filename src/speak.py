@@ -141,11 +141,7 @@ def _ensure_mp3(
     if not force and _mp3_ready(out_path):
         logger.info("skip existing %s (%s)", label, out_path)
         return False
-    if (
-        not force
-        and content_path is not None
-        and _mp3_ready(content_path)
-    ):
+    if not force and content_path is not None and _mp3_ready(content_path):
         out_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(content_path, out_path)
         logger.info("reuse content %s → %s", label, out_path)
@@ -241,9 +237,7 @@ def run_speak(
         clip = format_item_speak(item, lang=lang)
         name = f"{item.index:03d}.mp3"
         out = audio_dir / name
-        item_force = _item_tts_force(
-            force=force, url_keys=url_keys, item_url=item.url
-        )
+        item_force = _item_tts_force(force=force, url_keys=url_keys, item_url=item.url)
         if _ensure_mp3(
             text=clip,
             out_path=out,
@@ -275,11 +269,7 @@ def run_speak(
         if int(path.stem) <= 0:
             continue
         dest = content_day / path.name
-        if (
-            force
-            or not _mp3_ready(dest)
-            or path.stat().st_mtime > dest.stat().st_mtime
-        ):
+        if force or not _mp3_ready(dest) or path.stat().st_mtime > dest.stat().st_mtime:
             shutil.copy2(path, dest)
     logger.info(
         "synced site audio → %s (new_tts=%s force=%s url_filter=%s)",

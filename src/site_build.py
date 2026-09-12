@@ -13,11 +13,19 @@ from html import escape
 from pathlib import Path
 
 from src.config import load_app_config
+from src.deep_summarize import hot_topic_display_title
 from src.digest import _parse_score_line, has_usable_digest_summary
 from src.leaderboard import fetch_arena_boards
-from src.models import ArenaLeaderboard, DigestDocument, DigestItem, SiteConfig
+from src.models import (
+    ArenaLeaderboard,
+    DigestDocument,
+    DigestItem,
+    HotTopicSnapshot,
+    HotTopicSnapshotItem,
+    SiteConfig,
+)
 from src.site_parse import parse_digest_markdown
-from src.timeutil import parse_published
+from src.timeutil import format_published, parse_published
 
 _DIGEST_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(en|zh)\.md$")
 _ITEM_MP3_RE = re.compile(r"^(\d{3})\.mp3$")
@@ -97,6 +105,7 @@ class TimelineEntry:
 class PageLinks:
     css: str
     home: str
+    hot: str
     arena: str
     archive: str
     disclosure: str
@@ -112,6 +121,7 @@ def build_site(
     output_dir: Path,
     site: SiteConfig | None = None,
     arena_boards: list[ArenaLeaderboard] | None = None,
+    hot_topics: HotTopicSnapshot | None = None,
     audio_dir: Path | None = None,
     audio_dirs: list[Path] | None = None,
     audio_dirs_by_lang: dict[str, list[Path]] | None = None,
@@ -193,6 +203,12 @@ def build_site(
     _write(output_dir / "zh" / "arena.html", _render_arena_page("zh", cfg, boards))
     sitemap_urls.extend(
         [_abs_url(origin, "/arena.html"), _abs_url(origin, "/zh/arena.html")]
+    )
+    hot_snap = hot_topics if hot_topics is not None else HotTopicSnapshot()
+    _write(output_dir / "hot.html", _render_hot_page("en", cfg, hot_snap))
+    _write(output_dir / "zh" / "hot.html", _render_hot_page("zh", cfg, hot_snap))
+    sitemap_urls.extend(
+        [_abs_url(origin, "/hot.html"), _abs_url(origin, "/zh/hot.html")]
     )
     _write(output_dir / "disclosure.html", _render_disclosure("en", cfg))
     _write(output_dir / "zh" / "disclosure.html", _render_disclosure("zh", cfg))
@@ -324,6 +340,7 @@ def _make_links(
     return PageLinks(
         css=css,
         home=home,
+        hot=disclosure.replace("disclosure.html", "hot.html"),
         arena=disclosure.replace("disclosure.html", "arena.html"),
         archive=archive,
         disclosure=disclosure,
@@ -472,15 +489,16 @@ def _chrome_brand_nav(
 
 def _main_nav(lang: str, links: PageLinks) -> str:
     if lang == "en":
-        home_l, arena_l = "Home", "AI Models"
+        home_l, hot_l, arena_l = "Home", "Trending", "AI Models"
         about_l, privacy_l = "About", "Privacy"
         nav_label = "Primary"
     else:
-        home_l, arena_l = "首页", "AI 模型榜"
+        home_l, hot_l, arena_l = "首页", "今日热搜", "AI 模型榜"
         about_l, privacy_l = "关于", "隐私"
         nav_label = "主导航"
     parts = [
         f'<a href="{escape(links.home)}">{home_l}</a>',
+        f'<a href="{escape(links.hot)}">{hot_l}</a>',
         f'<a href="{escape(links.arena)}">{arena_l}</a>',
         f'<a href="{escape(links.about)}">{about_l}</a>',
         f'<a href="{escape(links.privacy)}">{privacy_l}</a>',
@@ -582,11 +600,14 @@ def _digest_description(lang: str, day: date, selected: int) -> str:
 
 
 def _static_description(page: str, lang: str) -> str:
-    """page: home|archive|arena|about|privacy|disclosure|empty|missing"""
+    """page: home|archive|arena|hot|about|privacy|disclosure|empty|missing"""
     en = {
         "home": SITE_TAGLINE_EN,
         "archive": "Browse archived daily AI Hot Digests by date.",
         "arena": "AI model leaderboards from Arena.ai (third-party scores).",
+        "hot": (
+            "Cross-source AI trending topics from HN, Reddit, Google News, and more."
+        ),
         "about": "About AI Hot Digest — personal AI news curation from HN and RSS.",
         "privacy": "Privacy policy for the AI Hot Digest static site.",
         "disclosure": "Affiliate disclosure for AI Hot Digest.",
@@ -597,6 +618,7 @@ def _static_description(page: str, lang: str) -> str:
         "home": SITE_TAGLINE_ZH,
         "archive": "按日期浏览 AI 热点摘要归档。",
         "arena": "来自 Arena.ai 的 AI 模型榜（第三方数据）。",
+        "hot": "跨源 AI 今日热搜：HN、Reddit、Google News 等。",
         "about": "关于 AI Hot Digest：个人维护的 HN 与 RSS AI 热点摘要。",
         "privacy": "AI Hot Digest 静态站隐私说明。",
         "disclosure": "AI Hot Digest 联盟推广披露说明。",
@@ -2020,6 +2042,194 @@ def _render_arena_page(
     )
 
 
+def _hot_source_family(source: str) -> str:
+    if ":" in source:
+        return source.split(":", 1)[0]
+    return source
+
+
+def _hot_source_label(source: str, lang: str) -> str:
+    family = _hot_source_family(source)
+    en = {
+        "hn": "HN",
+        "reddit": "Reddit",
+        "google_news": "Google News",
+        "trends": "Google Trends",
+        "threads": "Threads",
+    }
+    zh = {
+        "hn": "HN",
+        "reddit": "Reddit",
+        "google_news": "谷歌新闻",
+        "trends": "谷歌趋势",
+        "threads": "Threads",
+    }
+    table = zh if lang == "zh" else en
+    return table.get(family, family)
+
+
+def _hot_item_sources(item: HotTopicSnapshotItem) -> list[str]:
+    if item.sources:
+        return item.sources
+    family = _hot_source_family(item.source)
+    return [family] if family else []
+
+
+def _render_hot_source_badges(sources: list[str], lang: str) -> str:
+    badges: list[str] = []
+    for family in sources:
+        label = _hot_source_label(family, lang)
+        badges.append(
+            f'<span class="badge badge-primary badge-source" '
+            f'data-source="{escape(family, quote=True)}">'
+            f"{escape(label)}</span>"
+        )
+    return f'<span class="badge-group">{"".join(badges)}</span>'
+
+
+def _hot_meta_text(lang: str, item: HotTopicSnapshotItem) -> str:
+    parts: list[str] = []
+    heat_l = "热度" if lang == "zh" else "Heat"
+    parts.append(f"{heat_l} {item.heat:.2f}")
+    if item.published_at is not None:
+        pub = format_published(item.published_at)
+        if lang == "zh":
+            parts.append(f"发布 {pub}")
+        else:
+            parts.append(f"Published {pub}")
+    if item.score is not None and item.score > 0:
+        if lang == "zh":
+            parts.append(f"{item.score} 分")
+        else:
+            parts.append(f"{item.score} pts")
+    if item.comments is not None and item.comments > 0:
+        if lang == "zh":
+            parts.append(f"{item.comments} 评论")
+        else:
+            parts.append(f"{item.comments} comments")
+    return " · ".join(parts)
+
+
+def _render_hot_item(item: HotTopicSnapshotItem, lang: str, *, index: int) -> str:
+    labels = (
+        {"read": "Read article"}
+        if lang == "en"
+        else {"read": "看正文"}
+    )
+    source = item.source.strip()
+    sources = _hot_item_sources(item)
+    source_attr = sources[0] if sources else _hot_source_family(source)
+    source_badges = _render_hot_source_badges(sources, lang)
+    title = escape(hot_topic_display_title(item, lang))
+    url = item.url.strip()
+    meta_text = _hot_meta_text(lang, item)
+    heat = min(3, max(1, int(item.heat / 3) + 1))
+    stagger_i = max(0, min(index - 1, 12))
+    attrs = [
+        'class="item"',
+        f'data-heat="{heat}"',
+        f'data-source="{escape(source_attr, quote=True)}"',
+        f'style="--i: {stagger_i}"',
+    ]
+    if len(sources) >= 2:
+        attrs.append('data-cross-source="true"')
+    cross_fire = ""
+    if len(sources) >= 2:
+        fire_label = "多平台热议" if lang == "zh" else "Cross-source trending"
+        cross_fire = (
+            f'<span class="hot-fire" aria-label="{escape(fire_label)}">🔥</span>'
+        )
+    bits = [
+        f"<article {' '.join(attrs)}>",
+        f'<span class="item-index" aria-hidden="true">{index:02d}</span>',
+        '<div class="item-body">',
+        '<div class="item-meta">'
+        f"{source_badges}"
+        f"{cross_fire}"
+        f'<span class="meta-text">{escape(meta_text)}</span>'
+        "</div>",
+    ]
+    if url:
+        bits.append(
+            f'<h2><a href="{escape(url, quote=True)}" '
+            f'target="_blank" rel="noopener noreferrer">{title}</a></h2>'
+        )
+    else:
+        bits.append(f"<h2>{title}</h2>")
+    summary = (
+        (item.summary_zh or item.summary or "")
+        if lang == "zh"
+        else (item.summary_en or item.summary or "")
+    ).strip()
+    if summary:
+        bits.append(f'<p class="summary">{escape(summary)}</p>')
+    if url:
+        bits.append(
+            f'<p class="item-actions">'
+            f'<a class="item-read" href="{escape(url, quote=True)}" '
+            f'target="_blank" rel="noopener noreferrer">'
+            f"{labels['read']}</a></p>"
+        )
+    bits.extend(["</div>", "</article>"])
+    return "\n".join(bits)
+
+
+def _render_hot_page(lang: str, site: SiteConfig, snapshot: HotTopicSnapshot) -> str:
+    if lang == "en":
+        links = _links_root("en", lang_other="zh/hot.html")
+        heading = "Trending Today"
+        intro = (
+            "Cross-source AI hot topics ranked by engagement, recency, and source "
+            "weight. Refreshed on each site build from HN, Reddit, Google News, "
+            "and optional Google Trends / Threads."
+        )
+        empty = "No trending topics available right now. Run the hot topics probe."
+        updated = "Updated"
+    else:
+        links = _links_root("zh", lang_other="../hot.html")
+        heading = "今日热搜"
+        intro = (
+            "跨源 AI 热搜榜：按互动、时效与来源权重综合排序。"
+            "站点每次构建时从 HN、Reddit、Google News 等拉取；"
+            "可选 Google Trends / Threads。"
+        )
+        empty = "暂无热搜数据。请先运行 hot topics probe。"
+        updated = "更新于"
+
+    if snapshot.items:
+        body = "\n".join(
+            _render_hot_item(item, lang, index=idx)
+            for idx, item in enumerate(snapshot.items, start=1)
+        )
+        as_of = _format_tagline_as_of(snapshot.generated_at.isoformat())
+        if as_of:
+            intro = f"{intro} {updated} {as_of} UTC."
+    else:
+        body = f'<p class="muted">{escape(empty)}</p>'
+
+    origin = _origin(site)
+    en_path, zh_path = "/hot.html", "/zh/hot.html"
+    return _shell(
+        title=f"{SITE_NAME_EN} — {heading}",
+        css_href=links.css,
+        lang=lang,
+        description=_static_description("hot", lang),
+        canonical=_abs_url(origin, en_path if lang == "en" else zh_path),
+        hreflang=_hreflang_pairs(en_path=en_path, zh_path=zh_path, origin=origin),
+        body=f"""
+<div class="site">
+{_chrome_brand_nav(lang, links)}
+  <h1 class="page-title">{escape(heading)}</h1>
+  <p class="meta arena-page-intro">{escape(intro)}</p>
+<main class="feed hot-page">
+  {body}
+</main>
+<footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
+</div>
+""",
+    )
+
+
 def _render_item(
     item: DigestItem,
     lang: str,
@@ -2559,961 +2769,15 @@ def _favicon_svg() -> str:
 """.strip()
 
 
+_DESIGN_SYSTEM_DIR = Path(__file__).resolve().parent.parent / "design-system"
+_STYLESHEET_PARTS = ("tokens.css", "editorial.css")
+
+
 def _stylesheet() -> str:
-    # Dark glow field (indigo + pink radials); dials VARIANCE 5 / MOTION 3 / DENSITY 2
-    return """
-:root {
-  --bg: #0d0f17;
-  --bg-elev: rgba(255, 255, 255, 0.05);
-  --ink: #e2e8f0;
-  --muted: #94a3b8;
-  --accent: #a5b4fc;
-  --accent-hot: #c4b5fd;
-  --line: rgba(255, 255, 255, 0.12);
-  --focus: #a5b4fc;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --radius: 16px;
-  --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
-    sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
-    sans-serif;
-  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
-    sans-serif;
-  --pad: clamp(1.5rem, 5vw, 2.5rem);
-  --max: 72rem;
-}
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: var(--font-ui);
-  font-size: 1.0625rem;
-  background-color: var(--bg);
-  color: var(--ink);
-  line-height: 1.7;
-  overflow-x: hidden;
-  position: relative;
-}
-body::before,
-body::after {
-  content: "";
-  position: fixed;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: -1;
-  transform: translateZ(0);
-}
-body::before {
-  top: -10%;
-  left: -10%;
-  width: 50vw;
-  height: 50vw;
-  background: radial-gradient(
-    circle,
-    rgba(99, 102, 241, 0.4) 0%,
-    rgba(0, 0, 0, 0) 70%
-  );
-  filter: blur(80px);
-}
-body::after {
-  bottom: -10%;
-  right: -10%;
-  width: 60vw;
-  height: 60vw;
-  background: radial-gradient(
-    circle,
-    rgba(236, 72, 153, 0.3) 0%,
-    rgba(0, 0, 0, 0) 70%
-  );
-  filter: blur(100px);
-}
-.site {
-  margin: 0 auto;
-  max-width: var(--max);
-  padding: var(--pad) var(--pad) 4rem;
-  position: relative;
-  z-index: 0;
-}
-a {
-  color: var(--accent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
-  transition: color 0.28s ease, opacity 0.28s ease;
-}
-a:hover { color: var(--accent-hot); }
-a:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-.site-header {
-  margin-bottom: 0;
-}
-.brand-block {
-  margin-bottom: 1.35rem;
-  animation: soft-in 0.7s ease both;
-}
-.brand {
-  font-family: var(--font-display);
-  font-size: clamp(2.45rem, 7vw, 3.25rem);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  margin: 0 0 0.5rem;
-  line-height: 1.08;
-}
-.brand a {
-  color: inherit;
-  text-decoration: none;
-}
-.brand a:hover { color: var(--accent); }
-.tagline {
-  margin: 0;
-  max-width: 28rem;
-  color: var(--muted);
-  font-size: 1.18rem;
-  font-weight: 400;
-  line-height: 1.5;
-}
-.site-nav {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.85rem 1.75rem;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 1.75rem;
-  padding: 16px 24px;
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0;
-  box-shadow: none;
-  font-size: 1rem;
-  font-weight: 500;
-}
-body.has-day-sticky .site-nav {
-  margin-bottom: 0;
-  border-radius: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: none;
-}
-.nav-primary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem 1.65rem;
-}
-.nav-primary a {
-  color: var(--muted);
-  text-decoration: none;
-  cursor: pointer;
-  padding: 0.15rem 0.1rem;
-}
-.nav-primary a:hover { color: var(--accent-hot); }
-.lang-switch {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.lang-toggle {
-  color: var(--ink);
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-a.lang-toggle:hover { color: var(--accent-hot); }
-.lang-toggle.muted { font-weight: 500; color: var(--muted); }
-.day-bar {
-  padding: 1rem 1.15rem;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  animation: soft-in 0.85s 0.08s ease both;
-}
-.day-bar h1,
-.page-title {
-  font-family: var(--font-display);
-  font-size: clamp(1.5rem, 4vw, 1.85rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.3rem;
-}
-.day-bar .meta,
-.meta {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-.day-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 0.75rem;
-  margin-top: 0.85rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--line);
-  font-size: 0.92rem;
-}
-.day-nav-gap {
-  flex: 1 1 auto;
-  min-width: 0.5rem;
-}
-.day-nav > :last-child {
-  margin-left: auto;
-  text-align: right;
-}
-.day-nav-link {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-  cursor: pointer;
-}
-.day-nav-link:hover { text-decoration: underline; }
-.day-nav-muted {
-  color: var(--muted);
-  opacity: 0.55;
-  cursor: default;
-}
-.feed-day-sticky {
-  position: sticky;
-  top: var(--nav-sticky-bottom, 3.75rem);
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 24px 0 16px;
-  padding: 0.45rem 0;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: none;
-  border-radius: 0;
-  font-family: var(--font-ui);
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: #94a3b8;
-}
-.feed-day-sticky::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  min-width: 2rem;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent);
-}
-.feed-day-sticky:first-child {
-  margin-top: 0;
-}
-.feed-day-sticky + .item {
-  margin-top: 0;
-}
-.feed:has(> .item) > .feed-day-sticky + .item {
-  margin-top: 0;
-}
-.feed-day-sticky time {
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-.page-title { margin-bottom: 1.25rem; }
-.arena {
-  padding: 1.2rem 1.15rem 1.15rem;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  animation: soft-in 0.85s 0.05s ease both;
-}
-.arena-head h2 {
-  font-family: var(--font-display);
-  font-size: clamp(1.2rem, 3.2vw, 1.4rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.25rem;
-}
-.arena-sub,
-.arena-page-intro {
-  margin: 0 0 0.9rem;
-  color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-.arena-page-intro { margin-bottom: 1.25rem; }
-.arena-table-wrap {
-  overflow-x: auto;
-  margin: 0 0 0.65rem;
-  border: 1px solid var(--line);
-  border-radius: calc(var(--radius) - 6px);
-}
-.arena-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-  font-variant-numeric: tabular-nums;
-}
-.arena-table th,
-.arena-table td {
-  padding: 0.55rem 0.7rem;
-  text-align: left;
-  border-bottom: 1px solid var(--line);
-  vertical-align: top;
-}
-.arena-table th {
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-}
-.arena-table tbody tr:last-child td { border-bottom: none; }
-.arena-rank,
-.arena-elo {
-  font-family: var(--font-display);
-  font-weight: 600;
-  color: var(--accent);
-  white-space: nowrap;
-}
-.arena-meta,
-.arena-note {
-  margin: 0.35rem 0 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-.feed {
-  display: flex;
-  flex-direction: column;
-  gap: 0.95rem;
-}
-.feed:has(> .item) {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
-  gap: 1.25rem;
-  align-items: stretch;
-}
-.feed:has(> .item) > .feed-day-sticky {
-  grid-column: 1 / -1;
-}
-.read-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  z-index: 50;
-  pointer-events: none;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-.read-progress::after {
-  content: "";
-  display: block;
-  height: 100%;
-  width: 100%;
-  background: var(--accent);
-  transform-origin: left center;
-  transform: scaleX(var(--p, 0));
-}
-.item {
-  --source: var(--accent);
-  position: relative;
-  display: grid;
-  grid-template-columns: 2.5rem 1fr;
-  gap: 0.55rem 0.95rem;
-  padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-left: 3px solid var(--source);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  animation: soft-in 0.55s ease both;
-  animation-delay: calc(var(--i, 0) * 45ms);
-  transition:
-    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.item:has(.item-read) {
-  cursor: pointer;
-}
-.item[data-source="hn"] { --source: #c45c26; }
-.item[data-source="openai"],
-.item[data-source="rss:openai"],
-.item[data-source="rss:openai_youtube"] { --source: #1a7f64; }
-.item[data-source="rss:claude_youtube"] { --source: #b56a4a; }
-.item[data-source="rss:grok_youtube"] { --source: #6b7280; }
-.item[data-source="google_ai"],
-.item[data-source="rss:google_ai"] { --source: #3b6ea5; }
-.item[data-source="deepmind"],
-.item[data-source="rss:deepmind"] { --source: #2a8f8a; }
-.item[data-source="anthropic"],
-.item[data-source="rss:anthropic"] { --source: #b56a4a; }
-.item[data-source="huggingface"],
-.item[data-source="rss:huggingface"] { --source: #b0891d; }
-.item[data-source="nvidia_ai"],
-.item[data-source="rss:nvidia_ai"] { --source: #4a9a3e; }
-.item[data-source="apple_newsroom"],
-.item[data-source="rss:apple_newsroom"],
-.item[data-source="apple_ml"],
-.item[data-source="rss:apple_ml"] { --source: #6b7280; }
-.item[data-source="qbitai"],
-.item[data-source="rss:qbitai"] { --source: #6b5b8a; }
-.item:hover {
-  transform: translateY(-4px);
-  border-color: rgba(99, 102, 241, 0.5);
-  border-left-color: var(--source);
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow:
-    0 12px 30px -10px rgba(0, 0, 0, 0.5),
-    0 0 15px rgba(99, 102, 241, 0.15);
-}
-.item:active {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-.item-index {
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #38bdf8;
-  letter-spacing: -0.02em;
-  padding-top: 0.3rem;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.7;
-}
-.item-thumb {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  margin: 0 0 0.75rem;
-  border-radius: 0.55rem;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--line) 55%, transparent);
-}
-.item-thumb img,
-.item-thumb iframe {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
-.item-thumb img {
-  object-fit: cover;
-}
-.yt-facade {
-  appearance: none;
-  display: block;
-  position: relative;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: #000;
-  cursor: pointer;
-  color: #fff;
-}
-.yt-facade-play {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
-  transition: background 0.15s ease;
-}
-.yt-facade:hover .yt-facade-play,
-.yt-facade:focus-visible .yt-facade-play {
-  background: rgba(0, 0, 0, 0.2);
-}
-.yt-facade-play svg {
-  width: 3rem;
-  height: 3rem;
-  padding: 0.65rem 0.55rem 0.65rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(220, 38, 38, 0.92);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-}
-.item-body { min-width: 0; }
-.item h2 {
-  font-family: var(--font-body);
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0 0 0.55rem;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
-  color: #ffffff;
-}
-.item[data-heat="1"] h2 { font-weight: 500; }
-.item[data-heat="2"] h2 { font-weight: 600; }
-.item[data-heat="3"] h2 { font-weight: 700; }
-.item-actions {
-  margin: 12px 0 0;
-  position: relative;
-  z-index: 2;
-}
-.item-read {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  padding: 0;
-  border: none;
-  background: none;
-  font-family: var(--font-ui);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #818cf8;
-  text-decoration: none;
-  cursor: pointer;
-}
-.item-read::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-}
-.item-read::after {
-  content: " →";
-  transition: transform 0.2s ease;
-}
-.item:hover .item-read {
-  color: #a5b4fc;
-}
-.item:hover .item-read::after {
-  transform: translateX(4px);
-}
-.item-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 0.65rem;
-  font-family: var(--font-ui);
-}
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  font-family: var(--font-ui);
-  background: rgba(99, 102, 241, 0.12);
-  color: #a5b4fc;
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-.badge-primary,
-.badge-source {
-  background: color-mix(in srgb, var(--source) 22%, transparent);
-  color: color-mix(in srgb, var(--source) 55%, #ffffff);
-  border-color: color-mix(in srgb, var(--source) 35%, transparent);
-}
-.badge-tag {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
-  border-color: rgba(255, 255, 255, 0.12);
-}
-.item[data-tag="paper"] .badge-tag {
-  background: rgba(90, 111, 154, 0.2);
-  color: #c7d2fe;
-  border-color: rgba(90, 111, 154, 0.35);
-}
-.item[data-tag="video"] .badge-tag {
-  background: rgba(220, 38, 38, 0.18);
-  color: #fecaca;
-  border-color: rgba(220, 38, 38, 0.35);
-}
-.feed-filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0 0 1rem;
-  padding: 0 0.15rem;
-}
-.feed-filter-tab {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
-  color: #94a3b8;
-  font-family: var(--font-ui);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 0.35rem 0.75rem;
-  border-radius: 9999px;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-}
-.feed-filter-tab:hover {
-  color: #e2e8f0;
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
-}
-.feed-filter-tab.is-active {
-  color: #ffffff;
-  border-color: color-mix(in srgb, var(--accent-hot) 55%, var(--line));
-  background: color-mix(in srgb, var(--accent-hot) 22%, transparent);
-}
-.item.is-filtered-out,
-.feed-day-sticky.is-filtered-out {
-  display: none;
-}
-.meta-text {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #64748b;
-  letter-spacing: 0.01em;
-}
-.summary, .why, .affiliate {
-  margin: 12px 0 0;
-  font-family: var(--font-body);
-  font-size: 0.95rem;
-  line-height: 1.65;
-  color: #e2e8f0;
-  white-space: pre-line;
-}
-.why {
-  color: var(--muted);
-  font-size: 0.875rem;
-  font-family: var(--font-ui);
-}
-.affiliate {
-  position: relative;
-  z-index: 2;
-  margin-top: 0.75rem;
-  padding-top: 0.7rem;
-  border-top: 1px dashed var(--line);
-  font-size: 0.875rem;
-  font-family: var(--font-ui);
-  color: var(--muted);
-}
-.label {
-  display: inline-block;
-  font-family: var(--font-ui);
-  font-size: 0.74rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent);
-  margin-right: 0.4rem;
-}
-.muted { color: var(--muted); }
-.prose {
-  font-family: var(--font-body);
-  font-size: 1.18rem;
-}
-.prose p { margin: 0 0 1rem; }
-.archive-list {
-  list-style: none;
-  margin: 0;
-  padding: 0.35rem;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-.archive-list li {
-  margin: 0;
-  border-bottom: 1px solid var(--line);
-  padding: 0.95rem 1rem;
-  line-height: 1.4;
-  transition: background-color 0.25s ease;
-}
-.archive-list li:last-child { border-bottom: none; }
-.archive-list li:hover {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-}
-.archive-list a {
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-weight: 600;
-  text-decoration: none;
-  letter-spacing: -0.01em;
-}
-.archive-list a:hover { color: var(--accent-hot); }
-.site-footer {
-  margin-top: 3rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 0.84rem;
-  font-family: var(--font-ui);
-}
-.site-footer a { color: var(--accent); }
-code {
-  font-size: 0.85em;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-}
-@keyframes soft-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  .brand-block, .day-bar, .arena, .item { animation: none; }
-  .item, .archive-list li { transition: none; }
-  .item:hover,
-  .item:active { transform: none; }
-  .read-progress::after { transition: none; }
-}
-@media (max-width: 720px) {
-  /* 手机端大 blur 易被裁切/淡化：加大光斑、提高不透明度、减弱 blur */
-  body::before {
-    top: -8%;
-    left: -30%;
-    width: min(120vw, 34rem);
-    height: min(120vw, 34rem);
-    background: radial-gradient(
-      circle,
-      rgba(99, 102, 241, 0.65) 0%,
-      rgba(99, 102, 241, 0.22) 42%,
-      rgba(0, 0, 0, 0) 72%
-    );
-    filter: blur(36px);
-  }
-  body::after {
-    bottom: 5%;
-    right: -35%;
-    top: auto;
-    width: min(130vw, 38rem);
-    height: min(130vw, 38rem);
-    background: radial-gradient(
-      circle,
-      rgba(236, 72, 153, 0.55) 0%,
-      rgba(236, 72, 153, 0.18) 45%,
-      rgba(0, 0, 0, 0) 72%
-    );
-    filter: blur(42px);
-  }
-  .site-nav,
-  body.has-day-sticky .site-nav,
-  .feed-day-sticky {
-    width: 100vw;
-    max-width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    box-sizing: border-box;
-  }
-  .site-nav {
-    top: 0;
-    align-items: flex-start;
-    padding: 0.85rem var(--pad);
-  }
-  body.has-day-sticky .site-nav {
-    margin-bottom: 0;
-    border-radius: 0;
-  }
-  .feed-day-sticky {
-    padding-left: var(--pad);
-    padding-right: var(--pad);
-  }
-  .item {
-    grid-template-columns: 1.8rem 1fr;
-    padding: 1.05rem 1rem 1.1rem;
-  }
-  .feed:has(> .item) {
-    grid-template-columns: 1fr;
-    gap: 0.95rem;
-  }
-}
-.item-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  align-items: center;
-  justify-content: flex-start;
-  margin: 0.65rem 0 0;
-  position: relative;
-  z-index: 2;
-}
-.item-read {
-  margin-left: auto;
-}
-.item-speak {
-  appearance: none;
-  position: relative;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(15, 23, 42, 0.55);
-  color: #e2e8f0;
-  border-radius: 999px;
-  font: inherit;
-  cursor: pointer;
-  isolation: isolate;
-  overflow: visible;
-}
-.item-speak-icon {
-  display: inline-flex;
-  line-height: 0;
-}
-.item-speak-icon[hidden] {
-  display: none;
-}
-.item-speak-icon svg {
-  display: block;
-}
-.item-speak[aria-pressed="true"] {
-  border: none;
-  background: rgba(79, 70, 229, 1);
-  color: #f8fafc;
-  box-shadow:
-    0 10px 28px rgba(99, 102, 241, 0.45),
-    0 0 0 2px rgba(165, 180, 252, 0.45);
-}
-.item-speak[aria-pressed="true"]::before,
-.item-speak[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  border: 2px solid rgba(165, 180, 252, 0.55);
-  z-index: -1;
-  pointer-events: none;
-  animation: podcast-ripple 1.8s ease-out infinite;
-}
-.item-speak[aria-pressed="true"]::after {
-  animation-delay: 0.9s;
-}
-.item.is-playing {
-  outline: 1px solid rgba(99, 102, 241, 0.55);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
-}
-.podcast-dock {
-  position: fixed;
-  left: auto;
-  right: max(0.85rem, env(safe-area-inset-right));
-  bottom: max(0.85rem, env(safe-area-inset-bottom));
-  z-index: 40;
-  width: auto;
-  max-width: calc(100vw - 1.7rem);
-  transform: none;
-  display: flex;
-  flex-direction: column-reverse;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-}
-.podcast-mode,
-.podcast-nav {
-  appearance: none;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(30, 41, 59, 0.9);
-  color: #f8fafc;
-  border-radius: 999px;
-  padding: 0.45rem 0.9rem;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.podcast-mode {
-  width: auto;
-  min-width: 3.6rem;
-  height: auto;
-  padding: 0.55rem 0.7rem 0.45rem;
-  border: none;
-  border-radius: 1.15rem;
-  background: rgba(99, 102, 241, 0.95);
-  color: #f8fafc;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  position: relative;
-  isolation: isolate;
-  overflow: visible;
-  box-shadow:
-    0 10px 28px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-.podcast-mode-label {
-  display: block;
-  line-height: 1;
-}
-.podcast-mode-icon {
-  display: inline-flex;
-  line-height: 0;
-}
-.podcast-mode-icon svg {
-  display: block;
-}
-.podcast-mode-icon[hidden] {
-  display: none !important;
-}
-.podcast-mode[aria-pressed="true"] {
-  background: rgba(79, 70, 229, 1);
-  box-shadow:
-    0 10px 28px rgba(99, 102, 241, 0.45),
-    0 0 0 2px rgba(165, 180, 252, 0.45);
-}
-.podcast-mode[aria-pressed="true"]::before,
-.podcast-mode[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  border: 2px solid rgba(165, 180, 252, 0.55);
-  z-index: -1;
-  pointer-events: none;
-  animation: podcast-ripple 1.8s ease-out infinite;
-}
-.podcast-mode[aria-pressed="true"]::after {
-  animation-delay: 0.9s;
-}
-.podcast-controls,
-.podcast-now {
-  display: none;
-}
-@keyframes podcast-ripple {
-  0% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1.55);
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .podcast-mode[aria-pressed="true"]::before,
-  .podcast-mode[aria-pressed="true"]::after,
-  .item-speak[aria-pressed="true"]::before,
-  .item-speak[aria-pressed="true"]::after {
-    animation: none;
-  }
-}
-""".strip()
+    return "\n\n".join(
+        (_DESIGN_SYSTEM_DIR / name).read_text(encoding="utf-8").strip()
+        for name in _STYLESHEET_PARTS
+    )
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -3529,6 +2793,41 @@ def main(argv: list[str] | None = None) -> int:
         config.http,
         cache_dir=Path(config.paths.arena_cache_dir),
     )
+    hot_path = Path(config.paths.hot_topics_path)
+    hot_snapshot: HotTopicSnapshot | None = None
+    try:
+        from src.hot_topics_probe import (
+            load_hot_topics_snapshot,
+            run_probe,
+            save_hot_topics_snapshot,
+        )
+
+        ranked = run_probe(config)
+        save_hot_topics_snapshot(hot_path, ranked)
+        hot_snapshot = load_hot_topics_snapshot(hot_path)
+        if config.hot_topics.deep_summarize and hot_snapshot is not None:
+            from src.deep_summarize import deep_summarize_hot_topics
+
+            try:
+                _, n = deep_summarize_hot_topics(
+                    config,
+                    snapshot_path=hot_path,
+                    llm_flag=None,
+                )
+                if n:
+                    hot_snapshot = load_hot_topics_snapshot(hot_path)
+                print(f"[ai_hot] hot topics deep-summarized {n} item(s)")
+            except Exception as ds_exc:
+                print(
+                    f"[ai_hot] hot topics deep-summarize skipped: {ds_exc}",
+                    file=sys.stderr,
+                )
+    except Exception as exc:
+        print(f"[ai_hot] hot topics probe skipped: {exc}", file=sys.stderr)
+        hot_snapshot = load_hot_topics_snapshot(hot_path)
+    if hot_snapshot is None:
+        hot_snapshot = HotTopicSnapshot()
+
     output_dir = Path(config.paths.site_output_dir).resolve()
 
     def _audio_base(path: Path) -> Path:
@@ -3541,6 +2840,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=output_dir,
         site=config.site,
         arena_boards=boards,
+        hot_topics=hot_snapshot,
         audio_dirs_by_lang={
             "zh": [content_audio / "zh", speak_audio / "zh"],
             "en": [content_audio / "en", speak_audio / "en"],

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
-from src.models import SiteConfig
+from src.models import HotTopicSnapshot, HotTopicSnapshotItem, SiteConfig
 from src.publish import archive_digests
 from src.site_build import build_site
 from src.site_parse import parse_digest_markdown
@@ -239,6 +239,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'rel="sponsored' not in home
     assert "partner.example" not in home
     assert 'href="about.html"' in home
+    assert 'href="hot.html"' in home
+    assert ">Trending<" in home
     assert 'href="arena.html"' in home
     assert ">AI Models<" in home
     assert 'href="privacy.html"' in home
@@ -339,6 +341,7 @@ def test_build_site_outputs(tmp_path: Path) -> None:
         ">归档<"
         not in zh_home.split('class="nav-primary">', 1)[1].split("</div>", 1)[0]
     )
+    assert 'href="hot.html">今日热搜</a>' in zh_home
     assert 'href="archive/index.html">归档</a>' in zh_home
 
     archive_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
@@ -509,6 +512,8 @@ def test_build_site_seo(tmp_path: Path) -> None:
     assert f"<loc>{base}/zh/archive/2026-09-10/</loc>" in sitemap
     assert f"<loc>{base}/about.html</loc>" in sitemap
     assert f"<loc>{base}/arena.html</loc>" in sitemap
+    assert f"<loc>{base}/hot.html</loc>" in sitemap
+    assert f"<loc>{base}/zh/hot.html</loc>" in sitemap
 
     home = (out / "index.html").read_text(encoding="utf-8")
     assert 'rel="canonical" href="https://example.test/"' in home
@@ -533,6 +538,91 @@ def test_build_site_seo(tmp_path: Path) -> None:
     assert 'hreflang="zh-Hans" href="https://example.test/zh/archive/2026-09-09/"' in (
         archive_day
     )
+
+
+def test_build_site_hot_page(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    out = tmp_path / "public"
+    url = "https://mathandai.org/"
+    summary_en = "⚡️ One-liner\nAI math gap.\n\n🔥 Key takeaways\n📐 Proof issues\n"
+    summary_zh = "⚡️ 一句话总结\nAI 数学对齐问题。\n\n🔥 核心亮点\n📐 证明缺口\n"
+    snapshot = HotTopicSnapshot(
+        generated_at=datetime(2026, 9, 12, 10, 0, tzinfo=timezone.utc),
+        items=[
+            HotTopicSnapshotItem(
+                heat=9.11,
+                source="hn",
+                title="A misalignment of AI in mathematics",
+                title_zh="AI 在数学上的错位",
+                url=url,
+                score=944,
+                comments=906,
+                summary_en=summary_en,
+                summary_zh=summary_zh,
+                published_at=datetime(2026, 9, 11, 17, 0, tzinfo=timezone.utc),
+            )
+        ],
+    )
+    build_site(
+        content_dir=content,
+        output_dir=out,
+        site=SiteConfig(base_url="https://example.test"),
+        hot_topics=snapshot,
+    )
+    hot_en = (out / "hot.html").read_text(encoding="utf-8")
+    hot_zh = (out / "zh" / "hot.html").read_text(encoding="utf-8")
+    assert "Trending Today" in hot_en
+    assert "misalignment of AI" in hot_en
+    assert "One-liner" in hot_en
+    assert 'data-source="hn"' in hot_en
+    assert ">Trending<" in hot_en
+    assert "今日热搜" in hot_zh
+    assert "AI 在数学上的错位" in hot_zh
+    zh_h2 = hot_zh.split("<h2>", 1)[1].split("</h2>", 1)[0]
+    assert "AI 数学对齐问题" not in zh_h2
+
+
+def test_build_site_hot_page_cross_source_badges(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    out = tmp_path / "public"
+    url = "https://mathandai.org/misalignment"
+    snapshot = HotTopicSnapshot(
+        generated_at=datetime(2026, 9, 12, 10, 0, tzinfo=timezone.utc),
+        items=[
+            HotTopicSnapshotItem(
+                heat=9.11,
+                source="hn",
+                sources=["hn", "reddit", "google_news"],
+                title="A misalignment of AI in mathematics",
+                url=url,
+                score=944,
+                comments=906,
+                published_at=datetime(2026, 9, 11, 17, 0, tzinfo=timezone.utc),
+            )
+        ],
+    )
+    build_site(
+        content_dir=content,
+        output_dir=out,
+        site=SiteConfig(base_url="https://example.test"),
+        hot_topics=snapshot,
+    )
+    hot_en = (out / "hot.html").read_text(encoding="utf-8")
+    hot_zh = (out / "zh" / "hot.html").read_text(encoding="utf-8")
+    assert 'data-cross-source="true"' in hot_en
+    assert 'class="hot-fire"' in hot_en
+    assert 'data-source="hn"' in hot_en
+    assert 'data-source="reddit"' in hot_en
+    assert 'data-source="google_news"' in hot_en
+    assert ">HN</span>" in hot_en
+    assert ">Reddit</span>" in hot_en
+    assert ">Google News</span>" in hot_en
+    assert 'aria-label="Cross-source trending"' in hot_en
+    assert 'aria-label="多平台热议"' in hot_zh
+    assert ">谷歌新闻</span>" in hot_zh
+    assert "跨源 AI 热搜榜" in hot_zh
 
 
 def test_build_site_affiliate_enabled(tmp_path: Path) -> None:
@@ -671,3 +761,16 @@ def test_build_site_copies_bgm_and_ducks(tmp_path: Path) -> None:
     assert "createGain" in feed_js
     assert "SPEECH_VOL" in feed_js
     assert "ensureBgm" in feed_js
+
+
+def test_design_system_source_files() -> None:
+    from src.site_build import _DESIGN_SYSTEM_DIR, _STYLESHEET_PARTS, _stylesheet
+
+    for name in _STYLESHEET_PARTS:
+        path = _DESIGN_SYSTEM_DIR / name
+        assert path.is_file(), name
+        assert path.read_text(encoding="utf-8").strip()
+    css = _stylesheet()
+    assert "--bg:" in css or "--bg: " in css
+    assert ".feed" in css
+    assert ".arena-table" in css

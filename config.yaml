@@ -8,6 +8,7 @@ paths:
   speak_audio_dir: out/audio
   content_audio_dir: content/audio
   content_digests_dir: content/digests
+  hot_topics_path: content/hot_topics/latest.json
   arena_cache_dir: content/arena
   site_output_dir: public
 
@@ -47,6 +48,87 @@ hn:
   top_n: 30
   min_score: 100
   min_comments: 20
+
+# Reddit 公开 JSON（无需 key）；进入 digest 时受 max_new_total 限制
+reddit:
+  enabled: true
+  subreddits:
+    - MachineLearning
+    - LocalLLaMA
+    - artificial
+    - OpenAI
+  listing: top
+  time_filter: day
+  limit: 25
+  min_score: 20
+  max_new_total: 5
+
+# Google News RSS 搜索
+google_news:
+  enabled: true
+  max_per_query: 10
+  max_new_total: 5
+  queries:
+    - name: ai_en
+      query: "artificial intelligence when:1d"
+      hl: en-US
+      gl: US
+      ceid: "US:en"
+    - name: ai_zh
+      query: "人工智能 when:1d"
+      hl: zh-CN
+      gl: CN
+      ceid: "CN:zh-Hans"
+
+# Google Trends：非官方；probe 用；失败跳过。不写入 digest pipeline。
+trends:
+  enabled: false
+  geo: US
+  seed_keywords:
+    - artificial intelligence
+    - ChatGPT
+    - LLM
+  ai_keywords:
+    - ai
+    - artificial intelligence
+    - chatgpt
+    - openai
+    - claude
+    - gemini
+    - llm
+    - gpt
+    - deepseek
+    - 人工智能
+    - 大模型
+
+# Threads Keyword Search：需 .env THREADS_ACCESS_TOKEN + App Review；默认关
+threads:
+  enabled: false
+  seed_tags:
+    - AI
+    - LLM
+    - OpenAI
+    - Claude
+    - ChatGPT
+  limit: 25
+  max_new_total: 5
+  search_type: TOP
+
+hot_topics:
+  top_n: 30
+  deep_summarize: false
+  deep_summarize_top_n: 0
+  deep_summarize_max_chars: 8000
+  w_engagement: 1.0
+  w_recency: 0.5
+  w_source: 1.0
+  trends_boost: 0.3
+  source_weights:
+    hn: 1.0
+    reddit: 0.8
+    google_news: 0.6
+    threads: 0.7
+    trends: 0.5
 
 rss:
   max_new_per_feed: 5

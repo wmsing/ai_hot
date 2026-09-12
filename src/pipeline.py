@@ -22,8 +22,11 @@ from src.keywords import matched_keyword, passes_keywords
 from src.llm import build_llm_runtime, resolve_llm_model, resolve_provider
 from src.models import AppConfig, FeedConfig, HotItem, LlmRuntime
 from src.ollama_client import is_junk_summary, is_usable_source_summary, summarize_item
+from src.sources.google_news import fetch_google_news_candidates
 from src.sources.hn import fetch_hn_candidates
+from src.sources.reddit import fetch_reddit_candidates
 from src.sources.rss import fetch_rss_candidates
+from src.sources.threads import fetch_threads_candidates
 from src.storage import ItemStore
 from src.textutil import truncate
 
@@ -38,6 +41,16 @@ def _feed_by_source(config: AppConfig, source: str) -> FeedConfig | None:
         if feed.name == name:
             return feed
     return None
+
+
+def _source_bucket(source: str) -> str:
+    if source.startswith("reddit:"):
+        return "reddit"
+    if source.startswith("google_news:"):
+        return "google_news"
+    if source.startswith("threads:"):
+        return "threads"
+    return source
 
 
 def _within_max_age(
@@ -89,8 +102,27 @@ def run_once(
             candidates: list[HotItem] = []
             candidates.extend(fetch_hn_candidates(client, config.hn))
             candidates.extend(fetch_rss_candidates(client, config.rss))
+            candidates.extend(fetch_reddit_candidates(client, config.reddit))
+            candidates.extend(fetch_google_news_candidates(client, config.google_news))
+            candidates.extend(
+                fetch_threads_candidates(
+                    client,
+                    config.threads,
+                    access_token=settings.threads_access_token,
+                )
+            )
 
             rss_new_count: dict[str, int] = {}
+            social_new_count: dict[str, int] = {
+                "reddit": 0,
+                "google_news": 0,
+                "threads": 0,
+            }
+            social_caps = {
+                "reddit": config.reddit.max_new_total,
+                "google_news": config.google_news.max_new_total,
+                "threads": config.threads.max_new_total,
+            }
             for item in candidates:
                 feed = _feed_by_source(config, item.source)
                 keywords = feed.keywords if feed else []
@@ -127,6 +159,12 @@ def run_once(
                         if count >= cap:
                             continue
                         rss_new_count[item.source] = count + 1
+                else:
+                    bucket = _source_bucket(item.source)
+                    if bucket in social_caps:
+                        if social_new_count[bucket] >= social_caps[bucket]:
+                            continue
+                        social_new_count[bucket] += 1
                 selected.append(item)
 
             selected = _attach_hn_page_snippets(

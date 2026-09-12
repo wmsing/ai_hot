@@ -1,0 +1,26 @@
+/**
+ * AI Hot Editorial — design tokens
+ * Dark glow field (indigo + pink radials)
+ * Dials: VARIANCE 5 / MOTION 3 / DENSITY 2
+ */
+
+:root {
+  --bg: #0d0f17;
+  --bg-elev: rgba(255, 255, 255, 0.05);
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #a5b4fc;
+  --accent-hot: #c4b5fd;
+  --line: rgba(255, 255, 255, 0.12);
+  --focus: #a5b4fc;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --radius: 16px;
+  --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    sans-serif;
+  --pad: clamp(1.5rem, 5vw, 2.5rem);
+  --max: 72rem;
+}

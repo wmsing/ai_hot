@@ -25,6 +25,7 @@ class Settings(BaseModel):
     api_key: str = Field(default="")
     openrouter_api_key: str = Field(default="")
     llm_provider: str = Field(default="")
+    threads_access_token: str = Field(default="")
 
 
 def load_settings() -> Settings:
@@ -34,6 +35,7 @@ def load_settings() -> Settings:
         api_key=os.getenv("API_KEY", ""),
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
         llm_provider=os.getenv("LLM_PROVIDER", ""),
+        threads_access_token=os.getenv("THREADS_ACCESS_TOKEN", ""),
     )
 
 

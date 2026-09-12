@@ -25,8 +25,33 @@ class HotItem(BaseModel):
     published_at: datetime | None = None
     # 展示标签，如 paper → 站点 EN: Paper / ZH: 论文
     tag: str = ""
+    # 同 URL 合并后的来源族，如 ["hn", "reddit", "google_news"]
+    sources: list[str] = Field(default_factory=list)
     reason: str = ""
     fetched_at: datetime = Field(default_factory=utc_now)
+
+
+class HotTopicSnapshotItem(BaseModel):
+    """站点「今日热搜」页一条。"""
+
+    heat: float
+    source: str
+    title: str
+    url: str
+    score: int | None = None
+    comments: int | None = None
+    summary: str | None = None
+    summary_en: str | None = None
+    summary_zh: str | None = None
+    title_zh: str | None = None
+    published_at: datetime | None = None
+    sources: list[str] = Field(default_factory=list)
+    reason: str = ""
+
+
+class HotTopicSnapshot(BaseModel):
+    generated_at: datetime = Field(default_factory=utc_now)
+    items: list[HotTopicSnapshotItem] = Field(default_factory=list)
 
 
 class FeedConfig(BaseModel):
@@ -52,6 +77,123 @@ class HnConfig(BaseModel):
     min_comments: int = 20
 
 
+class RedditConfig(BaseModel):
+    """Reddit 公开 JSON（无需 API key）。"""
+
+    enabled: bool = True
+    subreddits: list[str] = Field(
+        default_factory=lambda: [
+            "MachineLearning",
+            "LocalLLaMA",
+            "artificial",
+            "OpenAI",
+        ]
+    )
+    listing: Literal["top", "hot"] = "top"
+    time_filter: Literal["hour", "day", "week", "month", "year", "all"] = "day"
+    limit: int = 25
+    min_score: int = 20
+    # 进入 digest pipeline 时每轮总上限
+    max_new_total: int = 5
+
+
+class GoogleNewsQuery(BaseModel):
+    """一条 Google News RSS 查询。"""
+
+    name: str
+    # 完整 RSS URL，或仅 q= 查询串（由代码拼默认 RSS）
+    query: str
+    hl: str = "en-US"
+    gl: str = "US"
+    ceid: str = "US:en"
+
+
+class GoogleNewsConfig(BaseModel):
+    enabled: bool = True
+    max_per_query: int = 10
+    max_new_total: int = 5
+    queries: list[GoogleNewsQuery] = Field(
+        default_factory=lambda: [
+            GoogleNewsQuery(
+                name="ai_en",
+                query="artificial intelligence when:1d",
+                hl="en-US",
+                gl="US",
+                ceid="US:en",
+            ),
+            GoogleNewsQuery(
+                name="ai_zh",
+                query="人工智能 when:1d",
+                hl="zh-CN",
+                gl="CN",
+                ceid="CN:zh-Hans",
+            ),
+        ]
+    )
+
+
+class TrendsConfig(BaseModel):
+    """Google Trends：非官方，失败则跳过。"""
+
+    enabled: bool = True
+    geo: str = "US"
+    # 对 Top 候选做 related 补强时的种子词
+    seed_keywords: list[str] = Field(
+        default_factory=lambda: ["artificial intelligence", "ChatGPT", "LLM"]
+    )
+    # 日榜 RSS 命中这些词才入选
+    ai_keywords: list[str] = Field(
+        default_factory=lambda: [
+            "ai",
+            "artificial intelligence",
+            "chatgpt",
+            "openai",
+            "claude",
+            "gemini",
+            "llm",
+            "gpt",
+            "deepseek",
+            "人工智能",
+            "大模型",
+        ]
+    )
+
+
+class ThreadsConfig(BaseModel):
+    """Threads Keyword Search；需 THREADS_ACCESS_TOKEN + App Review。"""
+
+    enabled: bool = False
+    seed_tags: list[str] = Field(
+        default_factory=lambda: ["AI", "LLM", "OpenAI", "Claude", "ChatGPT"]
+    )
+    limit: int = 25
+    max_new_total: int = 5
+    search_type: Literal["TOP", "RECENT"] = "TOP"
+
+
+class HotTopicsConfig(BaseModel):
+    """跨源热门话题 probe / 打分。"""
+
+    top_n: int = 20
+    deep_summarize: bool = False
+    # 0 = 精写快照里全部条目；>0 则只精写前 N 条
+    deep_summarize_top_n: int = 0
+    deep_summarize_max_chars: int = 8000
+    source_weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "hn": 1.0,
+            "reddit": 0.8,
+            "google_news": 0.6,
+            "threads": 0.7,
+            "trends": 0.5,
+        }
+    )
+    w_engagement: float = 1.0
+    w_recency: float = 0.5
+    w_source: float = 1.0
+    trends_boost: float = 0.3
+
+
 class RssConfig(BaseModel):
     max_new_per_feed: int = 5
     feeds: list[FeedConfig] = Field(default_factory=list)
@@ -71,6 +213,7 @@ class PathsConfig(BaseModel):
     speak_audio_dir: str = "out/audio"
     content_audio_dir: str = "content/audio"
     content_digests_dir: str = "content/digests"
+    hot_topics_path: str = "content/hot_topics/latest.json"
     arena_cache_dir: str = "content/arena"
     site_output_dir: str = "public"
 
@@ -221,6 +364,11 @@ class AppConfig(BaseModel):
     site: SiteConfig = Field(default_factory=SiteConfig)
     leaderboard: LeaderboardConfig = Field(default_factory=LeaderboardConfig)
     hn: HnConfig = Field(default_factory=HnConfig)
+    reddit: RedditConfig = Field(default_factory=RedditConfig)
+    google_news: GoogleNewsConfig = Field(default_factory=GoogleNewsConfig)
+    trends: TrendsConfig = Field(default_factory=TrendsConfig)
+    threads: ThreadsConfig = Field(default_factory=ThreadsConfig)
+    hot_topics: HotTopicsConfig = Field(default_factory=HotTopicsConfig)
     rss: RssConfig = Field(default_factory=RssConfig)
     filter: FilterConfig = Field(default_factory=FilterConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)

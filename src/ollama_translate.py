@@ -125,11 +125,7 @@ def _usable_zh(item: HotItem) -> bool:
         return False
     summary = (item.summary or "").strip()
     speak = (item.speak_summary or "").strip()
-    return (
-        contains_cjk(item.title)
-        or contains_cjk(summary)
-        or contains_cjk(speak)
-    )
+    return contains_cjk(item.title) or contains_cjk(summary) or contains_cjk(speak)
 
 
 def _align_translated(
