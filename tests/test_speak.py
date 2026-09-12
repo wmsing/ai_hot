@@ -66,6 +66,14 @@ def test_format_speak_document_en_intro() -> None:
     assert "Hello.\nWorld." in text
 
 
+def test_speak_langs_default_both() -> None:
+    from src.speak import _parse_args, speak_langs
+
+    assert speak_langs(_parse_args([])) == ["en", "zh"]
+    assert speak_langs(_parse_args(["--lang", "zh"])) == ["zh"]
+    assert speak_langs(_parse_args(["--lang", "en"])) == ["en"]
+
+
 def test_run_speak_skips_existing_mp3(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -106,6 +114,47 @@ def test_run_speak_skips_existing_mp3(
     assert "002.mp3" in calls
     assert (out_audio / "zh" / "2026-09-11" / "001.mp3").read_bytes() == b"EXISTING-1"
     assert (content_day / "002.mp3").is_file()
+
+
+def test_run_speak_url_only_regenerates_matching_item(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    digest = tmp_path / "digest.zh.md"
+    digest.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T12:00:00+00:00\n"
+        "Selected: 2\n\n"
+        "## 1. 一\n\n- source: `hn`\n- url: https://a.example/1\n"
+        "- summary: 摘要一\n\n"
+        "## 2. 二\n\n- source: `hn`\n- url: https://a.example/2\n"
+        "- summary: 摘要二\n",
+        encoding="utf-8",
+    )
+    content_day = tmp_path / "content_audio" / "zh" / "2026-09-11"
+    content_day.mkdir(parents=True)
+    (content_day / "001.mp3").write_bytes(b"KEEP-1")
+    (content_day / "002.mp3").write_bytes(b"KEEP-2")
+    cfg = AppConfig(
+        paths=PathsConfig(
+            digest_zh_path=str(digest),
+            speak_zh_path=str(tmp_path / "speak.zh.md"),
+            speak_audio_dir=str(tmp_path / "out_audio"),
+            content_audio_dir=str(tmp_path / "content_audio"),
+        )
+    )
+    calls: list[str] = []
+
+    def _fake_synthesize(text: str, path: Path, **_kwargs: object) -> None:
+        calls.append(path.name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(f"NEW-{path.name}".encode())
+
+    monkeypatch.setattr("src.speak.synthesize", _fake_synthesize)
+    run_speak(cfg, lang="zh", urls=["https://a.example/2/"])
+
+    assert "001.mp3" not in calls
+    assert "002.mp3" in calls
+    assert (content_day / "001.mp3").read_bytes() == b"KEEP-1"
+    assert (content_day / "002.mp3").read_bytes() == b"NEW-002.mp3"
 
 
 def test_run_speak_force_regenerates(

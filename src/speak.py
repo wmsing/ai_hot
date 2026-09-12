@@ -9,7 +9,6 @@ import shutil
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Literal
 
 from src.config import load_app_config, settings
 from src.models import AppConfig, DigestDocument
@@ -28,8 +27,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--lang",
         choices=("zh", "en"),
-        default="zh",
-        help="Language (default: zh)",
+        default=None,
+        help="Only zh or en; default: generate both",
     )
     parser.add_argument(
         "--input",
@@ -62,7 +61,42 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Regenerate all mp3 even if files already exist",
     )
+    parser.add_argument(
+        "--url",
+        action="append",
+        default=[],
+        help="Only (re)generate TTS for digest items with this URL (repeatable)",
+    )
     return parser.parse_args(argv)
+
+
+def _normalize_url(url: str) -> str:
+    text = url.strip()
+    if len(text) > 8 and text.endswith("/"):
+        text = text.rstrip("/")
+    return text
+
+
+def _url_filter_set(urls: list[str] | None) -> set[str] | None:
+    if not urls:
+        return None
+    keys = {_normalize_url(u) for u in urls if u.strip()}
+    return keys or None
+
+
+def _item_tts_force(*, force: bool, url_keys: set[str] | None, item_url: str) -> bool:
+    if force:
+        return True
+    if url_keys is None:
+        return False
+    return _normalize_url(item_url) in url_keys
+
+
+def speak_langs(args: argparse.Namespace) -> list[SpeakLang]:
+    """默认中英各生成一份；--lang 指定时只跑该语言。"""
+    if args.lang is None:
+        return ["en", "zh"]
+    return [args.lang]
 
 
 def _audio_day(doc: DigestDocument) -> date:
@@ -131,11 +165,14 @@ def run_speak(
     voice: str | None = None,
     rate: str | None = None,
     force: bool = False,
+    urls: list[str] | None = None,
 ) -> tuple[Path, Path | None]:
     """写口播稿；非 script_only 时再写逐条 mp3 + full.mp3 + playlist.m3u。
 
-    默认跳过已有非空 mp3（out 或 content），只补缺；--force 全量重生成。
+    默认跳过已有非空 mp3（out 或 content），只补缺；--force 全量重生成；
+    urls 非空时只强制重生成匹配 URL 的条目（序号 = digest 里 ## N.）。
     """
+    url_keys = _url_filter_set(urls)
     if input_path is not None:
         src = Path(input_path)
     elif lang == "en":
@@ -204,13 +241,16 @@ def run_speak(
         clip = format_item_speak(item, lang=lang)
         name = f"{item.index:03d}.mp3"
         out = audio_dir / name
+        item_force = _item_tts_force(
+            force=force, url_keys=url_keys, item_url=item.url
+        )
         if _ensure_mp3(
             text=clip,
             out_path=out,
             content_path=content_day / name,
             voice=voice_id,
             rate=rate_val,
-            force=force,
+            force=item_force,
             label=f"item {item.index}",
         ):
             made_new += 1
@@ -235,13 +275,18 @@ def run_speak(
         if int(path.stem) <= 0:
             continue
         dest = content_day / path.name
-        if force or not _mp3_ready(dest) or path.stat().st_mtime > dest.stat().st_mtime:
+        if (
+            force
+            or not _mp3_ready(dest)
+            or path.stat().st_mtime > dest.stat().st_mtime
+        ):
             shutil.copy2(path, dest)
     logger.info(
-        "synced site audio → %s (new_tts=%s force=%s)",
+        "synced site audio → %s (new_tts=%s force=%s url_filter=%s)",
         content_day,
         made_new,
         force,
+        bool(url_keys),
     )
 
     return speak_path, audio_dir
@@ -262,24 +307,30 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     config = load_app_config()
-    lang: Literal["en", "zh"] = args.lang
-    speak_path, audio_dir = run_speak(
-        config,
-        lang=lang,
-        input_path=args.input,
-        script_only=args.script_only,
-        limit=args.limit,
-        voice=args.voice,
-        rate=args.rate,
-        force=args.force,
-    )
-    if audio_dir is None:
-        print(f"[ai_hot] speak script → {speak_path} (script-only lang={lang})")
-    else:
-        print(
-            f"[ai_hot] speak script → {speak_path}; "
-            f"audio playlist → {audio_dir / 'playlist.m3u'} (lang={lang})"
+    langs = speak_langs(args)
+    last_speak: Path | None = None
+    for lang in langs:
+        speak_path, audio_dir = run_speak(
+            config,
+            lang=lang,
+            input_path=args.input,
+            script_only=args.script_only,
+            limit=args.limit,
+            voice=args.voice,
+            rate=args.rate,
+            force=args.force,
+            urls=args.url or None,
         )
+        last_speak = speak_path
+        if audio_dir is None:
+            print(f"[ai_hot] speak script → {speak_path} (script-only lang={lang})")
+        else:
+            print(
+                f"[ai_hot] speak script → {speak_path}; "
+                f"audio playlist → {audio_dir / 'playlist.m3u'} (lang={lang})"
+            )
+    if len(langs) > 1 and last_speak is not None:
+        print(f"[ai_hot] speak done langs={','.join(langs)}")
     return 0
 
 
