@@ -192,6 +192,7 @@ class HotTopicsConfig(BaseModel):
     w_recency: float = 0.5
     w_source: float = 1.0
     trends_boost: float = 0.3
+    exclude_digest_urls: bool = True
 
 
 class RssConfig(BaseModel):

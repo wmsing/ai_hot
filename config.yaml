@@ -123,6 +123,7 @@ hot_topics:
   w_recency: 0.5
   w_source: 1.0
   trends_boost: 0.3
+  exclude_digest_urls: true
   source_weights:
     hn: 1.0
     reddit: 0.8

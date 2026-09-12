@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import httpx
 
 from src.hot_score import cluster_and_rank, heat_score, source_family
+from src.normalize import normalize_url
 from src.models import (
     GoogleNewsConfig,
     GoogleNewsQuery,
@@ -284,6 +285,45 @@ def test_fetch_threads_requires_token() -> None:
     )
     assert items == []
     client.get.assert_not_called()
+
+
+def test_filter_hot_candidates_against_digest() -> None:
+    from src.hot_topics_probe import filter_hot_candidates_against_digest
+    from src.models import AppConfig, HotTopicsConfig, PathsConfig
+
+    url = "https://example.com/on-home"
+    dup = HotItem(
+        source="hn",
+        title="On home",
+        url=url,
+        reason="hn",
+    )
+    fresh = HotItem(
+        source="reddit:OpenAI",
+        title="Hot only",
+        url="https://example.com/hot-only",
+        reason="reddit",
+    )
+    cfg = AppConfig(
+        hot_topics=HotTopicsConfig(exclude_digest_urls=True),
+        paths=PathsConfig(),
+    )
+    blocked = {normalize_url(url)}
+    kept = filter_hot_candidates_against_digest(
+        [dup, fresh],
+        cfg,
+        digest_urls=blocked,
+    )
+    assert len(kept) == 1
+    assert kept[0].url == fresh.url
+
+    cfg_off = AppConfig(
+        hot_topics=HotTopicsConfig(exclude_digest_urls=False),
+        paths=PathsConfig(),
+    )
+    assert len(
+        filter_hot_candidates_against_digest([dup, fresh], cfg_off, digest_urls=blocked)
+    ) == 2
 
 
 def test_load_hot_topics_snapshot_roundtrip(tmp_path: Path) -> None:

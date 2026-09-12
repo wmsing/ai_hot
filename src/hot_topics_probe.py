@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import load_app_config, settings
+from src.digest import load_hot_items
 from src.hot_score import cluster_and_rank
 from src.http_client import build_client
 from src.models import AppConfig, HotItem, HotTopicSnapshot, HotTopicSnapshotItem
@@ -52,6 +53,60 @@ def collect_hot_topic_candidates(
     return items
 
 
+def load_digest_url_set(config: AppConfig) -> set[str]:
+    """主页 digest 已收录 URL（content/digests 归档 + out/digest*）。"""
+    urls: set[str] = set()
+    paths: list[Path] = []
+    content_dir = Path(config.paths.content_digests_dir)
+    if content_dir.is_dir():
+        paths.extend(sorted(content_dir.glob("*.*.md")))
+    for rel in (config.paths.digest_path, config.paths.digest_zh_path):
+        path = Path(rel)
+        if path.is_file():
+            paths.append(path)
+    seen: set[Path] = set()
+    for path in paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        try:
+            _, items = load_hot_items(path)
+        except (ValueError, OSError) as exc:
+            logger.warning("digest url load skip path=%s err=%s", path, exc)
+            continue
+        for item in items:
+            key = normalize_url(item.url)
+            if key:
+                urls.add(key)
+    return urls
+
+
+def filter_hot_candidates_against_digest(
+    candidates: list[HotItem],
+    config: AppConfig,
+    *,
+    digest_urls: set[str] | None = None,
+) -> list[HotItem]:
+    """去掉已在 digest 出现的 URL，避免与主页重复。"""
+    if not config.hot_topics.exclude_digest_urls:
+        return candidates
+    blocked = digest_urls if digest_urls is not None else load_digest_url_set(config)
+    if not blocked:
+        return candidates
+    kept: list[HotItem] = []
+    dropped = 0
+    for item in candidates:
+        key = normalize_url(item.url)
+        if key and key in blocked:
+            dropped += 1
+            continue
+        kept.append(item)
+    if dropped:
+        logger.info("hot topics skipped %s digest duplicate(s)", dropped)
+    return kept
+
+
 def run_probe(
     config: AppConfig,
     *,
@@ -71,6 +126,7 @@ def run_probe(
             include_trends=include_trends,
             include_threads=include_threads,
         )
+        candidates = filter_hot_candidates_against_digest(candidates, config)
         related: set[str] = set()
         if include_trends and config.trends.enabled:
             related = collect_related_query_set(client, config.trends)
