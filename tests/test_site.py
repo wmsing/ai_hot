@@ -219,9 +219,20 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="item-thumb"' in home
     assert "https://cdn.example/cover.webp" in home
     assert 'class="feed-filter"' in home
+    assert 'data-filter-kind="tag"' in home
+    assert 'data-filter-kind="source"' in home
     assert 'data-filter="paper"' in home
     assert 'data-filter="video"' in home
+    assert 'data-filter="hn"' in home
+    assert 'data-filter="openai"' in home
+    assert 'data-match="rss:openai,rss:openai_youtube"' in home
     assert ">Video<" in home
+
+    feed_js = (out / "feed.js").read_text(encoding="utf-8")
+    assert "readFilterFromUrl" in feed_js
+    assert 'searchParams.set("tag"' in feed_js
+    assert 'searchParams.set("source"' in feed_js
+    assert "history.replaceState" in feed_js
     assert 'class="day-nav"' not in home
     assert "Previous day" not in home
     assert ">Latest<" not in home
@@ -300,7 +311,7 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "affiliate_enabled" in disclosure
 
 
-def test_build_site_home_load_more(tmp_path: Path) -> None:
+def test_build_site_home_renders_all_items(tmp_path: Path) -> None:
     content = tmp_path / "digests"
     content.mkdir()
     en_lines = [
@@ -351,23 +362,17 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
 
     home = (out / "index.html").read_text(encoding="utf-8")
     assert "highlights · newest first" not in home
-    assert 'id="load-more"' in home
-    assert 'data-feed-base="feed/en"' in home
-    assert 'data-next="1"' in home
-    assert home.count('class="item"') == 30
+    assert 'id="load-more"' not in home
+    assert "data-feed-base=" not in home
+    assert home.count('class="item"') == 35
     assert home.count('class="feed-day-sticky"') == 1
     assert 'data-day="2026-09-10"' in home
-    page1 = (out / "feed" / "en" / "1.html").read_text(encoding="utf-8")
-    assert 'class="feed-chunk"' in page1
-    assert 'data-next=""' in page1
-    assert page1.count('class="item"') == 5
-    assert 'class="feed-day-sticky"' not in page1
-    assert "Title" in page1
+    assert not (out / "feed").exists()
 
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert "条 · 新在前" not in zh_home
-    assert 'data-feed-base="../feed/zh"' in zh_home
-    assert (out / "feed" / "zh" / "1.html").is_file()
+    assert 'id="load-more"' not in zh_home
+    assert zh_home.count('class="item"') == 35
 
 
 def test_build_site_home_sticky_by_day(tmp_path: Path) -> None:

@@ -30,11 +30,39 @@ SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
 SITE_TAGLINE_ZH = "AI 热点摘要"
 _REPO_ISSUES = "https://github.com/wmsing/ai_hot/issues"
-HOME_PAGE_SIZE = 30
 # 首页筛选 Tab（与 DigestItem.tag / data-tag 对齐；可扩展）
 _FEED_FILTER_TAGS: tuple[tuple[str, str, str], ...] = (
     ("paper", "Paper", "论文"),
     ("video", "Video", "视频"),
+)
+# key, en, zh, 匹配的 data-source 集合（族）
+_FEED_FILTER_SOURCES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
+    ("hn", "HN", "HN", frozenset({"hn"})),
+    (
+        "openai",
+        "OpenAI",
+        "OpenAI",
+        frozenset({"rss:openai", "rss:openai_youtube"}),
+    ),
+    (
+        "apple",
+        "Apple",
+        "Apple",
+        frozenset({"rss:apple_newsroom", "rss:apple_ml"}),
+    ),
+    ("google_ai", "Google", "Google", frozenset({"rss:google_ai"})),
+    ("deepmind", "DeepMind", "DeepMind", frozenset({"rss:deepmind"})),
+    ("anthropic", "Anthropic", "Anthropic", frozenset({"rss:anthropic"})),
+    (
+        "huggingface",
+        "Hugging Face",
+        "Hugging Face",
+        frozenset({"rss:huggingface"}),
+    ),
+    ("nvidia_ai", "NVIDIA", "NVIDIA", frozenset({"rss:nvidia_ai"})),
+    ("qbitai", "QbitAI", "量子位", frozenset({"rss:qbitai"})),
+    ("claude", "Claude", "Claude", frozenset({"rss:claude_youtube"})),
+    ("grok", "Grok", "Grok", frozenset({"rss:grok_youtube"})),
 )
 
 _BOARD_TITLES: dict[str, tuple[str, str]] = {
@@ -195,20 +223,6 @@ def build_site(
     (output_dir / "feed.js").write_text(_feed_js(), encoding="utf-8")
     en_timeline = _timeline_items(days, "en")
     zh_timeline = _timeline_items(days, "zh")
-    _write_feed_json_pages(
-        output_dir,
-        lang="en",
-        items=en_timeline,
-        affiliate_enabled=cfg.affiliate_enabled,
-        audio_available=audio_available,
-    )
-    _write_feed_json_pages(
-        output_dir,
-        lang="zh",
-        items=zh_timeline,
-        affiliate_enabled=cfg.affiliate_enabled,
-        audio_available=audio_available,
-    )
 
     if en_timeline:
         _write(
@@ -652,6 +666,7 @@ def _write_sitemap(output_dir: Path, urls: list[str]) -> None:
 
 
 def _item_sort_ts(item: DigestItem, day: date) -> float:
+    """首页排序键：有 published 用发布时间，否则回退归档日。"""
     dt = parse_published(item.published)
     if dt is not None:
         return dt.timestamp()
@@ -660,6 +675,7 @@ def _item_sort_ts(item: DigestItem, day: date) -> float:
 
 
 def _item_group_day(item: DigestItem, archive_day: date) -> date:
+    """时间线 sticky 日：UTC 发布日；无 published 则用归档日。"""
     dt = parse_published(item.published)
     if dt is not None:
         return dt.astimezone(timezone.utc).date()
@@ -923,24 +939,35 @@ def _render_day_sticky(day: date) -> str:
 
 
 def _render_feed_filter(lang: str) -> str:
-    """首页 tag 筛选：全部 + 已知 tag（paper / video）。"""
+    """首页筛选：全部 + tag（paper/video）+ 来源族；互斥单选。"""
     if lang == "zh":
-        aria = "按标签筛选"
+        aria = "按标签或来源筛选"
         all_l = "全部"
     else:
-        aria = "Filter by tag"
+        aria = "Filter by tag or source"
         all_l = "All"
     bits = [
         f'<nav class="feed-filter" role="tablist" aria-label="{escape(aria)}">',
         '<button type="button" class="feed-filter-tab is-active" role="tab" '
-        'aria-selected="true" data-filter="">'
+        'aria-selected="true" data-filter-kind="" data-filter="">'
         f"{escape(all_l)}</button>",
     ]
     for key, en_l, zh_l in _FEED_FILTER_TAGS:
         label = zh_l if lang == "zh" else en_l
         bits.append(
             '<button type="button" class="feed-filter-tab" role="tab" '
-            f'aria-selected="false" data-filter="{escape(key, quote=True)}">'
+            'aria-selected="false" data-filter-kind="tag" '
+            f'data-filter="{escape(key, quote=True)}">'
+            f"{escape(label)}</button>"
+        )
+    for key, en_l, zh_l, sources in _FEED_FILTER_SOURCES:
+        label = zh_l if lang == "zh" else en_l
+        match = ",".join(sorted(sources))
+        bits.append(
+            '<button type="button" class="feed-filter-tab" role="tab" '
+            'aria-selected="false" data-filter-kind="source" '
+            f'data-filter="{escape(key, quote=True)}" '
+            f'data-match="{escape(match, quote=True)}">'
             f"{escape(label)}</button>"
         )
     bits.append("</nav>")
@@ -978,41 +1005,6 @@ def _render_timeline_html(
             )
         )
     return "".join(bits)
-
-
-def _write_feed_json_pages(
-    output_dir: Path,
-    *,
-    lang: str,
-    items: list[TimelineEntry],
-    affiliate_enabled: bool,
-    audio_available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]],
-) -> None:
-    """page 0 在首页 HTML；从 1 起写 feed/{lang}/{n}.html 分片。"""
-    if len(items) <= HOME_PAGE_SIZE:
-        return
-    # 分片会插入首页 DOM，音频路径须相对首页而非 feed/ 目录
-    home_css = _links_digest_home(lang, "", has_other=True).css
-    feed_dir = output_dir / "feed" / lang
-    page_count = (len(items) + HOME_PAGE_SIZE - 1) // HOME_PAGE_SIZE
-    for page_i in range(1, page_count):
-        start = page_i * HOME_PAGE_SIZE
-        chunk = items[start : start + HOME_PAGE_SIZE]
-        prev_day = items[start - 1].group_day
-        inner = _render_timeline_html(
-            chunk,
-            lang,
-            affiliate_enabled=affiliate_enabled,
-            audio_available=audio_available,
-            prev_day=prev_day,
-            css_href=home_css,
-        )
-        next_page: int | None = page_i + 1 if page_i + 1 < page_count else None
-        next_attr = "" if next_page is None else str(next_page)
-        html = (
-            f'<div class="feed-chunk" data-next="{escape(next_attr)}">{inner}</div>\n'
-        )
-        _write(feed_dir / f"{page_i}.html", html)
 
 
 def _feed_js() -> str:
@@ -1347,18 +1339,107 @@ def _feed_js() -> str:
     });
   }
 
-  var btn = document.getElementById("load-more");
   var feed = document.getElementById("feed");
   var filterRoot = document.querySelector(".feed-filter");
+  var activeKind = "";
   var activeFilter = "";
+
+  var readFilterFromUrl = function () {
+    try {
+      var sp = new URLSearchParams(window.location.search || "");
+      var tag = (sp.get("tag") || "").toLowerCase();
+      var source = (sp.get("source") || "").toLowerCase();
+      if (tag) return { kind: "tag", key: tag };
+      if (source) return { kind: "source", key: source };
+      return { kind: "", key: "" };
+    } catch (e) {
+      return { kind: "", key: "" };
+    }
+  };
+
+  var writeFilterToUrl = function (kind, key) {
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.delete("tag");
+      url.searchParams.delete("source");
+      if (kind === "tag" && key) url.searchParams.set("tag", key);
+      else if (kind === "source" && key) url.searchParams.set("source", key);
+      var next = url.pathname + url.search + url.hash;
+      if (
+        next !==
+        window.location.pathname + window.location.search + window.location.hash
+      ) {
+        history.replaceState(null, "", next);
+      }
+    } catch (e) {}
+    var langLinks = document.querySelectorAll("a.lang-toggle[href]");
+    for (var i = 0; i < langLinks.length; i++) {
+      try {
+        var raw = langLinks[i].getAttribute("href") || "";
+        var pathOnly = raw.split("?")[0].split("#")[0];
+        var q = "";
+        if (kind === "tag" && key) q = "?tag=" + encodeURIComponent(key);
+        else if (kind === "source" && key)
+          q = "?source=" + encodeURIComponent(key);
+        langLinks[i].setAttribute("href", pathOnly + q);
+      } catch (e2) {}
+    }
+  };
+
+  var syncFilterTabs = function () {
+    if (!filterRoot) return;
+    var tabs = filterRoot.querySelectorAll(".feed-filter-tab");
+    var matched = false;
+    for (var i = 0; i < tabs.length; i++) {
+      var kind = (tabs[i].getAttribute("data-filter-kind") || "").toLowerCase();
+      var key = (tabs[i].getAttribute("data-filter") || "").toLowerCase();
+      var on = kind === activeKind && key === activeFilter;
+      if (on) matched = true;
+      tabs[i].classList.toggle("is-active", on);
+      tabs[i].setAttribute("aria-selected", on ? "true" : "false");
+    }
+    if (!matched && tabs.length) {
+      activeKind = "";
+      activeFilter = "";
+      tabs[0].classList.add("is-active");
+      tabs[0].setAttribute("aria-selected", "true");
+    }
+  };
+
+  var activeMatchSet = function () {
+    if (!filterRoot || activeKind !== "source" || !activeFilter) return null;
+    var tabs = filterRoot.querySelectorAll(".feed-filter-tab");
+    for (var i = 0; i < tabs.length; i++) {
+      var kind = (tabs[i].getAttribute("data-filter-kind") || "").toLowerCase();
+      var key = (tabs[i].getAttribute("data-filter") || "").toLowerCase();
+      if (kind === "source" && key === activeFilter) {
+        var raw = tabs[i].getAttribute("data-match") || "";
+        var parts = raw.split(",");
+        var set = {};
+        for (var p = 0; p < parts.length; p++) {
+          var s = parts[p].trim().toLowerCase();
+          if (s) set[s] = true;
+        }
+        return set;
+      }
+    }
+    return null;
+  };
 
   var applyTagFilter = function () {
     if (!feed) return;
+    var matchSet = activeKind === "source" ? activeMatchSet() : null;
     var items = feed.querySelectorAll(".item");
     for (var i = 0; i < items.length; i++) {
       var el = items[i];
-      var tag = (el.getAttribute("data-tag") || "").toLowerCase();
-      var hide = !!activeFilter && tag !== activeFilter;
+      var hide = false;
+      if (activeKind === "tag" && activeFilter) {
+        var tag = (el.getAttribute("data-tag") || "").toLowerCase();
+        hide = tag !== activeFilter;
+      } else if (activeKind === "source" && activeFilter) {
+        var src = (el.getAttribute("data-source") || "").toLowerCase();
+        hide = !(matchSet && matchSet[src]);
+      }
       el.classList.toggle("is-filtered-out", hide);
     }
     var stickies = feed.querySelectorAll(".feed-day-sticky");
@@ -1376,57 +1457,43 @@ def _feed_js() -> str:
         }
         next = next.nextElementSibling;
       }
-      sticky.classList.toggle("is-filtered-out", !!activeFilter && !anyVisible);
+      sticky.classList.toggle(
+        "is-filtered-out",
+        !!(activeKind && activeFilter) && !anyVisible
+      );
     }
   };
 
   if (filterRoot) {
+    var allowed = { "\0": true };
+    var tabsInit = filterRoot.querySelectorAll(".feed-filter-tab");
+    for (var t = 0; t < tabsInit.length; t++) {
+      var k0 = (tabsInit[t].getAttribute("data-filter-kind") || "").toLowerCase();
+      var f0 = (tabsInit[t].getAttribute("data-filter") || "").toLowerCase();
+      allowed[k0 + "\0" + f0] = true;
+    }
+    var initial = readFilterFromUrl();
+    if (allowed[initial.kind + "\0" + initial.key]) {
+      activeKind = initial.kind;
+      activeFilter = initial.key;
+    } else {
+      activeKind = "";
+      activeFilter = "";
+    }
+    syncFilterTabs();
+    applyTagFilter();
+    writeFilterToUrl(activeKind, activeFilter);
+
     filterRoot.addEventListener("click", function (ev) {
       var t = ev.target;
       if (!t || !t.closest) return;
       var tab = t.closest(".feed-filter-tab");
       if (!tab || !filterRoot.contains(tab)) return;
+      activeKind = (tab.getAttribute("data-filter-kind") || "").toLowerCase();
       activeFilter = (tab.getAttribute("data-filter") || "").toLowerCase();
-      var tabs = filterRoot.querySelectorAll(".feed-filter-tab");
-      for (var i = 0; i < tabs.length; i++) {
-        var on = tabs[i] === tab;
-        tabs[i].classList.toggle("is-active", on);
-        tabs[i].setAttribute("aria-selected", on ? "true" : "false");
-      }
+      syncFilterTabs();
       applyTagFilter();
-    });
-  }
-
-  if (btn && feed) {
-    btn.addEventListener("click", function () {
-      var next = btn.getAttribute("data-next");
-      var base = btn.getAttribute("data-feed-base");
-      if (!next || !base) return;
-      btn.disabled = true;
-      fetch(base + "/" + next)
-        .then(function (res) {
-          if (!res.ok) throw new Error("feed fetch failed");
-          return res.text();
-        })
-        .then(function (text) {
-          var wrap = document.createElement("div");
-          wrap.innerHTML = text;
-          var chunk = wrap.querySelector(".feed-chunk");
-          if (!chunk) throw new Error("feed chunk missing");
-          feed.insertAdjacentHTML("beforeend", chunk.innerHTML);
-          var more = chunk.getAttribute("data-next");
-          if (!more) {
-            btn.remove();
-          } else {
-            btn.setAttribute("data-next", more);
-            btn.disabled = false;
-          }
-          applyTagFilter();
-          refreshDock();
-        })
-        .catch(function () {
-          btn.disabled = false;
-        });
+      writeFilterToUrl(activeKind, activeFilter);
     });
   }
 })();
@@ -1598,22 +1665,13 @@ def _render_home_timeline(
     has_bgm: bool = False,
 ) -> str:
     links = _links_digest_home(lang, "", has_other_lang)
-    total = len(items)
-    page0 = items[:HOME_PAGE_SIZE]
-    has_more = total > HOME_PAGE_SIZE
-    if lang == "en":
-        load_l = "Load more"
-        feed_base = _page_asset("feed/en", links.css)
-    else:
-        load_l = "加载更多"
-        feed_base = _page_asset("feed/zh", links.css)
     script_src = _feed_script_href(links.css)
     available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]] = (
         audio_available or {}
     )
 
     items_html = _render_timeline_html(
-        page0,
+        items,
         lang,
         affiliate_enabled=site.affiliate_enabled,
         audio_available=available,
@@ -1625,15 +1683,6 @@ def _render_home_timeline(
             '<p class="muted">No items.</p>'
             if lang == "en"
             else '<p class="muted">暂无条目。</p>'
-        )
-
-    load_more = ""
-    if has_more:
-        load_more = (
-            f'<div class="load-more-wrap">'
-            f'<button type="button" class="load-more" id="load-more" '
-            f'data-feed-base="{escape(feed_base)}" data-next="1">'
-            f"{escape(load_l)}</button></div>"
         )
 
     origin = _origin(site)
@@ -1659,7 +1708,6 @@ def _render_home_timeline(
 <main class="feed" id="feed">
   {items_html}
 </main>
-{load_more}
 <footer class="site-footer"><p>{_footer(lang, links, site)}</p></footer>
 </div>
 {podcast}
@@ -2635,30 +2683,6 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   opacity: 0.55;
   cursor: default;
 }
-.load-more-wrap {
-  display: flex;
-  justify-content: center;
-  margin: 1.75rem 0 0.5rem;
-}
-.load-more {
-  font-family: var(--font-ui);
-  font-size: 0.92rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
-  border-radius: 0.55rem;
-  padding: 0.65rem 1.25rem;
-  cursor: pointer;
-}
-.load-more:hover {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-.load-more:disabled {
-  opacity: 0.55;
-  cursor: wait;
-}
 .feed-day-sticky {
   position: sticky;
   top: var(--nav-sticky-bottom, 3.75rem);
@@ -2827,6 +2851,8 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 .item[data-source="openai"],
 .item[data-source="rss:openai"],
 .item[data-source="rss:openai_youtube"] { --source: #1a7f64; }
+.item[data-source="rss:claude_youtube"] { --source: #b56a4a; }
+.item[data-source="rss:grok_youtube"] { --source: #6b7280; }
 .item[data-source="google_ai"],
 .item[data-source="rss:google_ai"] { --source: #3b6ea5; }
 .item[data-source="deepmind"],
