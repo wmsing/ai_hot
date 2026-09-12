@@ -419,6 +419,49 @@ def test_openrouter_fallback_on_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == ["primary:free", "openrouter/free"]
 
 
+def test_ollama_chat_sends_num_ctx(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.models import LlmRuntime
+    from src.ollama_client import llm_chat
+
+    captured: dict[str, object] = {}
+
+    class _Resp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"message": {"content": "one line summary"}}
+
+    class _Client:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> _Client:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def post(self, url: str, json: dict) -> _Resp:
+            captured["url"] = url
+            captured["json"] = json
+            return _Resp()
+
+    monkeypatch.setattr("src.ollama_client.httpx.Client", _Client)
+    runtime = LlmRuntime(
+        provider="ollama",
+        model="qwen3:4b-instruct",
+        base_url="http://127.0.0.1:11434",
+        num_ctx=8192,
+        think=False,
+    )
+    assert llm_chat(system="s", user="u", llm=runtime) == "one line summary"
+    payload = captured["json"]
+    assert isinstance(payload, dict)
+    assert payload["options"] == {"num_ctx": 8192}
+    assert payload["think"] is False
+
+
 def test_write_digest_tag(tmp_path: Path) -> None:
     path = tmp_path / "digest.md"
     write_digest(

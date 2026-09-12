@@ -72,6 +72,8 @@ def build_llm_runtime(
         model=model or config.ollama.model,
         base_url=config.ollama.base_url,
         timeout_seconds=config.ollama.timeout_seconds,
+        num_ctx=config.ollama.num_ctx,
+        think=config.ollama.think,
     )
 
 
@@ -82,6 +84,8 @@ def runtime_from_ollama(ollama: OllamaConfig) -> LlmRuntime:
         model=ollama.model,
         base_url=ollama.base_url,
         timeout_seconds=ollama.timeout_seconds,
+        num_ctx=ollama.num_ctx,
+        think=ollama.think,
     )
 
 

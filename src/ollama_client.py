@@ -38,7 +38,7 @@ def ollama_chat(
 
 def _ollama_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
     url = f"{llm.base_url.rstrip('/')}/api/chat"
-    payload = {
+    payload: dict[str, Any] = {
         "model": llm.model,
         "stream": False,
         "messages": [
@@ -46,6 +46,11 @@ def _ollama_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
             {"role": "user", "content": user},
         ],
     }
+    if llm.num_ctx is not None and llm.num_ctx > 0:
+        payload["options"] = {"num_ctx": int(llm.num_ctx)}
+    if llm.think is not None:
+        # 顶层字段；勿放进 options（会被忽略）
+        payload["think"] = bool(llm.think)
     with httpx.Client(timeout=llm.timeout_seconds) as client:
         resp = client.post(url, json=payload)
         resp.raise_for_status()
