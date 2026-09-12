@@ -55,7 +55,15 @@ python -m src.resummarize --url 'https://support.claude.com/...'
 # 改完 EN 后增量译中文：
 python -m src.translate
 
-# 本地 Ollama（默认 qwen3:4b-instruct）把英文 digest 译成中文
+# 整日重生成（今天 UTC）：只删 content/digests/ 不够
+# 真正挡重跑的是 out/digest.md（同日 URL merge）+ data/ai_hot.db（cooldown 去重）
+rm -f out/digest.md out/digest.zh.md
+rm -f data/ai_hot.db   # 可选：整库删除（不是“只删今天”）；放开 cooldown 内已见 URL
+                       # 去重只看近 24h，不会重写 content/digests/ 历史归档
+python -m src.main --llm qwen && python -m src.translate && python -m src.publish && python -m src.site_build
+# publish 会覆盖写入 content/digests/YYYY-MM-DD.{en,zh}.md
+
+# 本地 Ollama（默认见 config.yaml ollama.model）把英文 digest 译成中文
 python -m src.translate
 # 查看：out/digest.zh.md
 
