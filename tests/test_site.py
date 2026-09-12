@@ -218,6 +218,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "<h2><a " not in home
     assert 'class="item-thumb"' in home
     assert "https://cdn.example/cover.webp" in home
+    assert 'class="feed-filter"' in home
+    assert 'data-filter="paper"' in home
+    assert 'data-filter="video"' in home
+    assert ">Video<" in home
     assert 'class="day-nav"' not in home
     assert "Previous day" not in home
     assert ">Latest<" not in home
@@ -256,6 +260,10 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'class="feed-day-sticky"' in zh_home
     assert "AI 热点摘要 截至 2026-09-10" in zh_home
     assert ">看正文<" in zh_home
+    assert 'class="feed-filter"' in zh_home
+    assert ">视频<" in zh_home
+    assert ">论文<" in zh_home
+    assert ">全部<" in zh_home
     assert "<h2><a " not in zh_home
     assert "截至 2026-09-10 05" not in zh_home
     assert 'class="lang-toggle"' in zh_home
@@ -344,7 +352,7 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
     home = (out / "index.html").read_text(encoding="utf-8")
     assert "highlights · newest first" not in home
     assert 'id="load-more"' in home
-    assert 'data-feed-base="/feed/en"' in home
+    assert 'data-feed-base="feed/en"' in home
     assert 'data-next="1"' in home
     assert home.count('class="item"') == 30
     assert home.count('class="feed-day-sticky"') == 1
@@ -358,7 +366,7 @@ def test_build_site_home_load_more(tmp_path: Path) -> None:
 
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert "条 · 新在前" not in zh_home
-    assert 'data-feed-base="/feed/zh"' in zh_home
+    assert 'data-feed-base="../feed/zh"' in zh_home
     assert (out / "feed" / "zh" / "1.html").is_file()
 
 
@@ -503,9 +511,9 @@ def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
     zh_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
         encoding="utf-8"
     )
-    assert 'data-audio="/audio/zh/2026-09-10/001.mp3"' in zh_day
+    assert 'data-audio="../../../audio/zh/2026-09-10/001.mp3"' in zh_day
     assert 'class="item-speak"' in zh_day
-    assert 'item-speak-play' in zh_day
+    assert "item-speak-play" in zh_day
     assert 'aria-label="播放"' in zh_day
     assert 'id="podcast-dock"' in zh_day
     assert 'id="podcast-mode"' in zh_day
@@ -515,7 +523,7 @@ def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
     # dock HTML 可存在；无音频时 JS 会保持 hidden
 
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
-    assert 'data-audio="/audio/zh/2026-09-10/001.mp3"' in zh_home
+    assert 'data-audio="../audio/zh/2026-09-10/001.mp3"' in zh_home
     assert 'id="podcast-mode"' in zh_home
 
     feed_js = (out / "feed.js").read_text(encoding="utf-8")
@@ -526,6 +534,11 @@ def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
 
     styles = (out / "styles.css").read_text(encoding="utf-8")
     assert ".podcast-dock" in styles
+    assert "podcast-ripple" in styles
+    assert '.item-speak[aria-pressed="true"]::before' in styles
+    assert "padding-bottom: 4.5rem" not in styles
+    assert "safe-area-inset-right" in styles
+    assert "translateX(-50%)" not in styles
     assert ".item.is-playing" in styles
     assert ".item-speak-icon" in styles
     assert "margin-left: auto" in styles
@@ -564,7 +577,7 @@ def test_build_site_podcast_en_audio(tmp_path: Path) -> None:
     )
     assert (out / "audio" / "en" / "2026-09-10" / "001.mp3").is_file()
     en_day = (out / "archive" / "2026-09-10" / "index.html").read_text(encoding="utf-8")
-    assert 'data-audio="/audio/en/2026-09-10/001.mp3"' in en_day
+    assert 'data-audio="../../audio/en/2026-09-10/001.mp3"' in en_day
     assert 'class="item-speak"' in en_day
     assert 'aria-label="Play"' in en_day
     assert ">Listen<" in en_day
@@ -590,7 +603,7 @@ def test_build_site_copies_bgm_and_ducks(tmp_path: Path) -> None:
     assert (out / "audio" / "bgm.mp3").read_bytes() == b"bgm-bytes"
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
     assert 'id="site-bgm"' in zh_home
-    assert 'src="/audio/bgm.mp3"' in zh_home
+    assert 'src="../audio/bgm.mp3"' in zh_home
     feed_js = (out / "feed.js").read_text(encoding="utf-8")
     assert "site-bgm" in feed_js
     assert "BGM_DUCK" in feed_js

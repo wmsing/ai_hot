@@ -13,7 +13,7 @@ from html import escape
 from pathlib import Path
 
 from src.config import load_app_config
-from src.digest import _parse_score_line
+from src.digest import _parse_score_line, has_usable_digest_summary
 from src.leaderboard import fetch_arena_boards
 from src.models import ArenaLeaderboard, DigestDocument, DigestItem, SiteConfig
 from src.site_parse import parse_digest_markdown
@@ -21,12 +21,21 @@ from src.timeutil import parse_published
 
 _DIGEST_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(en|zh)\.md$")
 _ITEM_MP3_RE = re.compile(r"^(\d{3})\.mp3$")
+_YT_WATCH_RE = re.compile(
+    r"(?:youtube\.com/watch\?(?:[^#]*&)?v=|youtu\.be/)([A-Za-z0-9_-]{11})",
+    re.IGNORECASE,
+)
 
 SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
 SITE_TAGLINE_ZH = "AI 热点摘要"
 _REPO_ISSUES = "https://github.com/wmsing/ai_hot/issues"
 HOME_PAGE_SIZE = 30
+# 首页筛选 Tab（与 DigestItem.tag / data-tag 对齐；可扩展）
+_FEED_FILTER_TAGS: tuple[tuple[str, str, str], ...] = (
+    ("paper", "Paper", "论文"),
+    ("video", "Video", "视频"),
+)
 
 _BOARD_TITLES: dict[str, tuple[str, str]] = {
     "agent": ("Agent", "Agent"),
@@ -97,6 +106,10 @@ def build_site(
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "styles.css").write_text(_stylesheet(), encoding="utf-8")
     (output_dir / "favicon.svg").write_text(_favicon_svg(), encoding="utf-8")
+    (output_dir / "_headers").write_text(
+        "/*\n  Referrer-Policy: strict-origin-when-cross-origin\n",
+        encoding="utf-8",
+    )
     roots: list[Path] = []
     if audio_dirs:
         roots.extend(audio_dirs)
@@ -663,6 +676,8 @@ def _timeline_items(days: list[DayFiles], lang: str) -> list[TimelineEntry]:
         if doc is None:
             continue
         for item in doc.items:
+            if not has_usable_digest_summary(item.summary, title=item.title):
+                continue
             ts = _item_sort_ts(item, day_files.day)
             group_day = _item_group_day(item, day_files.day)
             entry = TimelineEntry(
@@ -693,8 +708,31 @@ def _timeline_items(days: list[DayFiles], lang: str) -> list[TimelineEntry]:
     return out
 
 
-def _audio_public_href(lang: str, day: date, index: int) -> str:
-    return f"/audio/{lang}/{day.isoformat()}/{index:03d}.mp3"
+def _asset_prefix(css_href: str) -> str:
+    """从 styles.css 相对路径得到站点根前缀：'' / '../' / '../../'。"""
+    normalized = css_href.replace("\\", "/")
+    if "/" not in normalized:
+        return ""
+    return normalized.rsplit("/", 1)[0] + "/"
+
+
+def _page_asset(path_from_root: str, css_href: str) -> str:
+    """把站点根相对路径（可带前导 /）转成相对当前页的 URL。"""
+    clean = path_from_root.lstrip("/")
+    return f"{_asset_prefix(css_href)}{clean}"
+
+
+def _audio_public_href(
+    lang: str,
+    day: date,
+    index: int,
+    *,
+    css_href: str = "styles.css",
+) -> str:
+    return _page_asset(
+        f"audio/{lang}/{day.isoformat()}/{index:03d}.mp3",
+        css_href,
+    )
 
 
 def _resolve_audio_href(
@@ -703,6 +741,7 @@ def _resolve_audio_href(
     source_day: date,
     source_index: int,
     audio_available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]],
+    css_href: str = "styles.css",
 ) -> str | None:
     if lang not in {"zh", "en"}:
         return None
@@ -715,7 +754,7 @@ def _resolve_audio_href(
     key = (source_day.isoformat(), source_index)
     if key not in bucket:
         return None
-    return _audio_public_href(lang, source_day, source_index)
+    return _audio_public_href(lang, source_day, source_index, css_href=css_href)
 
 
 def _copy_speak_audio_roots(
@@ -820,7 +859,12 @@ def _copy_site_bgm(candidates: list[Path], output_dir: Path) -> bool:
     return False
 
 
-def _podcast_dock_html(lang: str, *, has_bgm: bool = False) -> str:
+def _podcast_dock_html(
+    lang: str,
+    *,
+    has_bgm: bool = False,
+    css_href: str = "styles.css",
+) -> str:
     if lang == "zh":
         mode_label = "伴读"
         prev_l, play_l, next_l = "上一", "播", "下一"
@@ -833,8 +877,9 @@ def _podcast_dock_html(lang: str, *, has_bgm: bool = False) -> str:
         mode_a = "Listen play or pause"
     else:
         return ""
+    bgm_src = escape(_page_asset("audio/bgm.mp3", css_href), quote=True)
     bgm = (
-        '<audio id="site-bgm" src="/audio/bgm.mp3" loop preload="none"></audio>\n'
+        f'<audio id="site-bgm" src="{bgm_src}" loop preload="none"></audio>\n'
         if has_bgm
         else ""
     )
@@ -877,6 +922,31 @@ def _render_day_sticky(day: date) -> str:
     )
 
 
+def _render_feed_filter(lang: str) -> str:
+    """首页 tag 筛选：全部 + 已知 tag（paper / video）。"""
+    if lang == "zh":
+        aria = "按标签筛选"
+        all_l = "全部"
+    else:
+        aria = "Filter by tag"
+        all_l = "All"
+    bits = [
+        f'<nav class="feed-filter" role="tablist" aria-label="{escape(aria)}">',
+        '<button type="button" class="feed-filter-tab is-active" role="tab" '
+        'aria-selected="true" data-filter="">'
+        f"{escape(all_l)}</button>",
+    ]
+    for key, en_l, zh_l in _FEED_FILTER_TAGS:
+        label = zh_l if lang == "zh" else en_l
+        bits.append(
+            '<button type="button" class="feed-filter-tab" role="tab" '
+            f'aria-selected="false" data-filter="{escape(key, quote=True)}">'
+            f"{escape(label)}</button>"
+        )
+    bits.append("</nav>")
+    return "\n".join(bits)
+
+
 def _render_timeline_html(
     entries: list[TimelineEntry],
     lang: str,
@@ -884,6 +954,7 @@ def _render_timeline_html(
     affiliate_enabled: bool,
     audio_available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]],
     prev_day: date | None = None,
+    css_href: str = "styles.css",
 ) -> str:
     bits: list[str] = []
     last = prev_day
@@ -896,6 +967,7 @@ def _render_timeline_html(
             source_day=entry.source_day,
             source_index=entry.source_index,
             audio_available=audio_available,
+            css_href=css_href,
         )
         bits.append(
             _render_item(
@@ -919,6 +991,8 @@ def _write_feed_json_pages(
     """page 0 在首页 HTML；从 1 起写 feed/{lang}/{n}.html 分片。"""
     if len(items) <= HOME_PAGE_SIZE:
         return
+    # 分片会插入首页 DOM，音频路径须相对首页而非 feed/ 目录
+    home_css = _links_digest_home(lang, "", has_other=True).css
     feed_dir = output_dir / "feed" / lang
     page_count = (len(items) + HOME_PAGE_SIZE - 1) // HOME_PAGE_SIZE
     for page_i in range(1, page_count):
@@ -931,6 +1005,7 @@ def _write_feed_json_pages(
             affiliate_enabled=affiliate_enabled,
             audio_available=audio_available,
             prev_day=prev_day,
+            css_href=home_css,
         )
         next_page: int | None = page_i + 1 if page_i + 1 < page_count else None
         next_attr = "" if next_page is None else str(next_page)
@@ -957,6 +1032,49 @@ def _feed_js() -> str:
   }
   syncNavStickyBottom();
   window.addEventListener("resize", syncNavStickyBottom);
+
+  var mountYoutube = function (wrap) {
+    if (!wrap) return;
+    var id = wrap.getAttribute("data-yt");
+    if (!id || wrap.getAttribute("data-yt-mounted") === "1") return;
+    if (location.protocol === "file:") {
+      window.open(
+        "https://www.youtube.com/watch?v=" + encodeURIComponent(id),
+        "_blank",
+        "noopener,noreferrer"
+      );
+      return;
+    }
+    wrap.setAttribute("data-yt-mounted", "1");
+    var titleEl = wrap.closest(".item");
+    var title = "";
+    if (titleEl) {
+      var h2 = titleEl.querySelector("h2");
+      if (h2) title = h2.textContent || "";
+    }
+    var iframe = document.createElement("iframe");
+    iframe.src =
+      "https://www.youtube.com/embed/" +
+      encodeURIComponent(id) +
+      "?autoplay=1&rel=0";
+    iframe.title = title || "YouTube";
+    iframe.allow =
+      "accelerometer; autoplay; clipboard-write; encrypted-media; " +
+      "gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
+    iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    iframe.setAttribute("loading", "eager");
+    wrap.replaceChildren(iframe);
+  };
+
+  document.addEventListener("click", function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var facade = t.closest(".yt-facade");
+    if (!facade) return;
+    ev.preventDefault();
+    mountYoutube(facade.closest(".item-thumb-video"));
+  });
 
   var bar = document.querySelector(".read-progress");
   if (bar) {
@@ -1231,36 +1349,86 @@ def _feed_js() -> str:
 
   var btn = document.getElementById("load-more");
   var feed = document.getElementById("feed");
-  if (!btn || !feed) return;
-  btn.addEventListener("click", function () {
-    var next = btn.getAttribute("data-next");
-    var base = btn.getAttribute("data-feed-base");
-    if (!next || !base) return;
-    btn.disabled = true;
-    fetch(base + "/" + next)
-      .then(function (res) {
-        if (!res.ok) throw new Error("feed fetch failed");
-        return res.text();
-      })
-      .then(function (text) {
-        var wrap = document.createElement("div");
-        wrap.innerHTML = text;
-        var chunk = wrap.querySelector(".feed-chunk");
-        if (!chunk) throw new Error("feed chunk missing");
-        feed.insertAdjacentHTML("beforeend", chunk.innerHTML);
-        var more = chunk.getAttribute("data-next");
-        if (!more) {
-          btn.remove();
-        } else {
-          btn.setAttribute("data-next", more);
-          btn.disabled = false;
+  var filterRoot = document.querySelector(".feed-filter");
+  var activeFilter = "";
+
+  var applyTagFilter = function () {
+    if (!feed) return;
+    var items = feed.querySelectorAll(".item");
+    for (var i = 0; i < items.length; i++) {
+      var el = items[i];
+      var tag = (el.getAttribute("data-tag") || "").toLowerCase();
+      var hide = !!activeFilter && tag !== activeFilter;
+      el.classList.toggle("is-filtered-out", hide);
+    }
+    var stickies = feed.querySelectorAll(".feed-day-sticky");
+    for (var s = 0; s < stickies.length; s++) {
+      var sticky = stickies[s];
+      var next = sticky.nextElementSibling;
+      var anyVisible = false;
+      while (next && !next.classList.contains("feed-day-sticky")) {
+        if (
+          next.classList.contains("item") &&
+          !next.classList.contains("is-filtered-out")
+        ) {
+          anyVisible = true;
+          break;
         }
-        refreshDock();
-      })
-      .catch(function () {
-        btn.disabled = false;
-      });
-  });
+        next = next.nextElementSibling;
+      }
+      sticky.classList.toggle("is-filtered-out", !!activeFilter && !anyVisible);
+    }
+  };
+
+  if (filterRoot) {
+    filterRoot.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var tab = t.closest(".feed-filter-tab");
+      if (!tab || !filterRoot.contains(tab)) return;
+      activeFilter = (tab.getAttribute("data-filter") || "").toLowerCase();
+      var tabs = filterRoot.querySelectorAll(".feed-filter-tab");
+      for (var i = 0; i < tabs.length; i++) {
+        var on = tabs[i] === tab;
+        tabs[i].classList.toggle("is-active", on);
+        tabs[i].setAttribute("aria-selected", on ? "true" : "false");
+      }
+      applyTagFilter();
+    });
+  }
+
+  if (btn && feed) {
+    btn.addEventListener("click", function () {
+      var next = btn.getAttribute("data-next");
+      var base = btn.getAttribute("data-feed-base");
+      if (!next || !base) return;
+      btn.disabled = true;
+      fetch(base + "/" + next)
+        .then(function (res) {
+          if (!res.ok) throw new Error("feed fetch failed");
+          return res.text();
+        })
+        .then(function (text) {
+          var wrap = document.createElement("div");
+          wrap.innerHTML = text;
+          var chunk = wrap.querySelector(".feed-chunk");
+          if (!chunk) throw new Error("feed chunk missing");
+          feed.insertAdjacentHTML("beforeend", chunk.innerHTML);
+          var more = chunk.getAttribute("data-next");
+          if (!more) {
+            btn.remove();
+          } else {
+            btn.setAttribute("data-next", more);
+            btn.disabled = false;
+          }
+          applyTagFilter();
+          refreshDock();
+        })
+        .catch(function () {
+          btn.disabled = false;
+        });
+    });
+  }
 })();
 """.strip()
 
@@ -1362,9 +1530,11 @@ def _render_digest(
                 source_day=day,
                 source_index=item.index,
                 audio_available=available,
+                css_href=links.css,
             ),
         )
         for item in doc.items
+        if has_usable_digest_summary(item.summary, title=item.title)
     )
     if not items_html:
         items_html = (
@@ -1387,7 +1557,7 @@ def _render_digest(
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
 
     script_src = _feed_script_href(links.css)
-    podcast = _podcast_dock_html(lang, has_bgm=has_bgm)
+    podcast = _podcast_dock_html(lang, has_bgm=has_bgm, css_href=links.css)
     return _shell(
         title=f"{SITE_NAME_EN} — {day_s}",
         css_href=links.css,
@@ -1433,10 +1603,10 @@ def _render_home_timeline(
     has_more = total > HOME_PAGE_SIZE
     if lang == "en":
         load_l = "Load more"
-        feed_base = "/feed/en"
+        feed_base = _page_asset("feed/en", links.css)
     else:
         load_l = "加载更多"
-        feed_base = "/feed/zh"
+        feed_base = _page_asset("feed/zh", links.css)
     script_src = _feed_script_href(links.css)
     available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]] = (
         audio_available or {}
@@ -1448,6 +1618,7 @@ def _render_home_timeline(
         affiliate_enabled=site.affiliate_enabled,
         audio_available=available,
         prev_day=None,
+        css_href=links.css,
     )
     if not items_html:
         items_html = (
@@ -1470,7 +1641,7 @@ def _render_home_timeline(
     en_hl = en_path if lang == "en" or has_other_lang else None
     zh_hl = zh_path if lang == "zh" or has_other_lang else None
     desc = _static_description("home", lang)
-    podcast = _podcast_dock_html(lang, has_bgm=has_bgm)
+    podcast = _podcast_dock_html(lang, has_bgm=has_bgm, css_href=links.css)
 
     return _shell(
         title=SITE_NAME_EN,
@@ -1484,6 +1655,7 @@ def _render_home_timeline(
 <div class="read-progress" aria-hidden="true"></div>
 <div class="site">
 {_chrome_brand_nav(lang, links, as_of=as_of or None)}
+{_render_feed_filter(lang)}
 <main class="feed" id="feed">
   {items_html}
 </main>
@@ -1765,8 +1937,26 @@ def _render_item(
         f'<span class="item-index" aria-hidden="true">{item.index:02d}</span>',
         '<div class="item-body">',
     ]
+    video_id = youtube_video_id(url)
     img = item.image_url.strip()
-    if img:
+    if video_id:
+        vid = escape(video_id, quote=True)
+        thumb = escape(
+            img or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+            quote=True,
+        )
+        play_l = "播放视频" if lang == "zh" else "Play video"
+        bits.append(
+            f'<div class="item-thumb item-thumb-video" data-yt="{vid}">'
+            f'<button type="button" class="yt-facade" '
+            f'aria-label="{escape(play_l)}">'
+            f'<img src="{thumb}" alt="" loading="lazy" decoding="async" />'
+            f'<span class="yt-facade-play" aria-hidden="true">'
+            f'<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">'
+            f'<path d="M8 5v14l11-7z"/></svg></span>'
+            f"</button></div>"
+        )
+    elif img:
         src = escape(img, quote=True)
         bits.append(
             f'<div class="item-thumb">'
@@ -1776,7 +1966,7 @@ def _render_item(
     if header_bits:
         bits.append(f'<div class="item-meta">{"".join(header_bits)}</div>')
     bits.append(f"<h2>{title}</h2>")
-    if item.summary:
+    if has_usable_digest_summary(item.summary, title=item.title):
         bits.append(f'<p class="summary">{escape(item.summary)}</p>')
     action_bits: list[str] = []
     if audio_href:
@@ -1809,6 +1999,17 @@ def _render_item(
         )
     bits.extend(["</div>", "</article>"])
     return "\n".join(bits)
+
+
+def youtube_video_id(url: str) -> str | None:
+    """从 watch?v= / youtu.be 链接提取 11 位 video id；Shorts 与其它形态返回 None。"""
+    text = url.strip()
+    if not text or "/shorts/" in text.lower():
+        return None
+    match = _YT_WATCH_RE.search(text)
+    if not match:
+        return None
+    return match.group(1)
 
 
 def _meta_day(raw: str) -> str:
@@ -1851,6 +2052,8 @@ def _display_tag(raw: str, lang: str) -> str:
     key = text.lower()
     if key == "paper":
         return "论文" if lang == "zh" else "Paper"
+    if key == "video":
+        return "视频" if lang == "zh" else "Video"
     return text
 
 
@@ -2182,6 +2385,7 @@ def _shell(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escape(title)}</title>
   <meta name="description" content="{escape(desc)}">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#0d0f17">
   <meta property="og:title" content="{escape(title)}">
   <meta property="og:description" content="{escape(desc)}">
@@ -2621,7 +2825,8 @@ a.lang-toggle:hover { color: var(--accent-hot); }
 }
 .item[data-source="hn"] { --source: #c45c26; }
 .item[data-source="openai"],
-.item[data-source="rss:openai"] { --source: #1a7f64; }
+.item[data-source="rss:openai"],
+.item[data-source="rss:openai_youtube"] { --source: #1a7f64; }
 .item[data-source="google_ai"],
 .item[data-source="rss:google_ai"] { --source: #3b6ea5; }
 .item[data-source="deepmind"],
@@ -2671,11 +2876,48 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--line) 55%, transparent);
 }
-.item-thumb img {
+.item-thumb img,
+.item-thumb iframe {
   display: block;
   width: 100%;
   height: 100%;
+  border: 0;
+}
+.item-thumb img {
   object-fit: cover;
+}
+.yt-facade {
+  appearance: none;
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: #000;
+  cursor: pointer;
+  color: #fff;
+}
+.yt-facade-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease;
+}
+.yt-facade:hover .yt-facade-play,
+.yt-facade:focus-visible .yt-facade-play {
+  background: rgba(0, 0, 0, 0.2);
+}
+.yt-facade-play svg {
+  width: 3rem;
+  height: 3rem;
+  padding: 0.65rem 0.55rem 0.65rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.92);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 .item-body { min-width: 0; }
 .item h2 {
@@ -2763,6 +3005,45 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   background: rgba(90, 111, 154, 0.2);
   color: #c7d2fe;
   border-color: rgba(90, 111, 154, 0.35);
+}
+.item[data-tag="video"] .badge-tag {
+  background: rgba(220, 38, 38, 0.18);
+  color: #fecaca;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+.feed-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0 0.15rem;
+}
+.feed-filter-tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
+  color: #94a3b8;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.feed-filter-tab:hover {
+  color: #e2e8f0;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.feed-filter-tab.is-active {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--accent-hot) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent-hot) 22%, transparent);
+}
+.item.is-filtered-out,
+.feed-day-sticky.is-filtered-out {
+  display: none;
 }
 .meta-text {
   font-size: 0.75rem;
@@ -2954,6 +3235,8 @@ code {
   border-radius: 999px;
   font: inherit;
   cursor: pointer;
+  isolation: isolate;
+  overflow: visible;
 }
 .item-speak-icon {
   display: inline-flex;
@@ -2966,9 +3249,26 @@ code {
   display: block;
 }
 .item-speak[aria-pressed="true"] {
-  border-color: rgba(99, 102, 241, 0.7);
-  background: rgba(99, 102, 241, 0.25);
-  color: #c7d2fe;
+  border: none;
+  background: rgba(79, 70, 229, 1);
+  color: #f8fafc;
+  box-shadow:
+    0 10px 28px rgba(99, 102, 241, 0.45),
+    0 0 0 2px rgba(165, 180, 252, 0.45);
+}
+.item-speak[aria-pressed="true"]::before,
+.item-speak[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid rgba(165, 180, 252, 0.55);
+  z-index: -1;
+  pointer-events: none;
+  animation: podcast-ripple 1.8s ease-out infinite;
+}
+.item-speak[aria-pressed="true"]::after {
+  animation-delay: 0.9s;
 }
 .item.is-playing {
   outline: 1px solid rgba(99, 102, 241, 0.55);
@@ -2976,24 +3276,25 @@ code {
 }
 .podcast-dock {
   position: fixed;
-  left: 50%;
-  right: auto;
-  bottom: 0;
+  left: auto;
+  right: max(0.85rem, env(safe-area-inset-right));
+  bottom: max(0.85rem, env(safe-area-inset-bottom));
   z-index: 40;
-  transform: translateX(-50%);
-  width: min(42rem, 100%);
+  width: auto;
+  max-width: calc(100vw - 1.7rem);
+  transform: none;
   display: flex;
+  flex-direction: column-reverse;
   flex-wrap: wrap;
   gap: 0.55rem;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
-  background: rgba(10, 12, 20, 0.94);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-bottom: none;
-  border-radius: 1rem 1rem 0 0;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 .podcast-mode,
 .podcast-nav {
@@ -3008,120 +3309,67 @@ code {
   font-weight: 600;
   cursor: pointer;
 }
+.podcast-mode {
+  width: auto;
+  min-width: 3.6rem;
+  height: auto;
+  padding: 0.55rem 0.7rem 0.45rem;
+  border: none;
+  border-radius: 1.15rem;
+  background: rgba(99, 102, 241, 0.95);
+  color: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.podcast-mode-label {
+  display: block;
+  line-height: 1;
+}
 .podcast-mode-icon {
-  display: none;
+  display: inline-flex;
   line-height: 0;
 }
 .podcast-mode-icon svg {
   display: block;
 }
-.podcast-mode-label {
-  display: inline;
-}
-@media (min-width: 721px) {
-  .podcast-mode-icon {
-    display: none !important;
-  }
+.podcast-mode-icon[hidden] {
+  display: none !important;
 }
 .podcast-mode[aria-pressed="true"] {
-  border-color: rgba(99, 102, 241, 0.75);
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(79, 70, 229, 1);
+  box-shadow:
+    0 10px 28px rgba(99, 102, 241, 0.45),
+    0 0 0 2px rgba(165, 180, 252, 0.45);
 }
-.podcast-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  align-items: center;
+.podcast-mode[aria-pressed="true"]::before,
+.podcast-mode[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid rgba(165, 180, 252, 0.55);
+  z-index: -1;
+  pointer-events: none;
+  animation: podcast-ripple 1.8s ease-out infinite;
 }
+.podcast-mode[aria-pressed="true"]::after {
+  animation-delay: 0.9s;
+}
+.podcast-controls,
 .podcast-now {
-  color: #cbd5e1;
-  font-size: 0.82rem;
-  min-width: 4.5rem;
-}
-body.has-podcast-dock {
-  padding-bottom: 4.5rem;
-}
-@media (max-width: 720px) {
-  body.has-podcast-dock {
-    padding-bottom: 0;
-  }
-  .podcast-dock {
-    left: auto;
-    right: max(0.85rem, env(safe-area-inset-right));
-    bottom: max(0.85rem, env(safe-area-inset-bottom));
-    width: auto;
-    max-width: calc(100vw - 1.7rem);
-    transform: none;
-    flex-direction: column-reverse;
-    align-items: flex-end;
-    gap: 0.55rem;
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-  .podcast-mode {
-    width: auto;
-    min-width: 3.6rem;
-    height: auto;
-    padding: 0.55rem 0.7rem 0.45rem;
-    border: none;
-    border-radius: 1.15rem;
-    background: rgba(99, 102, 241, 0.95);
-    color: #f8fafc;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-    position: relative;
-    isolation: isolate;
-    overflow: visible;
-    box-shadow:
-      0 10px 28px rgba(0, 0, 0, 0.45),
-      0 0 0 1px rgba(255, 255, 255, 0.08);
-  }
-  .podcast-mode-label {
-    display: block;
-    line-height: 1;
-  }
-  .podcast-mode-icon {
-    display: inline-flex;
-  }
-  .podcast-mode-icon[hidden] {
-    display: none !important;
-  }
-  .podcast-mode[aria-pressed="true"] {
-    background: rgba(79, 70, 229, 1);
-    box-shadow:
-      0 10px 28px rgba(99, 102, 241, 0.45),
-      0 0 0 2px rgba(165, 180, 252, 0.45);
-  }
-  .podcast-mode[aria-pressed="true"]::before,
-  .podcast-mode[aria-pressed="true"]::after {
-    content: "";
-    position: absolute;
-    inset: -2px;
-    border-radius: inherit;
-    border: 2px solid rgba(165, 180, 252, 0.55);
-    z-index: -1;
-    pointer-events: none;
-    animation: podcast-ripple 1.8s ease-out infinite;
-  }
-  .podcast-mode[aria-pressed="true"]::after {
-    animation-delay: 0.9s;
-  }
-  .podcast-controls {
-    display: none;
-  }
-  .podcast-now {
-    display: none;
-  }
+  display: none;
 }
 @keyframes podcast-ripple {
   0% {
@@ -3135,7 +3383,9 @@ body.has-podcast-dock {
 }
 @media (prefers-reduced-motion: reduce) {
   .podcast-mode[aria-pressed="true"]::before,
-  .podcast-mode[aria-pressed="true"]::after {
+  .podcast-mode[aria-pressed="true"]::after,
+  .item-speak[aria-pressed="true"]::before,
+  .item-speak[aria-pressed="true"]::after {
     animation: none;
   }
 }
