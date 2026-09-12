@@ -53,6 +53,13 @@ rss:
   feeds:
     - name: openai
       url: https://openai.com/news/rss.xml
+    # OpenAI YouTube：官方 videos.xml；排除 Shorts；每轮最多 1 条长视频
+    - name: openai_youtube
+      url: https://www.youtube.com/feeds/videos.xml?channel_id=UCXZCJLdBC09xxGZ6gcdrc6A
+      max_new: 1
+      exclude_url_contains:
+        - /shorts/
+      tag: video
     - name: google_ai
       url: https://blog.google/innovation-and-ai/technology/ai/rss/
     - name: deepmind

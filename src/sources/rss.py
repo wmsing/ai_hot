@@ -25,11 +25,17 @@ def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
     """按源抓取 RSS；多取若干条供 pipeline 去重后再截断 max_new_per_feed。"""
     results: list[HotItem] = []
     for feed in cfg.feeds:
+        per_feed_cap = (
+            feed.max_new if feed.max_new is not None else cfg.max_new_per_feed
+        )
         # 有关键词白名单时多抓，避免筛完后凑不满 max_new_per_feed
         if feed.keywords:
-            fetch_cap = max(cfg.max_new_per_feed * 20, 40)
+            fetch_cap = max(per_feed_cap * 20, 40)
+        elif feed.exclude_url_contains:
+            # Shorts 等排除后仍要凑满 max_new
+            fetch_cap = max(per_feed_cap * 10, 15)
         else:
-            fetch_cap = max(cfg.max_new_per_feed * 4, cfg.max_new_per_feed)
+            fetch_cap = max(per_feed_cap * 4, per_feed_cap)
         try:
             resp = client.get(str(feed.url))
             resp.raise_for_status()
@@ -46,6 +52,8 @@ def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
             title = str(getattr(entry, "title", "") or "").strip()
             link = _entry_link(entry)
             if not title or not link:
+                continue
+            if _url_excluded(link, feed.exclude_url_contains):
                 continue
             results.append(
                 HotItem(
@@ -64,6 +72,13 @@ def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
             taken += 1
         logger.info("rss feed=%s fetched=%s", feed.name, taken)
     return results
+
+
+def _url_excluded(url: str, needles: list[str]) -> bool:
+    if not needles:
+        return False
+    lower = url.lower()
+    return any(n.lower() in lower for n in needles if n.strip())
 
 
 def _entry_link(entry: Any) -> str:

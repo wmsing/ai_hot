@@ -34,6 +34,10 @@ class FeedConfig(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     # 写入条目的展示标签（如 paper）
     tag: str = ""
+    # 本源每轮最多新条；None → 用 RssConfig.max_new_per_feed
+    max_new: int | None = None
+    # URL 含子串则跳过（如 YouTube /shorts/）
+    exclude_url_contains: list[str] = Field(default_factory=list)
 
 
 class HnConfig(BaseModel):
