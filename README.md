@@ -3,14 +3,46 @@
 个人向 **AI 垂直热点定时巡检**：HN + 官方/镜像 RSS → SQLite 去重 → `out/digest.md`（**UTC 当日累计**：同日只追加新 URL，条数单调不减；跨日重新起篇）。  
 静态站 **AI Hot Digest**（中文副标题「AI 热点摘要」）经 Cloudflare Workers（静态 Assets）发布。
 
-website: https://ai-hot.tonysingwm.workers.dev/
+website: [https://ai-hot.tonysingwm.workers.dev/](https://ai-hot.tonysingwm.workers.dev/)
+
+## 一键生成
+
+### 生成+译 → 归档 → 伴读（TTS）→ push）：
+
+```bash
+python -m src.main --llm qwen && python -m src.publish && python -m src.speak && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: archive digest $DAY" && git push
+```
+
+### 重新生成 ADHD 摘要 → 归档 → 伴读（TTS）→ push：
+
+```bash
+# 同时写 out/digest.md + out/digest.zh.md（ADHD 中/英摘要）；建议先跑上一节 main，保留中文标题
+# 单条：
+URL='https://www.autom.dev/blog/google-search-goto-links'
+python -m src.deep_summarize --url "$URL" && python -m src.publish && python -m src.speak --url "$URL" && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: adhd summarize $DAY" && git push
+
+# 批量（重复 --url；speak 会重生成这些条的中英 mp3）：
+URLS=(
+  'https://www.bbc.com/news/articles/c8r6y4me2g6o'
+  'https://merybenavente.me/blog/proof-of-capture'
+)
+ARGS=(); for u in "${URLS[@]}"; do ARGS+=(--url "$u"); done
+python -m src.deep_summarize "${ARGS[@]}" && python -m src.publish && python -m src.speak "${ARGS[@]}" && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: adhd summarize $DAY" && git push
+# 全量重打伴读：python -m src.speak --force
+```
+
+```bash
+# 本地预览
+python -m src.site_build
+```
 
 ## Deploy
+
 ```bash
 source .venv/bin/activate
 
 ## (最新) 生成+译 → 归档 → 伴读（TTS）→ push）：
-python -m src.main --llm qwen && python -m src.publish && python -m src.speak --lang en && python -m src.speak --lang zh && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: archive digest $DAY" && git push
+python -m src.main --llm qwen && python -m src.publish && python -m src.speak && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: archive digest $DAY" && git push
 
 ## adhd style summary
 python -m src.deep_summarize --url 'https://openai.com/index/perplexity-improving-accuracy-with-astra' && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
@@ -75,10 +107,12 @@ python -m src.main --llm qwen && python -m src.publish && python -m src.site_bui
 
 # 口播稿 + TTS 播放列表（需 edge-tts）
 pip install -e ".[speak]"
-python -m src.speak --lang zh --script-only   # out/speak.zh.md
-python -m src.speak --lang en                 # EN TTS → content/audio/en/<day>/（已有 mp3 跳过）
-python -m src.speak --lang zh                 # ZH TTS → content/audio/zh/<day>/（只补缺）
-python -m src.speak --lang zh --force         # 强制全量重生成
+python -m src.speak                             # 默认中英各生成（已有 mp3 跳过）
+python -m src.speak --url 'https://example.com/x'  # 只重生成该 URL 的 mp3（中英）
+python -m src.speak --lang zh --script-only   # 只写 out/speak.zh.md
+python -m src.speak --lang en                 # 只生成英文 TTS
+python -m src.speak --lang zh                 # 只生成中文 TTS
+python -m src.speak --force                   # 强制全量重生成（中英）
 python -m src.speak --limit 3                 # 调试前 3 条
 # 播放：打开 out/audio/<lang>/<UTC-day>/playlist.m3u
 # 站点伴读（中/英桌面+手机）；垫乐：content/audio/bgm.mp3（口播时自动压低）
@@ -95,8 +129,6 @@ python -m src.site_build
 ```bash
 0 7,12,21 * * * cd /path/to/ai_hot && .venv/bin/python -m src.main --llm openrouter && .venv/bin/python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push >> /tmp/ai_hot.log 2>&1
 ```
-
-
 
 ## 静态站（旁路发布）
 
@@ -116,8 +148,6 @@ git add content/digests
 git commit -m "content: archive digest YYYY-MM-DD"
 git push
 ```
-
-
 
 ### Cloudflare 一次性配置
 
@@ -147,7 +177,6 @@ git push
 - 静态站含 About / Privacy / Disclosure；`site.affiliate_enabled` 已开。PartnerStack 前请在 `config.yaml` 填 `owner_name` / `contact_email` 后重新部署。
 - Anthropic 无官方 RSS，当前用社区镜像，可在 `config.yaml` 替换
 
-
 ## 质量闭环
 
 ```bash
@@ -155,8 +184,6 @@ pytest
 mypy src
 ruff check src && ruff format --check src
 ```
-
-
 
 ## v1 非目标
 
@@ -178,8 +205,8 @@ ruff check src && ruff format --check src
 | RSS | Anthropic News（社区镜像） | [https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml](https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml) |
 | RSS | Hugging Face Blog    | [https://huggingface.co/blog/feed.xml](https://huggingface.co/blog/feed.xml)                                                                                                             |
 | RSS | NVIDIA AI Platforms  | [https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml](https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml)                                                         |
-| RSS | Apple Newsroom       | [https://www.apple.com/newsroom/rss-feed.rss](https://www.apple.com/newsroom/rss-feed.rss)                                                                                                 |
-| RSS | Apple ML Research    | [https://machinelearning.apple.com/rss.xml](https://machinelearning.apple.com/rss.xml)（展示 tag：`Paper` / `论文`）                                                                        |
+| RSS | Apple Newsroom       | [https://www.apple.com/newsroom/rss-feed.rss](https://www.apple.com/newsroom/rss-feed.rss)                                                                                               |
+| RSS | Apple ML Research    | [https://machinelearning.apple.com/rss.xml](https://machinelearning.apple.com/rss.xml)（展示 tag：`Paper` / `论文`）                                                                            |
 | RSS | 量子位（关键词过滤）           | [https://www.qbitai.com/feed](https://www.qbitai.com/feed)                                                                                                                               |
 
 
