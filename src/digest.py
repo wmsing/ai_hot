@@ -131,14 +131,21 @@ def format_digest_markdown(
             tag = (item.tag or "").strip()
             if tag:
                 block.append(f"- tag: {tag}")
-            block.extend(
-                [
-                    f"- summary: {summary}",
-                    "",
-                ]
-            )
+            _extend_field(block, "summary", summary)
+            speak = (item.speak_summary or "").strip()
+            if speak:
+                _extend_field(block, "speak", speak)
+            block.append("")
             lines.extend(block)
     return "\n".join(lines)
+
+
+def _extend_field(block: list[str], key: str, value: str) -> None:
+    """写入可能多行的 - key: 字段（首行带键，续行无前缀）。"""
+    parts = value.splitlines() or [""]
+    block.append(f"- {key}: {parts[0]}")
+    for cont in parts[1:]:
+        block.append(cont)
 
 
 def write_digest(
@@ -190,7 +197,11 @@ def write_digest_preserving_indices(
                 block.append(f"- image: {item.image_url.strip()}")
             if item.tag.strip():
                 block.append(f"- tag: {item.tag.strip()}")
-            block.extend([f"- summary: {summary}", ""])
+            _extend_field(block, "summary", summary)
+            speak = item.speak_summary.strip()
+            if speak:
+                _extend_field(block, "speak", speak)
+            block.append("")
             lines.extend(block)
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -248,6 +259,7 @@ def _digest_item_to_hot(item: DigestItem) -> HotItem:
         score=score,
         comments=comments,
         summary=summary_out,
+        speak_summary=item.speak_summary.strip() or None,
         image_url=item.image_url.strip() or None,
         published_at=published_at,
         tag=(item.tag or "").strip(),

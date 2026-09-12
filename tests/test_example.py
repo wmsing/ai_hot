@@ -758,6 +758,51 @@ def test_translate_digest_file_batches_llm_calls(
     assert "条目 5" in out
 
 
+def test_translate_digest_file_retries_english_placeholder_zh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    src.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. Still EN\n\n- source: `hn`\n- url: https://a.example/stale\n"
+        "- summary: still english summary\n",
+        encoding="utf-8",
+    )
+    dst.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. Still EN\n\n- source: `hn`\n- url: https://a.example/stale\n"
+        "- summary: still english summary\n",
+        encoding="utf-8",
+    )
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct"),
+    )
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        assert "still english summary" in text
+        return (
+            "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+            "Selected: 1\n\n"
+            "## 1. 已是中文\n\n- source: `hn`\n- url: https://a.example/stale\n"
+            "- summary: 已是中文摘要\n"
+        )
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg)
+    out = dst.read_text(encoding="utf-8")
+    assert "已是中文" in out
+    assert "已是中文摘要" in out
+    assert "still english summary" not in out
+
+
 def test_translate_digest_file_no_llm_when_all_reused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -840,3 +885,37 @@ def test_translate_cli_model_flag() -> None:
     args = _parse_args(["--model", "nvidia/nemotron-3-ultra-550b-a55b:free"])
     assert args.model == "nvidia/nemotron-3-ultra-550b-a55b:free"
     assert _parse_args([]).model is None
+
+
+def test_main_should_translate_defaults() -> None:
+    from src.main import _parse_args, should_translate
+
+    assert should_translate(_parse_args(["--llm", "qwen"]))
+    assert should_translate(_parse_args(["--llm"]))
+    assert not should_translate(_parse_args([]))
+    assert should_translate(_parse_args(["--llm", "qwen", "--translate"]))
+    assert not should_translate(_parse_args(["--llm", "qwen", "--no-translate"]))
+
+
+def test_main_runs_translate_after_digest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.main import main
+    from src.models import AppConfig, HotItem
+
+    calls: list[str] = []
+    item = HotItem(source="hn", title="T", url="https://x.com", summary="s")
+
+    monkeypatch.setattr("src.main.load_app_config", lambda: AppConfig())
+    monkeypatch.setattr("src.main.run_once", lambda *a, **k: [item])
+    monkeypatch.setattr(
+        "src.main.translate_digest_file",
+        lambda config, *, model=None: calls.append(model or "") or Path("out/digest.zh.md"),
+    )
+
+    assert main(["--llm", "qwen"]) == 0
+    assert calls == ["qwen"]
+
+    calls.clear()
+    assert main(["--llm", "qwen", "--no-translate"]) == 0
+    assert calls == []

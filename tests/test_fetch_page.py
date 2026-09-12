@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from src.fetch_page import extract_page_snippet, fetch_page_snippet
+from src.fetch_page import (
+    extract_page_body,
+    extract_page_snippet,
+    fetch_page_snippet,
+)
 from src.models import HotItem, LlmRuntime
 from src.ollama_client import summarize_item
 from src.pipeline import _attach_hn_page_snippets, _enrich_with_llm
@@ -43,6 +47,43 @@ def test_extract_falls_back_to_meta_then_body() -> None:
 
 def test_extract_empty_html_returns_none() -> None:
     assert extract_page_snippet("<html><head></head><body></body></html>") is None
+
+
+def test_extract_page_body_prefers_article_over_og() -> None:
+    html = (
+        """
+    <html><head>
+      <meta property="og:description" content="Short OG only.">
+    </head><body>
+      <nav>Home About</nav>
+      <article>
+        <h1>Long story</h1>
+        <p>"""
+        + ("Body sentence about Astra and Perplexity. " * 20)
+        + """</p>
+      </article>
+      <footer>copyright</footer>
+    </body></html>
+    """
+    )
+    body = extract_page_body(html, max_chars=8000)
+    assert body is not None
+    assert "Astra and Perplexity" in body
+    assert "Short OG only" not in body
+    assert len(body) > len("Short OG only.")
+    snippet = extract_page_snippet(html)
+    assert snippet == "Short OG only."
+
+
+def test_extract_page_body_falls_back_when_no_article() -> None:
+    html = (
+        "<html><body><p>"
+        + ("Plain page text without article tags. " * 15)
+        + "</p></body></html>"
+    )
+    body = extract_page_body(html, max_chars=500)
+    assert body is not None
+    assert "Plain page text" in body
 
 
 def test_fetch_page_snippet_uses_client_html() -> None:

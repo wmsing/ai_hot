@@ -11,6 +11,19 @@ from src.speak import run_speak
 from src.speak_script import format_item_speak, format_speak_document
 
 
+def test_format_item_speak_prefers_speak_summary() -> None:
+    item = DigestItem(
+        index=1,
+        title="标题",
+        summary="⚡️ 展示用摘要带 emoji",
+        speak_summary="朗读用摘要没有表情",
+    )
+    text = format_item_speak(item)
+    assert "朗读用摘要没有表情" in text
+    assert "emoji" not in text
+    assert "⚡️" not in text
+
+
 def test_format_item_speak_with_summary() -> None:
     item = DigestItem(
         index=1,

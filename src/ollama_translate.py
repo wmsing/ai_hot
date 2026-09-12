@@ -16,6 +16,7 @@ from src.digest import (
 from src.llm import build_llm_runtime, resolve_provider, runtime_from_ollama
 from src.models import AppConfig, HotItem, LlmRuntime, OllamaConfig
 from src.ollama_client import llm_chat
+from src.textutil import contains_cjk
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
                     update={
                         "title": prev.title,
                         "summary": prev.summary,
+                        "speak_summary": prev.speak_summary,
                     }
                 )
             )
@@ -118,7 +120,16 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
 
 
 def _usable_zh(item: HotItem) -> bool:
-    return bool(item.title.strip())
+    """已有中文 digest 条目：title 或 summary 含汉字才复用，避免英文占位被跳过。"""
+    if not item.title.strip():
+        return False
+    summary = (item.summary or "").strip()
+    speak = (item.speak_summary or "").strip()
+    return (
+        contains_cjk(item.title)
+        or contains_cjk(summary)
+        or contains_cjk(speak)
+    )
 
 
 def _align_translated(

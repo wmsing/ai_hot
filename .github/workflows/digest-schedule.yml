@@ -55,7 +55,7 @@ jobs:
           LLM_PROVIDER: openrouter
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          python -m src.main --llm openrouter && python -m src.translate && python -m src.publish
+          python -m src.main --llm openrouter && python -m src.publish
           DAY=$(date -u +%Y-%m-%d)
           git add content/digests
           if git diff --staged --quiet; then

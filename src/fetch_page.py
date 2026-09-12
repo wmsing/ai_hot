@@ -13,10 +13,21 @@ from src.textutil import strip_html, truncate
 logger = logging.getLogger(__name__)
 
 _MAX_DOWNLOAD_BYTES = 500_000
+_MAX_DOWNLOAD_BYTES_BODY = 1_000_000
 _DEFAULT_SNIPPET_CHARS = 1200
+_DEFAULT_BODY_CHARS = 8000
+_MIN_BODY_CHARS = 200
 
 _SCRIPT_STYLE_RE = re.compile(
     r"(?is)<(script|style|noscript)\b[^>]*>.*?</\1>",
+)
+_CHROME_RE = re.compile(
+    r"(?is)<(nav|footer|header|aside|svg)\b[^>]*>.*?</\1>",
+)
+_ARTICLE_RE = re.compile(r"(?is)<article\b[^>]*>(.*?)</article>")
+_MAIN_RE = re.compile(r"(?is)<main\b[^>]*>(.*?)</main>")
+_ROLE_MAIN_RE = re.compile(
+    r'(?is)<([a-zA-Z][\w:-]*)\b[^>]*\brole\s*=\s*["\']main["\'][^>]*>(.*?)</\1>'
 )
 
 
@@ -55,7 +66,7 @@ def fetch_page_snippet(
     if not target.startswith(("http://", "https://")):
         return None
     try:
-        html = _download_html(client, target)
+        html = _download_html(client, target, max_bytes=_MAX_DOWNLOAD_BYTES)
     except (httpx.HTTPError, ValueError) as exc:
         logger.info("page fetch failed url=%s err=%s", target[:120], exc)
         return None
@@ -66,6 +77,30 @@ def fetch_page_snippet(
         logger.info("page snippet empty url=%s", target[:120])
         return None
     return snippet
+
+
+def fetch_page_body(
+    client: httpx.Client,
+    url: str,
+    *,
+    max_chars: int = _DEFAULT_BODY_CHARS,
+) -> str | None:
+    """抓取 URL，返回 article/main 优先的长正文；失败或过短则 None。"""
+    target = url.strip()
+    if not target.startswith(("http://", "https://")):
+        return None
+    try:
+        html = _download_html(client, target, max_bytes=_MAX_DOWNLOAD_BYTES_BODY)
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.info("page body fetch failed url=%s err=%s", target[:120], exc)
+        return None
+    if not html:
+        return None
+    body = extract_page_body(html, max_chars=max_chars)
+    if not body:
+        logger.info("page body empty url=%s", target[:120])
+        return None
+    return body
 
 
 def extract_page_snippet(
@@ -90,7 +125,46 @@ def extract_page_snippet(
     return body or None
 
 
-def _download_html(client: httpx.Client, url: str) -> str:
+def extract_page_body(
+    html: str,
+    *,
+    max_chars: int = _DEFAULT_BODY_CHARS,
+) -> str | None:
+    """从 HTML 抽长正文：优先 article/main/role=main，否则去标签全文。"""
+    cleaned = _SCRIPT_STYLE_RE.sub(" ", html)
+    cleaned = _CHROME_RE.sub(" ", cleaned)
+
+    candidates: list[str] = []
+    for match in _ARTICLE_RE.finditer(cleaned):
+        candidates.append(match.group(1))
+    for match in _MAIN_RE.finditer(cleaned):
+        candidates.append(match.group(1))
+    for match in _ROLE_MAIN_RE.finditer(cleaned):
+        candidates.append(match.group(2))
+
+    best = ""
+    best_len = 0
+    for chunk in candidates:
+        text = strip_html(chunk).strip()
+        if len(text) > best_len:
+            best = text
+            best_len = len(text)
+
+    if best_len >= _MIN_BODY_CHARS:
+        return truncate(best, max_chars) or None
+
+    fallback = strip_html(cleaned).strip()
+    if len(fallback) < _MIN_BODY_CHARS:
+        return None
+    return truncate(fallback, max_chars) or None
+
+
+def _download_html(
+    client: httpx.Client,
+    url: str,
+    *,
+    max_bytes: int = _MAX_DOWNLOAD_BYTES,
+) -> str:
     with client.stream("GET", url) as resp:
         resp.raise_for_status()
         content_type = str(resp.headers.get("content-type") or "").lower()
@@ -101,7 +175,7 @@ def _download_html(client: httpx.Client, url: str) -> str:
         for chunk in resp.iter_bytes():
             chunks.append(chunk)
             total += len(chunk)
-            if total >= _MAX_DOWNLOAD_BYTES:
+            if total >= max_bytes:
                 break
         raw = b"".join(chunks)
         encoding = resp.charset_encoding or "utf-8"

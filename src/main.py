@@ -8,6 +8,7 @@ import sys
 
 from src.config import load_app_config, settings
 from src.llm import resolve_llm_model, resolve_provider
+from src.ollama_translate import translate_digest_file
 from src.pipeline import run_once
 
 
@@ -23,7 +24,27 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Examples: --llm qwen | --llm openrouter | --llm openrouter/free"
         ),
     )
+    parser.add_argument(
+        "--translate",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="After digest, translate EN → ZH (default: on when --llm is set)",
+    )
+    parser.add_argument(
+        "--translate-model",
+        default=None,
+        help="Override zh translation model (default: same as --llm)",
+    )
     return parser.parse_args(argv)
+
+
+def should_translate(args: argparse.Namespace) -> bool:
+    """有 --llm 时默认顺带译中文；可用 --no-translate 关闭。"""
+    if args.translate is True:
+        return True
+    if args.translate is False:
+        return False
+    return args.llm is not None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -44,6 +65,15 @@ def main(argv: list[str] | None = None) -> int:
         f"[ai_hot] env={settings.app_env} selected={len(selected)} "
         f"{mode} digest={config.paths.digest_path}"
     )
+    if should_translate(args):
+        translate_model = args.translate_model or args.llm
+        zh_path = translate_digest_file(config, model=translate_model)
+        tr_provider = resolve_provider(translate_model, config)
+        tr_model = resolve_llm_model(translate_model, config, provider=tr_provider)
+        print(
+            f"[ai_hot] translated → {zh_path} "
+            f"(provider={tr_provider}, model={tr_model})"
+        )
     return 0
 
 

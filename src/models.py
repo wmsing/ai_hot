@@ -19,6 +19,8 @@ class HotItem(BaseModel):
     score: int | None = None
     comments: int | None = None
     summary: str | None = None
+    # 口播用无 emoji 文本；空则 speak 回退 summary
+    speak_summary: str | None = None
     image_url: str | None = None
     published_at: datetime | None = None
     # 展示标签，如 paper → 站点 EN: Paper / ZH: 论文
@@ -149,6 +151,7 @@ class DigestItem(BaseModel):
     published: str = ""
     score_line: str = ""
     summary: str = ""
+    speak_summary: str = ""
     tag: str = ""
     reason: str = ""
     affiliate_url: str = ""

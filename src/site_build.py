@@ -1025,6 +1025,72 @@ def _feed_js() -> str:
   syncNavStickyBottom();
   window.addEventListener("resize", syncNavStickyBottom);
 
+  var mobileReadMq = window.matchMedia("(max-width: 720px)");
+  var feedScrollKey = "ai-hot-feed-scroll:" + location.pathname;
+
+  var isMobileRead = function () {
+    return mobileReadMq.matches;
+  };
+
+  var syncReadLinks = function () {
+    var links = document.querySelectorAll("a.item-read");
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i];
+      if (isMobileRead()) {
+        a.removeAttribute("target");
+        a.setAttribute("data-same-tab", "1");
+      } else if (a.getAttribute("data-same-tab") === "1") {
+        a.setAttribute("target", "_blank");
+        a.removeAttribute("data-same-tab");
+      } else if (!a.getAttribute("target")) {
+        a.setAttribute("target", "_blank");
+      }
+    }
+  };
+
+  var saveFeedScroll = function () {
+    try {
+      sessionStorage.setItem(feedScrollKey, String(window.scrollY || 0));
+    } catch (e) {}
+  };
+
+  var restoreFeedScroll = function () {
+    try {
+      var raw = sessionStorage.getItem(feedScrollKey);
+      if (raw == null) return;
+      var y = parseInt(raw, 10);
+      if (!(y > 0)) {
+        sessionStorage.removeItem(feedScrollKey);
+        return;
+      }
+      sessionStorage.removeItem(feedScrollKey);
+      window.requestAnimationFrame(function () {
+        window.scrollTo(0, y);
+      });
+    } catch (e) {}
+  };
+
+  syncReadLinks();
+  if (mobileReadMq.addEventListener) {
+    mobileReadMq.addEventListener("change", syncReadLinks);
+  } else if (mobileReadMq.addListener) {
+    mobileReadMq.addListener(syncReadLinks);
+  }
+
+  document.addEventListener(
+    "click",
+    function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var link = t.closest("a.item-read");
+      if (!link || !isMobileRead()) return;
+      saveFeedScroll();
+    },
+    true
+  );
+
+  window.addEventListener("pageshow", restoreFeedScroll);
+
   var mountYoutube = function (wrap) {
     if (!wrap) return;
     var id = wrap.getAttribute("data-yt");
@@ -1162,7 +1228,9 @@ def _feed_js() -> str:
   };
 
   var audioItems = function () {
-    return Array.prototype.slice.call(document.querySelectorAll(".item[data-audio]"));
+    return Array.prototype.slice.call(
+      document.querySelectorAll(".item[data-audio]:not(.is-filtered-out)")
+    );
   };
 
   var refreshDock = function () {
@@ -1176,6 +1244,8 @@ def _feed_js() -> str:
     dock.hidden = false;
     document.body.classList.add("has-podcast-dock");
   };
+
+  var syncPodcastToFilter = function () {};
 
   var setFabPlaying = function (playing) {
     if (!modeBtn) return;
@@ -1245,6 +1315,32 @@ def _feed_js() -> str:
         stopBgm();
       });
     }
+  };
+
+  // 筛选变更：伴读只跟可见队列；正在播且当前被滤掉 → 跳到筛选首条（无则停）
+  syncPodcastToFilter = function () {
+    refreshDock();
+    var items = audioItems();
+    var stillVisible = !!(currentItem && items.indexOf(currentItem) >= 0);
+    if (stillVisible) return;
+    var wasPlaying = !!(audio && !audio.paused);
+    if (wasPlaying && items.length) {
+      podcastOn = true;
+      if (controls) controls.hidden = false;
+      document.body.classList.add("podcast-on");
+      playItem(items[0], true);
+      return;
+    }
+    if (wasPlaying || podcastOn) {
+      podcastOn = false;
+      if (modeBtn) modeBtn.setAttribute("aria-pressed", "false");
+      if (controls) controls.hidden = true;
+      document.body.classList.remove("podcast-on");
+      if (audio) audio.pause();
+      stopBgm();
+    }
+    currentItem = null;
+    setPlayingUi(null, false);
   };
 
   var pauseAudio = function () {
@@ -1462,6 +1558,7 @@ def _feed_js() -> str:
         !!(activeKind && activeFilter) && !anyVisible
       );
     }
+    syncPodcastToFilter();
   };
 
   if (filterRoot) {
@@ -3083,6 +3180,7 @@ a.lang-toggle:hover { color: var(--accent-hot); }
   font-size: 0.95rem;
   line-height: 1.65;
   color: #e2e8f0;
+  white-space: pre-line;
 }
 .why {
   color: var(--muted);

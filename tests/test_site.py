@@ -44,6 +44,29 @@ _ZH_DIGEST = """# ai_hot 消息摘要
 """
 
 
+def test_parse_multiline_summary_and_speak() -> None:
+    from src.site_parse import parse_digest_markdown
+
+    text = """# ai_hot digest
+
+Generated (UTC): 2026-09-12T00:00:00+00:00
+Selected: 1
+
+## 1. Title
+
+- source: `hn`
+- url: https://example.com/x
+- summary: ⚡️一句话总结
+第二行亮点
+- speak: 一句话总结 第二行亮点
+"""
+    doc = parse_digest_markdown(text)
+    assert len(doc.items) == 1
+    assert "一句话总结" in doc.items[0].summary
+    assert "第二行亮点" in doc.items[0].summary
+    assert doc.items[0].speak_summary == "一句话总结 第二行亮点"
+
+
 def test_parse_digest_en() -> None:
     doc = parse_digest_markdown(_EN_DIGEST)
     assert doc.selected == 1
@@ -174,6 +197,7 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "1.2rem" in styles
     assert "linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent)" in styles
     assert ".feed-day-sticky::after" in styles
+    assert "white-space: pre-line" in styles
     assert "cursor: pointer" in styles
     assert "translateY(-4px)" in styles
     assert "rgba(99, 102, 241, 0.5)" in styles
@@ -256,6 +280,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert "--p" in feed_js
     assert "--nav-sticky-bottom" in feed_js
     assert "has-day-sticky" in feed_js
+    assert "syncReadLinks" in feed_js
+    assert "ai-hot-feed-scroll:" in feed_js
     assert "--nav-sticky-bottom" in styles
     assert "has-day-sticky" in styles
     zh_home = (out / "zh" / "index.html").read_text(encoding="utf-8")
@@ -536,6 +562,8 @@ def test_build_site_podcast_zh_audio(tmp_path: Path) -> None:
     assert "scrollIntoView" in feed_js
     assert "item-speak" in feed_js
     assert "setSpeakBtn" in feed_js
+    assert ":not(.is-filtered-out)" in feed_js
+    assert "syncPodcastToFilter" in feed_js
 
     styles = (out / "styles.css").read_text(encoding="utf-8")
     assert ".podcast-dock" in styles

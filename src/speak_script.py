@@ -21,11 +21,11 @@ def _ensure_sentence_end(text: str, *, lang: SpeakLang = "zh") -> str:
 
 
 def format_item_speak(item: DigestItem, *, lang: SpeakLang = "zh") -> str:
-    """单条口播：标题。\\n摘要（可缺）；不读序号。"""
+    """单条口播：标题。\\n朗读版优先，否则摘要（可缺）；不读序号。"""
     lines = [_ensure_sentence_end(item.title, lang=lang)]
-    summary = item.summary.strip()
-    if summary and summary.lower() != "n/a":
-        lines.append(_ensure_sentence_end(summary, lang=lang))
+    body = item.speak_summary.strip() or item.summary.strip()
+    if body and body.lower() != "n/a":
+        lines.append(_ensure_sentence_end(body, lang=lang))
     return "\n".join(lines)
 
 

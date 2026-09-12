@@ -16,6 +16,7 @@ _FIELD_MAP = {
     "url": "url",
     "published": "published",
     "summary": "summary",
+    "speak": "speak_summary",
     "tag": "tag",
     "why": "reason",
     "affiliate": "affiliate_url",
@@ -24,6 +25,8 @@ _FIELD_MAP = {
     "链接": "url",
     "发布时间": "published",
     "摘要": "summary",
+    "朗读": "speak_summary",
+    "口播": "speak_summary",
     "标签": "tag",
     "原因": "reason",
     "联盟链接": "affiliate_url",
@@ -54,6 +57,7 @@ def parse_digest_markdown(text: str) -> DigestDocument:
                 published=str(current.get("published", "")),
                 score_line=str(current.get("score_line", "")),
                 summary=str(current.get("summary", "")),
+                speak_summary=str(current.get("speak_summary", "")).strip(),
                 tag=str(current.get("tag", "")).strip(),
                 reason=str(current.get("reason", "")),
                 affiliate_url=str(current.get("affiliate_url", "")).strip(),
@@ -104,12 +108,18 @@ def parse_digest_markdown(text: str) -> DigestDocument:
 
         meta = _META_RE.match(line)
         if not meta:
+            # 多行 summary / speak 续行
+            last = current.get("_last_field")
+            if isinstance(last, str) and last in {"summary", "speak_summary"}:
+                prev = str(current.get(last, ""))
+                current[last] = f"{prev}\n{line}".strip() if prev else line
             continue
         key = meta.group(1).strip()
         value = meta.group(2).strip()
         field = _FIELD_MAP.get(key) or _FIELD_MAP.get(key.lower())
         if field is not None:
             current[field] = value
+            current["_last_field"] = field
 
     flush()
     if selected is None:

@@ -8,27 +8,34 @@ website: https://ai-hot.tonysingwm.workers.dev/
 ## Deploy
 ```bash
 source .venv/bin/activate
+
+## (最新) 生成+译 → 归档 → 伴读（TTS）→ push）：
+python -m src.main --llm qwen && python -m src.publish && python -m src.speak --lang en && python -m src.speak --lang zh && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: archive digest $DAY" && git push
+
+## adhd style summary
+python -m src.deep_summarize --url 'https://openai.com/index/perplexity-improving-accuracy-with-astra' && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
+
 # only update content（本机 Ollama）
-python -m src.main --llm qwen && python -m src.translate && python -m src.publish
+python -m src.main --llm qwen && python -m src.publish
 
 # Grok / 云端：OpenRouter free（不依赖本机睡眠与 Ollama）
 # export LLM_PROVIDER=openrouter
 # export OPENROUTER_API_KEY=sk-or-...
-python -m src.main --llm openrouter && python -m src.translate && python -m src.publish
+python -m src.main --llm openrouter && python -m src.publish
 
 # custom openrouter free model
 # check: https://openrouter.ai/models?variant=free&order=most-popular
-python -m src.main --llm nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.translate --model nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.publish
+python -m src.main --llm nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.publish
 
 # update content + publish
-python -m src.main --llm openrouter && python -m src.translate --model nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
+python -m src.main --llm openrouter && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
 
-# update content + publish local
-python -m src.main --llm openrouter && LLM_PROVIDER=ollama python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
+# EN 走 OpenRouter、中文译用本机 Ollama
+python -m src.main --llm openrouter --no-translate && LLM_PROVIDER=ollama python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
 
 
 # local build 
-python -m src.main --llm qwen && python -m src.translate && python -m src.publish && python -m src.site_build
+python -m src.main --llm qwen && python -m src.publish && python -m src.site_build
 
 ```
 
@@ -42,9 +49,10 @@ cp .env.example .env
 
 # 手动跑一次（v1 验收，模式 A：RSS 原生简介；含中文的 title/summary 会经 Ollama 译成英文再写入 digest.md）
 python -m src.main
-# 模式 B：入选条目用本地 Ollama（qwen）生成简介（中文条目仍会再做英文化）
+# 模式 B：入选条目用本地 Ollama（qwen）生成简介，并自动译成 out/digest.zh.md
 python -m src.main --llm qwen
-# 查看：out/digest.md ，库：data/ai_hot.db
+# 查看：out/digest.md 、 out/digest.zh.md ，库：data/ai_hot.db
+# 只生成英文、不译中文：python -m src.main --llm qwen --no-translate
 
 # 无可用摘要（n/a / 无内容 / 页面 junk）不写入 digest，站点也不展示
 
@@ -60,12 +68,10 @@ python -m src.translate
 rm -f out/digest.md out/digest.zh.md
 rm -f data/ai_hot.db   # 可选：整库删除（不是“只删今天”）；放开 cooldown 内已见 URL
                        # 去重只看近 24h，不会重写 content/digests/ 历史归档
-python -m src.main --llm qwen && python -m src.translate && python -m src.publish && python -m src.site_build
+python -m src.main --llm qwen && python -m src.publish && python -m src.site_build
 # publish 会覆盖写入 content/digests/YYYY-MM-DD.{en,zh}.md
 
-# 本地 Ollama（默认见 config.yaml ollama.model）把英文 digest 译成中文
-python -m src.translate
-# 查看：out/digest.zh.md
+# 仅增量译中文（如 resummarize 改完 EN 后）：python -m src.translate
 
 # 口播稿 + TTS 播放列表（需 edge-tts）
 pip install -e ".[speak]"
@@ -87,7 +93,7 @@ python -m src.site_build
 > 本机 24h 备选 cron（港时同点，换成本机路径）：
 
 ```bash
-0 7,12,21 * * * cd /path/to/ai_hot && .venv/bin/python -m src.main --llm openrouter && .venv/bin/python -m src.translate && .venv/bin/python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push >> /tmp/ai_hot.log 2>&1
+0 7,12,21 * * * cd /path/to/ai_hot && .venv/bin/python -m src.main --llm openrouter && .venv/bin/python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push >> /tmp/ai_hot.log 2>&1
 ```
 
 
