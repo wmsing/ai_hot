@@ -35,9 +35,12 @@ class FeedConfig(BaseModel):
     # 写入条目的展示标签（如 paper）
     tag: str = ""
     # 本源每轮最多新条；None → 用 RssConfig.max_new_per_feed
+    # 若设置了 max_age_hours，则不再按 max_new 截断（只按时间窗 + 已见跳过）
     max_new: int | None = None
     # URL 含子串则跳过（如 YouTube /shorts/）
     exclude_url_contains: list[str] = Field(default_factory=list)
+    # 只收 published_at 在最近 N 小时内的条目；None=不限
+    max_age_hours: int | None = None
 
 
 class HnConfig(BaseModel):
@@ -172,6 +175,10 @@ class OllamaConfig(BaseModel):
     timeout_seconds: float = 600.0
     # 增量翻译每批条数；过大易 ReadTimeout / 占满 RAM
     translate_batch_size: int = 8
+    # 上下文窗口；过大（如默认 65536）会把 KV cache 撑到十余 GB
+    num_ctx: int = 8192
+    # Qwen3.5 等默认会 thinking；摘要/翻译应关掉，否则极慢且 content 可能为空
+    think: bool = False
 
 
 class OpenRouterConfig(BaseModel):
@@ -200,6 +207,10 @@ class LlmRuntime(BaseModel):
     http_referer: str = ""
     app_title: str = "ai_hot"
     fallback_model: str = ""
+    # 仅 Ollama：传给 options.num_ctx；None=不设置（用服务端默认）
+    num_ctx: int | None = None
+    # 仅 Ollama：顶层 think；None=不传该字段
+    think: bool | None = False
 
 
 class AppConfig(BaseModel):

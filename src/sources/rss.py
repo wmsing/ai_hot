@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any
 
 import feedparser
@@ -19,6 +20,11 @@ _IMG_SRC_RE = re.compile(
     r"""<img[^>]+src=["']([^"']+)["']""",
     re.IGNORECASE,
 )
+_YT_FEED_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/122.0.0.0 Safari/537.36"
+)
 
 
 def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
@@ -29,15 +35,21 @@ def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
             feed.max_new if feed.max_new is not None else cfg.max_new_per_feed
         )
         # 有关键词白名单时多抓，避免筛完后凑不满 max_new_per_feed
-        if feed.keywords:
+        if feed.max_age_hours is not None:
+            # 时间窗过滤在 pipeline；Atom 按新→旧，多取一些再筛
+            fetch_cap = 20
+        elif feed.keywords:
             fetch_cap = max(per_feed_cap * 20, 40)
+        elif feed.exclude_url_contains and feed.max_new is not None:
+            # YouTube 等：排除 Shorts 后只要最新 N 条（通常 N=1）
+            fetch_cap = feed.max_new
         elif feed.exclude_url_contains:
             # Shorts 等排除后仍要凑满 max_new
             fetch_cap = max(per_feed_cap * 10, 15)
         else:
             fetch_cap = max(per_feed_cap * 4, per_feed_cap)
         try:
-            resp = client.get(str(feed.url))
+            resp = _get_feed(client, str(feed.url))
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             logger.warning("rss fetch failed name=%s err=%s", feed.name, exc)
@@ -71,7 +83,31 @@ def fetch_rss_candidates(client: httpx.Client, cfg: RssConfig) -> list[HotItem]:
             )
             taken += 1
         logger.info("rss feed=%s fetched=%s", feed.name, taken)
+        if "youtube.com/feeds" in str(feed.url):
+            time.sleep(0.8)
     return results
+
+
+def _get_feed(client: httpx.Client, url: str) -> httpx.Response:
+    """YouTube Atom 对连抓偶发 404/5xx：交替 UA + 退避重试。"""
+    if "youtube.com/feeds" not in url:
+        return client.get(url)
+    last: httpx.Response | None = None
+    for attempt in range(5):
+        headers = (
+            {"User-Agent": _YT_FEED_UA}
+            if attempt % 2 == 0
+            else {"User-Agent": "ai_hot/0.1 (+youtube-feed)"}
+        )
+        last = client.get(url, headers=headers)
+        try:
+            if int(getattr(last, "status_code", 200)) < 400:
+                return last
+        except (TypeError, ValueError):
+            return last
+        time.sleep(0.6 * (attempt + 1))
+    assert last is not None
+    return last
 
 
 def _url_excluded(url: str, needles: list[str]) -> bool:

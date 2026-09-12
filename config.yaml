@@ -53,9 +53,23 @@ rss:
   feeds:
     - name: openai
       url: https://openai.com/news/rss.xml
-    # OpenAI YouTube：官方 videos.xml；排除 Shorts；每轮最多 1 条长视频
+    # YouTube 长视频：每频道只取最新 1 条；已见跳过；排除 Shorts
     - name: openai_youtube
       url: https://www.youtube.com/feeds/videos.xml?channel_id=UCXZCJLdBC09xxGZ6gcdrc6A
+      max_new: 1
+      exclude_url_contains:
+        - /shorts/
+      tag: video
+    # Claude (@claude)
+    - name: claude_youtube
+      url: https://www.youtube.com/feeds/videos.xml?channel_id=UCV03SRZXJEz-hchIAogeJOg
+      max_new: 1
+      exclude_url_contains:
+        - /shorts/
+      tag: video
+    # Grok (@Grok)
+    - name: grok_youtube
+      url: https://www.youtube.com/feeds/videos.xml?channel_id=UCxgo0OMZU9SiaYpJsuZKWkQ
       max_new: 1
       exclude_url_contains:
         - /shorts/
@@ -126,9 +140,13 @@ http:
 
 ollama:
   base_url: http://127.0.0.1:11434
-  model: qwen3:4b-instruct
+  model: qwen3.5:9b
   timeout_seconds: 600
   translate_batch_size: 8
+  # 摘要/翻译够用；过大（如 65536）会把 KV cache 撑到十余 GB
+  num_ctx: 8192
+  # 关掉 Qwen3.5 thinking，否则摘要极慢且可能空 content
+  think: false
 
 # 默认 LLM；Grok/云端可设 LLM_PROVIDER=openrouter + OPENROUTER_API_KEY
 llm:

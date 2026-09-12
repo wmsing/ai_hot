@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -38,6 +38,23 @@ def _feed_by_source(config: AppConfig, source: str) -> FeedConfig | None:
         if feed.name == name:
             return feed
     return None
+
+
+def _within_max_age(
+    published_at: datetime | None,
+    *,
+    now: datetime,
+    max_age_hours: int,
+) -> bool:
+    """published_at 是否在最近 max_age_hours 内；缺发布时间则否。"""
+    if published_at is None:
+        return False
+    pub = published_at
+    if pub.tzinfo is None:
+        pub = pub.replace(tzinfo=timezone.utc)
+    else:
+        pub = pub.astimezone(timezone.utc)
+    return pub >= now - timedelta(hours=max_age_hours)
 
 
 def run_once(
@@ -93,15 +110,23 @@ def run_once(
                 ):
                     continue
                 if item.source.startswith("rss:"):
-                    count = rss_new_count.get(item.source, 0)
-                    cap = (
-                        feed.max_new
-                        if feed is not None and feed.max_new is not None
-                        else config.rss.max_new_per_feed
-                    )
-                    if count >= cap:
-                        continue
-                    rss_new_count[item.source] = count + 1
+                    if feed is not None and feed.max_age_hours is not None:
+                        if not _within_max_age(
+                            item.published_at,
+                            now=now,
+                            max_age_hours=feed.max_age_hours,
+                        ):
+                            continue
+                    else:
+                        count = rss_new_count.get(item.source, 0)
+                        cap = (
+                            feed.max_new
+                            if feed is not None and feed.max_new is not None
+                            else config.rss.max_new_per_feed
+                        )
+                        if count >= cap:
+                            continue
+                        rss_new_count[item.source] = count + 1
                 selected.append(item)
 
             selected = _attach_hn_page_snippets(

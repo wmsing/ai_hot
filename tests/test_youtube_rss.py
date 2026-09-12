@@ -1,7 +1,8 @@
-"""YouTube RSS 过滤 / max_new / 站点 embed。"""
+"""YouTube RSS 过滤 / max_age / 站点 embed。"""
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -63,6 +64,41 @@ def test_youtube_video_id() -> None:
     assert youtube_video_id("https://example.com/a") is None
 
 
+def test_within_max_age_last_day() -> None:
+    from src.pipeline import _within_max_age
+
+    now = datetime(2026, 9, 12, 12, 0, tzinfo=timezone.utc)
+    assert _within_max_age(
+        now - timedelta(hours=23),
+        now=now,
+        max_age_hours=24,
+    )
+    assert not _within_max_age(
+        now - timedelta(hours=25),
+        now=now,
+        max_age_hours=24,
+    )
+    assert not _within_max_age(None, now=now, max_age_hours=24)
+
+
+def test_config_youtube_feeds_latest_one() -> None:
+    from src.config import load_app_config
+
+    cfg = load_app_config()
+    yt = {
+        f.name: f
+        for f in cfg.rss.feeds
+        if f.name in {"openai_youtube", "claude_youtube", "grok_youtube"}
+    }
+    assert set(yt) == {"openai_youtube", "claude_youtube", "grok_youtube"}
+    for name, feed in yt.items():
+        assert feed.max_new == 1, name
+        assert feed.max_age_hours is None, name
+        assert "/shorts/" in feed.exclude_url_contains
+        assert feed.tag == "video"
+        assert "channel_id=" in str(feed.url)
+
+
 def test_fetch_rss_skips_shorts_and_respects_max_fetch(monkeypatch) -> None:
     cfg = RssConfig(
         max_new_per_feed=5,
@@ -79,6 +115,7 @@ def test_fetch_rss_skips_shorts_and_respects_max_fetch(monkeypatch) -> None:
 
     def fake_get(self: httpx.Client, url: str, **kwargs: object) -> MagicMock:
         resp = MagicMock()
+        resp.status_code = 200
         resp.raise_for_status = MagicMock()
         resp.text = _YT_FEED_XML
         return resp
@@ -88,7 +125,7 @@ def test_fetch_rss_skips_shorts_and_respects_max_fetch(monkeypatch) -> None:
     with httpx.Client() as client:
         items = fetch_rss_candidates(client, cfg)
 
-    assert len(items) == 2  # fetch_cap>1；Shorts 已滤；pipeline 再截 max_new
+    assert len(items) == 1  # Shorts 已滤；只要最新 1 条长视频
     assert items[0].url == "https://www.youtube.com/watch?v=OSaP6bJoU44"
     assert items[0].source == "rss:openai_youtube"
     assert items[0].tag == "video"
@@ -145,7 +182,11 @@ Selected: 1
     assert 'data-tag="video"' in home
     assert 'class="feed-filter"' in home
     assert 'data-filter="video"' in home
+    assert 'data-filter="openai"' in home
     assert ">Video<" in home
+    # sticky / 排序跟真实发布日，不跟归档日 2026-09-12
+    assert 'data-day="2026-09-11"' in home
+    assert 'data-day="2026-09-12"' not in home
     styles = (out / "styles.css").read_text(encoding="utf-8")
     assert ".yt-facade" in styles
     assert ".item-thumb iframe" in styles
@@ -154,6 +195,7 @@ Selected: 1
     feed_js = (out / "feed.js").read_text(encoding="utf-8")
     assert "applyTagFilter" in feed_js
     assert "data-filter" in feed_js
+    assert 'searchParams.set("source"' in feed_js
     assert "mountYoutube" in feed_js
     assert "youtube.com/embed/" in feed_js
     assert (out / "_headers").is_file()
