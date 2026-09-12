@@ -149,10 +149,54 @@ _RETRY_NUDGE = (
     "Keep one or two short factual sentences only.\n\n"
 )
 
+_JUNK_NUDGE = (
+    "The Existing snippet looks like website chrome/navigation, not an article "
+    "blurb. Ignore menus, language switchers, and help-center chrome. Write one "
+    "or two short factual sentences from any real content in the snippet; if "
+    "none remain, state the core claim from the title only.\n\n"
+)
+
+_JUNK_MARKERS = (
+    "skip to main content",
+    "how to get support",
+    "api docsrelease notes",
+    "⌘k",
+    "release notesget started",
+    "log in to your",
+    "cookie settings",
+    "managing your active sessions",
+)
+
 
 def summary_has_cliches(text: str) -> bool:
     """简介是否含常见套话（用于硬规则校验）。"""
     return bool(_CLICHE_RE.search(text.strip()))
+
+
+def is_junk_summary(text: str, *, title: str = "") -> bool:
+    """简介是否像页面导航/帮助中心垃圾（应强制 LLM 重写）。"""
+    cleaned = " ".join(text.split()).strip()
+    if not cleaned:
+        return False
+    lower = cleaned.casefold()
+    for marker in _JUNK_MARKERS:
+        if marker in lower:
+            return True
+    # 超长 FAQ/菜单倾倒
+    if len(cleaned) >= 800 and cleaned.count("?") >= 3:
+        return True
+    if len(cleaned) >= 1200:
+        return True
+    if title:
+        title_clean = " ".join(title.split()).strip().casefold()
+        if title_clean and lower.startswith(title_clean) and len(cleaned) > 400:
+            # 标题后粘了大段 chrome
+            rest = cleaned[len(title) :].lstrip(" |-—:")
+            if len(rest) > 300 and (
+                "skip to main" in rest.casefold() or rest.count("?") >= 2
+            ):
+                return True
+    return False
 
 
 def is_usable_source_summary(text: str, *, title: str = "") -> bool:
@@ -161,6 +205,8 @@ def is_usable_source_summary(text: str, *, title: str = "") -> bool:
     if len(cleaned) < _MIN_SOURCE_SUMMARY_CHARS:
         return False
     if title and cleaned.casefold() == title.casefold():
+        return False
+    if is_junk_summary(cleaned, title=title):
         return False
     return True
 
@@ -176,6 +222,7 @@ def summarize_item(item: HotItem, llm: LlmRuntime | OllamaConfig) -> str:
             item.title[:60],
         )
         return ""
+    junk_hint = is_junk_summary(hint, title=item.title)
     published = item.published_at.isoformat() if item.published_at else "(unknown)"
     base_user = (
         f"Title: {item.title}\n"
@@ -185,28 +232,36 @@ def summarize_item(item: HotItem, llm: LlmRuntime | OllamaConfig) -> str:
         f"Existing snippet: {hint}\n"
     )
     logger.info(
-        "llm summarize provider=%s model=%s source=%s title=%s",
+        "llm summarize provider=%s model=%s source=%s title=%s junk_hint=%s",
         runtime.provider,
         runtime.model,
         item.source,
         item.title[:60],
+        junk_hint,
     )
-    blurb = llm_chat(system=_SUMMARY_SYSTEM, user=base_user, llm=runtime).strip()
-    if not summary_has_cliches(blurb):
+    first_user = (_JUNK_NUDGE + base_user) if junk_hint else base_user
+    blurb = llm_chat(system=_SUMMARY_SYSTEM, user=first_user, llm=runtime).strip()
+    if blurb and not summary_has_cliches(blurb) and not is_junk_summary(blurb):
         return blurb
 
-    logger.info("llm summarize cliché hit; retry once title=%s", item.title[:60])
+    logger.info(
+        "llm summarize retry once title=%s cliche=%s junk=%s",
+        item.title[:60],
+        summary_has_cliches(blurb),
+        is_junk_summary(blurb),
+    )
     retry = llm_chat(
         system=_SUMMARY_SYSTEM,
-        user=_RETRY_NUDGE + base_user,
+        user=_JUNK_NUDGE + _RETRY_NUDGE + base_user,
         llm=runtime,
     ).strip()
-    if not summary_has_cliches(retry):
+    if retry and not summary_has_cliches(retry) and not is_junk_summary(retry):
         return retry
-    if hint:
-        logger.info("llm summarize still cliché; keep source snippet")
+    if hint and not junk_hint:
+        logger.info("llm summarize still bad; keep source snippet")
         return hint
-    return retry
+    logger.info("llm summarize still bad; drop junk snippet title=%s", item.title[:60])
+    return ""
 
 
 _TO_EN_SYSTEM = """You translate Chinese AI/tech news fields into English for a digest.

@@ -15,7 +15,11 @@ from src.http_client import build_client
 from src.keywords import matched_keyword, passes_keywords
 from src.llm import build_llm_runtime, resolve_llm_model, resolve_provider
 from src.models import AppConfig, FeedConfig, HotItem, LlmRuntime
-from src.ollama_client import is_usable_source_summary, summarize_item
+from src.ollama_client import (
+    is_junk_summary,
+    is_usable_source_summary,
+    summarize_item,
+)
 from src.sources.hn import fetch_hn_candidates
 from src.sources.rss import fetch_rss_candidates
 from src.storage import ItemStore
@@ -155,7 +159,7 @@ def _enrich_with_llm(items: list[HotItem], llm: LlmRuntime) -> list[HotItem]:
     enriched: list[HotItem] = []
     for item in items:
         existing = (item.summary or "").strip()
-        # RSS 等已有可靠原生简介可跳过；HN 页面片段仍交给 LLM 压成短句
+        # RSS 等已有可靠原生简介可跳过；junk / HN 页面片段仍交给 LLM
         if (
             item.source != "hn"
             and existing
@@ -171,10 +175,19 @@ def _enrich_with_llm(items: list[HotItem], llm: LlmRuntime) -> list[HotItem]:
         try:
             blurb = summarize_item(item, llm)
             if not blurb.strip():
-                enriched.append(item)
+                if existing and is_junk_summary(existing, title=item.title):
+                    enriched.append(item.model_copy(update={"summary": None}))
+                else:
+                    enriched.append(item)
+                continue
+            if is_junk_summary(blurb, title=item.title):
+                enriched.append(item.model_copy(update={"summary": None}))
                 continue
             enriched.append(item.model_copy(update={"summary": blurb}))
         except Exception as exc:
             logger.warning("llm summarize failed source=%s err=%s", item.source, exc)
-            enriched.append(item)
+            if existing and is_junk_summary(existing, title=item.title):
+                enriched.append(item.model_copy(update={"summary": None}))
+            else:
+                enriched.append(item)
     return enriched

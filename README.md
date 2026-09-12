@@ -44,6 +44,13 @@ python -m src.main --llm qwen
 # 仅把 digest.md 里残留中文 title/summary 译成英文（不重新抓取）
 python -m src.digest_en
 
+# 强制重写 junk / 低质英文简介（如帮助中心导航垃圾）
+python -m src.resummarize                 # 只处理 junk
+python -m src.resummarize --llm openrouter
+python -m src.resummarize --url 'https://support.claude.com/...'
+# 改完 EN 后增量译中文：
+python -m src.translate
+
 # 本地 Ollama（默认 qwen3:4b-instruct）把英文 digest 译成中文
 python -m src.translate
 # 查看：out/digest.zh.md
