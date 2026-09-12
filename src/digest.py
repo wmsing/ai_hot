@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.models import DigestItem, HotItem
+from src.ollama_client import is_junk_summary
 from src.site_parse import parse_digest_markdown
 from src.timeutil import format_published, parse_published
 
@@ -15,6 +16,31 @@ _SCORE_RE = re.compile(
     re.IGNORECASE,
 )
 _COMMENTS_ONLY_RE = re.compile(r"^comments=(?P<comments>\d+)$", re.IGNORECASE)
+
+_EMPTY_SUMMARIES = frozenset(
+    {
+        "",
+        "n/a",
+        "(none)",
+        "none",
+        "无内容",
+        "暂无",
+        "暂无内容",
+        "无",
+    }
+)
+
+
+def has_usable_digest_summary(summary: str | None, *, title: str = "") -> bool:
+    """是否有可收录/展示的摘要（空、n/a、无内容、junk 均否）。"""
+    cleaned = " ".join((summary or "").split()).strip()
+    if cleaned.casefold() in _EMPTY_SUMMARIES:
+        return False
+    if cleaned in {"无内容", "暂无", "暂无内容", "无"}:
+        return False
+    if is_junk_summary(cleaned, title=title):
+        return False
+    return True
 
 
 def same_utc_day(generated_at: datetime, now: datetime) -> bool:
@@ -130,6 +156,68 @@ def write_digest(
     )
 
 
+def write_digest_preserving_indices(
+    path: str | Path,
+    items: list[DigestItem],
+    *,
+    generated_at: str,
+) -> None:
+    """按 DigestItem.index 写回（可留号洞），避免打乱已有口播序号。"""
+    lines = [
+        "# ai_hot digest",
+        "",
+        f"Generated (UTC): {generated_at}",
+        f"Selected: {len(items)}",
+        "",
+    ]
+    if not items:
+        lines.append("_No items for this UTC day yet._")
+        lines.append("")
+    else:
+        for item in items:
+            summary = item.summary.strip() if item.summary else "n/a"
+            block = [
+                f"## {item.index}. {item.title}",
+                "",
+                f"- source: `{item.source}`",
+                f"- url: {item.url}",
+            ]
+            if item.published.strip():
+                block.append(f"- published: {item.published.strip()}")
+            if item.score_line.strip():
+                block.append(f"- {item.score_line.strip()}")
+            if item.image_url.strip():
+                block.append(f"- image: {item.image_url.strip()}")
+            if item.tag.strip():
+                block.append(f"- tag: {item.tag.strip()}")
+            block.extend([f"- summary: {summary}", ""])
+            lines.extend(block)
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines), encoding="utf-8")
+
+
+def prune_empty_summaries(path: str | Path) -> int:
+    """从已有 digest 去掉无可用摘要条目；保留原序号。返回删除条数。"""
+    out = Path(path)
+    if not out.is_file():
+        return 0
+    doc = parse_digest_markdown(out.read_text(encoding="utf-8"))
+    kept = [
+        item
+        for item in doc.items
+        if has_usable_digest_summary(item.summary, title=item.title)
+    ]
+    dropped = len(doc.items) - len(kept)
+    if dropped <= 0:
+        return 0
+    generated = doc.generated_at.strip() or datetime.now(timezone.utc).isoformat(
+        timespec="seconds"
+    )
+    write_digest_preserving_indices(out, kept, generated_at=generated)
+    return dropped
+
+
 def _parse_generated_at(raw: str) -> datetime | None:
     text = raw.strip()
     if not text:
@@ -147,7 +235,9 @@ def _digest_item_to_hot(item: DigestItem) -> HotItem:
     score, comments = _parse_score_line(item.score_line)
     published_at = parse_published(item.published)
     summary = item.summary.strip()
-    if summary.lower() in {"", "n/a"}:
+    cleaned = " ".join(summary.split()).strip()
+    # 占位空摘要清空；junk 原文保留，供 resummarize 识别重写
+    if cleaned.casefold() in _EMPTY_SUMMARIES:
         summary_out: str | None = None
     else:
         summary_out = summary

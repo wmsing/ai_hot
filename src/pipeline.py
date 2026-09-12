@@ -8,18 +8,20 @@ from datetime import datetime, timezone
 import httpx
 
 from src.config import settings
-from src.digest import load_hot_items, merge_by_url, same_utc_day, write_digest
+from src.digest import (
+    has_usable_digest_summary,
+    load_hot_items,
+    merge_by_url,
+    same_utc_day,
+    write_digest,
+)
 from src.digest_en import translate_cjk_fields_to_english
 from src.fetch_page import fetch_page_snippet
 from src.http_client import build_client
 from src.keywords import matched_keyword, passes_keywords
 from src.llm import build_llm_runtime, resolve_llm_model, resolve_provider
 from src.models import AppConfig, FeedConfig, HotItem, LlmRuntime
-from src.ollama_client import (
-    is_junk_summary,
-    is_usable_source_summary,
-    summarize_item,
-)
+from src.ollama_client import is_junk_summary, is_usable_source_summary, summarize_item
 from src.sources.hn import fetch_hn_candidates
 from src.sources.rss import fetch_rss_candidates
 from src.storage import ItemStore
@@ -92,7 +94,12 @@ def run_once(
                     continue
                 if item.source.startswith("rss:"):
                     count = rss_new_count.get(item.source, 0)
-                    if count >= config.rss.max_new_per_feed:
+                    cap = (
+                        feed.max_new
+                        if feed is not None and feed.max_new is not None
+                        else config.rss.max_new_per_feed
+                    )
+                    if count >= cap:
                         continue
                     rss_new_count[item.source] = count + 1
                 selected.append(item)
@@ -109,6 +116,16 @@ def run_once(
         # digest.md 默认英文：含汉字的 title/summary 用 LLM 译成英文
         selected = translate_cjk_fields_to_english(selected, runtime)
 
+        before = len(selected)
+        selected = [
+            item
+            for item in selected
+            if has_usable_digest_summary(item.summary, title=item.title)
+        ]
+        dropped = before - len(selected)
+        if dropped:
+            logger.info("dropped %s items without usable summary (pre-merge)", dropped)
+
         for item in selected:
             store.upsert_seen(item, now=now)
 
@@ -116,6 +133,16 @@ def run_once(
         prev_at, prev_items = load_hot_items(config.paths.digest_path)
         if prev_at is not None and same_utc_day(prev_at, now):
             selected = merge_by_url(prev_items, selected)
+
+        before = len(selected)
+        selected = [
+            item
+            for item in selected
+            if has_usable_digest_summary(item.summary, title=item.title)
+        ]
+        dropped = before - len(selected)
+        if dropped:
+            logger.info("dropped %s items without usable summary (write)", dropped)
 
         write_digest(config.paths.digest_path, selected, generated_at=now)
         logger.info(

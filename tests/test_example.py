@@ -9,14 +9,48 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.digest import (
+    has_usable_digest_summary,
     load_hot_items,
     merge_by_url,
+    prune_empty_summaries,
     same_utc_day,
     write_digest,
 )
 from src.models import HotItem
 from src.normalize import normalize_url, title_key
 from src.storage import ItemStore
+
+
+def test_has_usable_digest_summary_rejects_empty() -> None:
+    assert has_usable_digest_summary(
+        "OpenAI shipped Agents API for multi-step tool use in apps."
+    )
+    assert not has_usable_digest_summary("n/a")
+    assert not has_usable_digest_summary("无内容")
+    assert not has_usable_digest_summary("")
+    junk = "Help Center Skip to main contentAPI docsRelease notesHow to get support"
+    assert not has_usable_digest_summary(junk, title="Age")
+
+
+def test_prune_empty_summaries_keeps_index(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "digest.md"
+    path.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T12:00:00+00:00\n"
+        "Selected: 2\n\n"
+        "## 1. Keep\n\n- source: `hn`\n- url: https://a.example/1\n"
+        "- summary: A real usable summary about shipping an API today.\n\n"
+        "## 115. Drop\n\n- source: `hn`\n- url: https://a.example/115\n"
+        "- summary: n/a\n",
+        encoding="utf-8",
+    )
+    assert prune_empty_summaries(path) == 1
+    text = path.read_text(encoding="utf-8")
+    assert "## 1. Keep" in text
+    assert "## 115." not in text
+    assert "Selected: 1" in text
+    assert "n/a" not in text
 
 
 def test_normalize_url_strips_tracking() -> None:
@@ -414,6 +448,8 @@ def test_display_tag_paper() -> None:
 
     assert _display_tag("paper", "en") == "Paper"
     assert _display_tag("paper", "zh") == "论文"
+    assert _display_tag("video", "en") == "Video"
+    assert _display_tag("video", "zh") == "视频"
     assert _display_tag("", "en") == ""
 
 

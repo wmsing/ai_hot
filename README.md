@@ -25,6 +25,11 @@ python -m src.main --llm openrouter && python -m src.translate --model nvidia/ne
 
 # update content + publish local
 python -m src.main --llm openrouter && LLM_PROVIDER=ollama python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
+
+
+# local build 
+python -m src.main --llm qwen && python -m src.translate && python -m src.publish && python -m src.site_build
+
 ```
 
 ## 快速开始
@@ -41,8 +46,7 @@ python -m src.main
 python -m src.main --llm qwen
 # 查看：out/digest.md ，库：data/ai_hot.db
 
-# 仅把 digest.md 里残留中文 title/summary 译成英文（不重新抓取）
-python -m src.digest_en
+# 无可用摘要（n/a / 无内容 / 页面 junk）不写入 digest，站点也不展示
 
 # 强制重写 junk / 低质英文简介（如帮助中心导航垃圾）
 python -m src.resummarize                 # 只处理 junk
