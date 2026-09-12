@@ -35,6 +35,14 @@ _FIELD_MAP = {
 }
 
 
+def _append_multiline_field(current: dict[str, str | int], line: str) -> None:
+    """多行 summary / speak 续行（含 `- emoji 亮点：…` 列表项）。"""
+    last = current.get("_last_field")
+    if isinstance(last, str) and last in {"summary", "speak_summary"}:
+        prev = str(current.get(last, ""))
+        current[last] = f"{prev}\n{line}".strip() if prev else line
+
+
 def parse_digest_markdown(text: str) -> DigestDocument:
     """容错解析 digest markdown；缺字段时留空。"""
     lines = text.splitlines()
@@ -108,11 +116,7 @@ def parse_digest_markdown(text: str) -> DigestDocument:
 
         meta = _META_RE.match(line)
         if not meta:
-            # 多行 summary / speak 续行
-            last = current.get("_last_field")
-            if isinstance(last, str) and last in {"summary", "speak_summary"}:
-                prev = str(current.get(last, ""))
-                current[last] = f"{prev}\n{line}".strip() if prev else line
+            _append_multiline_field(current, line)
             continue
         key = meta.group(1).strip()
         value = meta.group(2).strip()
@@ -120,6 +124,9 @@ def parse_digest_markdown(text: str) -> DigestDocument:
         if field is not None:
             current[field] = value
             current["_last_field"] = field
+            continue
+        # ADHD 摘要里的 `- 🚀 亮点：…` 也会匹配 meta 形态，但不是 digest 字段
+        _append_multiline_field(current, line)
 
     flush()
     if selected is None:

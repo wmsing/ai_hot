@@ -67,6 +67,32 @@ Selected: 1
     assert doc.items[0].speak_summary == "一句话总结 第二行亮点"
 
 
+def test_parse_adhd_summary_bullet_lines() -> None:
+    from src.site_parse import parse_digest_markdown
+
+    text = """# ai_hot digest
+
+Generated (UTC): 2026-09-12T00:00:00+00:00
+Selected: 1
+
+## 1. RunningHub
+
+- source: `rss:qbitai`
+- url: https://example.com/x
+- summary: ⚡️ 一句话总结
+正文段落。
+
+🔥 核心亮点
+- 🚀 提速神技：等待从 6 分钟砍至半分钟
+- 🔧 三大工程刀法：自研 RH 后训练模型
+"""
+    doc = parse_digest_markdown(text)
+    summary = doc.items[0].summary
+    assert "🔥 核心亮点" in summary
+    assert "提速神技" in summary
+    assert "三大工程刀法" in summary
+
+
 def test_parse_digest_en() -> None:
     doc = parse_digest_markdown(_EN_DIGEST)
     assert doc.selected == 1
