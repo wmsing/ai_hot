@@ -33,6 +33,19 @@ _YT_WATCH_RE = re.compile(
     r"(?:youtube\.com/watch\?(?:[^#]*&)?v=|youtu\.be/)([A-Za-z0-9_-]{11})",
     re.IGNORECASE,
 )
+_ADHD_SECTION_MARKERS = ("🔥 核心亮点", "🔥 Key takeaways")
+_ADHD_SECTION_BREAK_RE = re.compile(
+    r"([^\n])\n?(🔥 (?:核心亮点|Key takeaways))"
+)
+
+
+def _format_summary_html(text: str) -> str:
+    """保留换行，并在 ADHD 二级标题前插入空行。"""
+    normalized = text.replace("\r\n", "\n").strip()
+    if not normalized:
+        return ""
+    normalized = _ADHD_SECTION_BREAK_RE.sub(r"\1\n\n\2", normalized)
+    return escape(normalized)
 
 SITE_NAME_EN = "AI Hot Digest"
 SITE_TAGLINE_EN = "Daily AI highlights from HN & official feeds"
@@ -2162,7 +2175,7 @@ def _render_hot_item(item: HotTopicSnapshotItem, lang: str, *, index: int) -> st
         else (item.summary_en or item.summary or "")
     ).strip()
     if summary:
-        bits.append(f'<p class="summary">{escape(summary)}</p>')
+        bits.append(f'<p class="summary">{_format_summary_html(summary)}</p>')
     if url:
         bits.append(
             f'<p class="item-actions">'
@@ -2322,7 +2335,7 @@ def _render_item(
         bits.append(f'<div class="item-meta">{"".join(header_bits)}</div>')
     bits.append(f"<h2>{title}</h2>")
     if has_usable_digest_summary(item.summary, title=item.title):
-        bits.append(f'<p class="summary">{escape(item.summary)}</p>')
+        bits.append(f'<p class="summary">{_format_summary_html(item.summary)}</p>')
     action_bits: list[str] = []
     if audio_href:
         action_bits.append(

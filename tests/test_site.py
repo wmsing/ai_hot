@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from html import escape
 from pathlib import Path
 
 from src.models import HotTopicSnapshot, HotTopicSnapshotItem, SiteConfig
@@ -538,6 +539,17 @@ def test_build_site_seo(tmp_path: Path) -> None:
     assert 'hreflang="zh-Hans" href="https://example.test/zh/archive/2026-09-09/"' in (
         archive_day
     )
+
+
+def test_format_summary_html_adds_break_before_adhd_section() -> None:
+    from src.site_build import _format_summary_html
+
+    single_break = "⚡️ 一句话总结\n现更少的人工介入。\n🔥 核心亮点\n- 一条"
+    assert _format_summary_html(single_break) == escape(
+        "⚡️ 一句话总结\n现更少的人工介入。\n\n🔥 核心亮点\n- 一条"
+    )
+    already_spaced = "⚡️ One-liner\nGap.\n\n🔥 Key takeaways\n- one"
+    assert _format_summary_html(already_spaced) == escape(already_spaced)
 
 
 def test_build_site_hot_page(tmp_path: Path) -> None:
