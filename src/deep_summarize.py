@@ -8,7 +8,7 @@ import sys
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -17,12 +17,20 @@ from src.digest import load_hot_items, write_digest
 from src.fetch_page import fetch_page_body
 from src.http_client import build_client
 from src.llm import build_llm_runtime, resolve_llm_model, resolve_provider
-from src.models import AppConfig, HotItem, HotTopicSnapshotItem, LlmRuntime
+from src.models import (
+    AppConfig,
+    HotItem,
+    HotTopicSnapshot,
+    HotTopicSnapshotItem,
+    LlmRuntime,
+)
 from src.ollama_client import llm_chat
 from src.textutil import contains_cjk, speak_plain
 
+AdhdLang = Literal["zh", "en", "both"]
 FetchBodyFn = Callable[..., str | None]
 ChatFn = Callable[..., str]
+ShouldStopFn = Callable[[], bool]
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +153,18 @@ def _hot_topic_summary_translate_fallback(
     }
 
 
+def _persist_hot_topics_snapshot(
+    path: Path,
+    snapshot: HotTopicSnapshot,
+    updated_items: list[HotTopicSnapshotItem],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        snapshot.model_copy(update={"items": updated_items}).model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+
+
 def _hot_topic_needs_title_zh(item: HotTopicSnapshotItem) -> bool:
     """缺 title_zh，或旧版误用一句话总结当标题。"""
     current = (item.title_zh or "").strip()
@@ -247,8 +267,9 @@ def summarize_adhd_pair(
     fetch_body: FetchBodyFn | None = None,
     chat: ChatFn | None = None,
     fallback_body: str | None = None,
-) -> tuple[str, str] | None:
-    """抓正文并写 ADHD 中/英摘要；失败返回 None。"""
+    lang: AdhdLang = "both",
+) -> tuple[str | None, str | None] | None:
+    """抓正文并写 ADHD 摘要；lang=zh/en 只生成单侧。"""
     fetch_fn = fetch_body or fetch_page_body
     chat_fn = chat or llm_chat
     body_raw: Any = fetch_fn(http, url, max_chars=max_chars)
@@ -265,35 +286,70 @@ def summarize_adhd_pair(
         logger.warning("summarize_adhd skip; no body url=%s", url[:120])
         return None
 
-    user_payload = (
-        f"Title: {title}\n"
-        f"URL: {url}\n"
-        f"Source: {source}\n\n"
-        f"【文章正文】\n{body}\n"
-    )
-    zh_summary = _normalize_adhd_summary(
-        chat_fn(system=_ADHD_SYSTEM, user=user_payload, llm=llm).strip()
-    )
-    if not zh_summary or "一句话总结" not in zh_summary:
-        logger.warning("summarize_adhd weak ZH output url=%s", url[:120])
+    zh_summary: str | None = None
+    en_summary: str | None = None
+    if lang in {"zh", "both"}:
+        user_payload = (
+            f"Title: {title}\nURL: {url}\nSource: {source}\n\n【文章正文】\n{body}\n"
+        )
+        zh_summary = _normalize_adhd_summary(
+            chat_fn(system=_ADHD_SYSTEM, user=user_payload, llm=llm).strip()
+        )
+        if not zh_summary or "一句话总结" not in zh_summary:
+            logger.warning("summarize_adhd weak ZH output url=%s", url[:120])
+            if lang in {"zh", "both"}:
+                return None
+
+    if lang in {"en", "both"}:
+        en_summary = _normalize_adhd_summary(
+            chat_fn(
+                system=_EN_ADHD_SYSTEM,
+                user=(f"Title: {title}\nURL: {url}\n\nArticle body:\n{body}\n"),
+                llm=llm,
+            ).strip()
+        )
+        if not en_summary or "One-liner" not in en_summary:
+            logger.warning("summarize_adhd weak EN output url=%s", url[:120])
+            if lang == "en":
+                return None
+            en_summary = ""
+
+    if lang == "zh":
+        return None, zh_summary
+    if lang == "en":
+        return en_summary, None
+    if not zh_summary:
         return None
+    return en_summary or "", zh_summary
 
-    en_summary = _normalize_adhd_summary(
-        chat_fn(
-            system=_EN_ADHD_SYSTEM,
-            user=(
-                f"Title: {title}\n"
-                f"URL: {url}\n\n"
-                f"Article body:\n{body}\n"
-            ),
-            llm=llm,
-        ).strip()
-    )
-    if not en_summary or "One-liner" not in en_summary:
-        logger.warning("summarize_adhd weak EN output url=%s", url[:120])
-        en_summary = ""
 
-    return en_summary, zh_summary
+def _hot_topic_has_adhd_zh(item: HotTopicSnapshotItem) -> bool:
+    zh = (item.summary_zh or "").strip()
+    if "一句话总结" in zh:
+        return True
+    return bool(zh and contains_cjk(zh) and "核心亮点" in zh)
+
+
+def _hot_topic_has_adhd_en(item: HotTopicSnapshotItem) -> bool:
+    en = (item.summary_en or "").strip()
+    if "One-liner" in en:
+        return True
+    return bool(en and "Key takeaways" in en)
+
+
+def _hot_topic_needs_adhd(
+    item: HotTopicSnapshotItem,
+    lang: AdhdLang,
+    *,
+    force: bool,
+) -> bool:
+    if force:
+        return True
+    if lang == "zh":
+        return not _hot_topic_has_adhd_zh(item)
+    if lang == "en":
+        return not _hot_topic_has_adhd_en(item)
+    return not _hot_topic_has_adhd_summary(item)
 
 
 def _hot_topic_has_adhd_summary(item: HotTopicSnapshotItem) -> bool:
@@ -390,6 +446,8 @@ def deep_summarize_digest(
             en_summary, zh_summary = pair
             if not en_summary:
                 en_summary = (item.summary or "").strip()
+            if not zh_summary:
+                continue
 
             prev_zh = zh_by_url.get(key)
             if prev_zh and prev_zh.title.strip():
@@ -451,6 +509,76 @@ def deep_summarize_digest(
     return en_path, zh_path, changed
 
 
+def translate_hot_topic_titles(
+    config: AppConfig,
+    *,
+    snapshot_path: str | Path | None = None,
+    urls: list[str] | None = None,
+    llm_flag: str | None = None,
+    force: bool = False,
+    runtime: LlmRuntime | None = None,
+    chat: ChatFn | None = None,
+    should_stop: ShouldStopFn | None = None,
+) -> tuple[Path, int]:
+    """补翻热搜快照里缺失的 title_zh；返回 (path, changed)。"""
+    from src.hot_topics_probe import load_hot_topics_snapshot
+
+    path = Path(snapshot_path or config.paths.hot_topics_path)
+    snapshot = load_hot_topics_snapshot(path)
+    if snapshot is None or not snapshot.items:
+        raise FileNotFoundError(f"no hot topics snapshot at {path}; run probe first")
+
+    url_filter = {_normalize_url(u) for u in (urls or []) if u.strip()}
+    if url_filter:
+        all_keys = {_normalize_url(it.url) for it in snapshot.items}
+        missing = url_filter - all_keys
+        if missing:
+            raise ValueError(
+                "URL not in hot topics snapshot: "
+                + ", ".join(sorted(missing)[:5])
+                + ("…" if len(missing) > 5 else "")
+            )
+
+    provider = resolve_provider(llm_flag, config)
+    model = resolve_llm_model(llm_flag, config, provider=provider) if llm_flag else None
+    llm = runtime or build_llm_runtime(
+        config,
+        provider=provider,
+        model=model,
+        api_key=settings.openrouter_api_key,
+    )
+    chat_fn = chat or llm_chat
+    changed = 0
+    updated_items = list(snapshot.items)
+
+    stopped = False
+    for idx, item in enumerate(updated_items):
+        if should_stop and should_stop():
+            stopped = True
+            break
+        key = _normalize_url(item.url)
+        if url_filter and key not in url_filter:
+            continue
+        if not force and not _hot_topic_needs_title_zh(item):
+            continue
+        title_zh = translate_title_to_zh(item.title, llm, chat=chat_fn)
+        if not title_zh:
+            continue
+        updated_items[idx] = item.model_copy(update={"title_zh": title_zh})
+        changed += 1
+        _persist_hot_topics_snapshot(path, snapshot, updated_items)
+        logger.info(
+            "translate hot title url=%s zh=%s",
+            item.url[:120],
+            title_zh[:80],
+        )
+
+    if stopped:
+        logger.info("translate hot topic titles stopped early changed=%s", changed)
+    logger.info("translate hot topic titles changed=%s path=%s", changed, path)
+    return path, changed
+
+
 def deep_summarize_hot_topics(
     config: AppConfig,
     *,
@@ -459,12 +587,15 @@ def deep_summarize_hot_topics(
     llm_flag: str | None = None,
     max_chars: int | None = None,
     top_n: int | None = None,
+    force: bool = False,
+    lang: AdhdLang = "both",
     client: httpx.Client | None = None,
     runtime: LlmRuntime | None = None,
     fetch_body: FetchBodyFn | None = None,
     chat: ChatFn | None = None,
+    should_stop: ShouldStopFn | None = None,
 ) -> tuple[Path, int]:
-    """对热搜快照里的 URL 写 ADHD 中/英摘要并回写 JSON。"""
+    """对热搜快照里的 URL 写 ADHD 摘要并回写 JSON（逐条落盘；lang 控制语种）。"""
     from src.hot_topics_probe import load_hot_topics_snapshot
 
     path = Path(snapshot_path or config.paths.hot_topics_path)
@@ -502,22 +633,24 @@ def deep_summarize_hot_topics(
     updated_items = list(snapshot.items)
 
     title_targets: list[int] = []
-    for idx, item in enumerate(updated_items):
-        key = _normalize_url(item.url)
-        if url_filter and key not in url_filter:
-            continue
-        if _hot_topic_needs_title_zh(item):
-            title_targets.append(idx)
+    if lang in {"zh", "both"}:
+        for idx, item in enumerate(updated_items):
+            key = _normalize_url(item.url)
+            if url_filter and key not in url_filter:
+                continue
+            if _hot_topic_needs_title_zh(item):
+                title_targets.append(idx)
 
     pending: list[int] = []
     for idx, item in enumerate(updated_items):
         key = _normalize_url(item.url)
         if url_filter and key not in url_filter:
             continue
-        if _hot_topic_has_adhd_summary(item):
+        if not _hot_topic_needs_adhd(item, lang, force=force):
             logger.info(
-                "deep_summarize hot skip; already summarized url=%s",
+                "deep_summarize hot skip; already summarized url=%s lang=%s",
                 item.url[:120],
+                lang,
             )
             continue
         pending.append(idx)
@@ -531,71 +664,98 @@ def deep_summarize_hot_topics(
         logger.info("deep_summarize hot topics: nothing pending")
         return path, 0
 
+    stopped = False
     try:
         for idx in title_targets:
+            if should_stop and should_stop():
+                stopped = True
+                break
             item = updated_items[idx]
             title_zh = translate_title_to_zh(item.title, llm, chat=chat_fn)
             if not title_zh:
                 continue
             updated_items[idx] = item.model_copy(update={"title_zh": title_zh})
             changed += 1
+            _persist_hot_topics_snapshot(path, snapshot, updated_items)
             logger.info(
                 "translate hot title url=%s zh=%s",
                 item.url[:120],
                 title_zh[:80],
             )
 
-        for idx in summary_targets:
-            item = updated_items[idx]
-            url = item.url.strip()
-            logger.info(
-                "deep_summarize hot url=%s model=%s",
-                url[:120],
-                llm.model,
-            )
-            fallback_body = (item.summary or "").strip() or None
-            pair = summarize_adhd_pair(
-                title=item.title,
-                url=url,
-                source=item.source,
-                llm=llm,
-                http=http,
-                max_chars=chars,
-                fetch_body=fetch_body,
-                chat=chat_fn,
-                fallback_body=fallback_body,
-            )
-            updates: dict[str, object] | None
-            if pair is None:
-                translated = _hot_topic_summary_translate_fallback(
-                    item,
-                    llm,
-                    chat=chat_fn,
+        if not stopped:
+            for idx in summary_targets:
+                if should_stop and should_stop():
+                    stopped = True
+                    break
+                item = updated_items[idx]
+                url = item.url.strip()
+                logger.info(
+                    "deep_summarize hot url=%s model=%s",
+                    url[:120],
+                    llm.model,
                 )
-                if translated is None:
-                    continue
-                updates = dict(translated)
-            else:
-                en_summary, zh_summary = pair
-                updates = {
-                    "summary_en": en_summary or None,
-                    "summary_zh": zh_summary,
-                    "summary": zh_summary,
-                }
-            if _hot_topic_needs_title_zh(updated_items[idx]):
-                title_zh = translate_title_to_zh(item.title, llm, chat=chat_fn)
-                if title_zh:
-                    updates["title_zh"] = title_zh
-            updated_items[idx] = updated_items[idx].model_copy(update=updates)
-            changed += 1
+                fallback_body = (item.summary or "").strip() or None
+                pair = summarize_adhd_pair(
+                    title=item.title,
+                    url=url,
+                    source=item.source,
+                    llm=llm,
+                    http=http,
+                    max_chars=chars,
+                    fetch_body=fetch_body,
+                    chat=chat_fn,
+                    fallback_body=fallback_body,
+                    lang=lang,
+                )
+                updates: dict[str, object] | None = None
+                if pair is None:
+                    if lang in {"zh", "both"}:
+                        translated = _hot_topic_summary_translate_fallback(
+                            item,
+                            llm,
+                            chat=chat_fn,
+                        )
+                        if translated is not None:
+                            if lang == "zh":
+                                updates = {
+                                    "summary_zh": translated["summary_zh"],
+                                    "summary": translated["summary_zh"],
+                                }
+                            else:
+                                updates = dict(translated)
+                    if updates is None:
+                        continue
+                else:
+                    en_summary, zh_summary = pair
+                    if lang == "zh":
+                        updates = {
+                            "summary_zh": zh_summary,
+                            "summary": zh_summary,
+                        }
+                    elif lang == "en":
+                        updates = {"summary_en": en_summary or None}
+                    else:
+                        updates = {
+                            "summary_en": en_summary or None,
+                            "summary_zh": zh_summary,
+                            "summary": zh_summary,
+                        }
+                if lang in {"zh", "both"} and _hot_topic_needs_title_zh(
+                    updated_items[idx]
+                ):
+                    title_zh = translate_title_to_zh(item.title, llm, chat=chat_fn)
+                    if title_zh:
+                        updates["title_zh"] = title_zh
+                updated_items[idx] = updated_items[idx].model_copy(update=updates)
+                changed += 1
+                _persist_hot_topics_snapshot(path, snapshot, updated_items)
     finally:
         if owns_client:
             http.close()
 
-    if changed:
-        snapshot = snapshot.model_copy(update={"items": updated_items})
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
+    if stopped:
+        logger.info("deep_summarize hot topics stopped early changed=%s", changed)
     logger.info("deep_summarize hot topics changed=%s path=%s", changed, path)
     return path, changed
 

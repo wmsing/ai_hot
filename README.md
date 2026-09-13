@@ -1,95 +1,8 @@
 # ai_hot
 
-个人向 **AI 垂直热点定时巡检**：HN + Reddit + Google News + 官方/镜像 RSS → SQLite 去重 → `out/digest.md`（**UTC 当日累计**：同日只追加新 URL，条数单调不减；跨日重新起篇）。  
-静态站 **AI Hot Digest**（中文副标题「AI 热点摘要」）经 Cloudflare Workers（静态 Assets）发布。
+个人向 **AI 垂直热点定时巡检**：HN + Reddit + Google News + 官方/镜像 RSS → SQLite 去重 → `out/digest.md`（**UTC 当日累计**）→ 归档 `content/digests/` → 静态站 **AI Hot Digest**。
 
-website: [https://ai-hot.tonysingwm.workers.dev/](https://ai-hot.tonysingwm.workers.dev/)
-
-## 一键生成
-
-### 生成+译 → 归档 → 伴读（TTS）→ push）：
-
-```bash
-python -m src.main --llm qwen && python -m src.publish && python -m src.speak && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: archive digest $DAY" && git push
-```
-
-### 重新生成 ADHD 摘要 → 归档 → 伴读（TTS）→ push：
-
-```bash
-# 同时写 out/digest.md + out/digest.zh.md（ADHD 中/英摘要）；建议先跑上一节 main，保留中文标题
-# 单条：
-URL='https://www.autom.dev/blog/google-search-goto-links'
-python -m src.deep_summarize --url "$URL" && python -m src.publish && python -m src.speak --url "$URL" && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: adhd summarize $DAY" && git push
-
-# 批量（重复 --url；speak 会重生成这些条的中英 mp3）：
-URLS=(
-  'https://www.bbc.com/news/articles/c8r6y4me2g6o'
-  'https://merybenavente.me/blog/proof-of-capture'
-)
-ARGS=(); for u in "${URLS[@]}"; do ARGS+=(--url "$u"); done
-python -m src.deep_summarize "${ARGS[@]}" && python -m src.publish && python -m src.speak "${ARGS[@]}" && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: adhd summarize $DAY" && git push
-# 全量重打伴读：python -m src.speak --force
-```
-
-
-
-## 今日热搜
-### 最小：只拉榜
-``` bash
-python -m src.hot_topics_probe --top 30 --save
-```
-
-### 完整：拉榜 → 译标题 + 精写摘要
-``` bash
-python -m src.hot_topics_probe --top 30 --save
-python -m src.deep_summarize --hot-topics --llm qwen
-```
-
-### 只补写
-``` bash
-python -m src.deep_summarize --hot-topics --llm qwen
-```
-
-### 本地预览/建站
-```bash
-python -m src.site_build
-```
-
-
-## Deploy
-
-```bash
-source .venv/bin/activate
-
-## (最新) 生成+译 → 归档 → 伴读（TTS）→ push）：
-python -m src.main --llm qwen && python -m src.publish && python -m src.speak && DAY=$(date -u +%Y-%m-%d) && git add content/digests content/audio && git commit -m "content: archive digest $DAY" && git push
-
-## adhd style summary
-python -m src.deep_summarize --url 'https://openai.com/index/perplexity-improving-accuracy-with-astra' && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
-
-# only update content（本机 Ollama）
-python -m src.main --llm qwen && python -m src.publish
-
-# Grok / 云端：OpenRouter free（不依赖本机睡眠与 Ollama）
-# export LLM_PROVIDER=openrouter
-# export OPENROUTER_API_KEY=sk-or-...
-python -m src.main --llm openrouter && python -m src.publish
-
-# custom openrouter free model
-# check: https://openrouter.ai/models?variant=free&order=most-popular
-python -m src.main --llm nvidia/nemotron-3-ultra-550b-a55b:free && python -m src.publish
-
-# update content + publish
-python -m src.main --llm openrouter && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
-
-# EN 走 OpenRouter、中文译用本机 Ollama
-python -m src.main --llm openrouter --no-translate && LLM_PROVIDER=ollama python -m src.translate && python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push
-
-
-# local build 
-python -m src.main --llm qwen && python -m src.publish && python -m src.site_build
-
-```
+网站：[https://ai-hot.tonysingwm.workers.dev/](https://ai-hot.tonysingwm.workers.dev/)
 
 ## 快速开始
 
@@ -98,166 +11,112 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
-
-# 手动跑一次（v1 验收，模式 A：RSS 原生简介；含中文的 title/summary 会经 Ollama 译成英文再写入 digest.md）
-python -m src.main
-# 模式 B：入选条目用本地 Ollama（qwen）生成简介，并自动译成 out/digest.zh.md
-python -m src.main --llm qwen
-# 查看：out/digest.md 、 out/digest.zh.md ，库：data/ai_hot.db
-# 只生成英文、不译中文：python -m src.main --llm qwen --no-translate
-
-# 无可用摘要（n/a / 无内容 / 页面 junk）不写入 digest，站点也不展示
-
-# 强制重写 junk / 低质英文简介（如帮助中心导航垃圾）
-python -m src.resummarize                 # 只处理 junk
-python -m src.resummarize --llm openrouter
-python -m src.resummarize --url 'https://support.claude.com/...'
-# 改完 EN 后增量译中文：
-python -m src.translate
-
-# 整日重生成（今天 UTC）：只删 content/digests/ 不够
-# 真正挡重跑的是 out/digest.md（同日 URL merge）+ data/ai_hot.db（cooldown 去重）
-rm -f out/digest.md out/digest.zh.md
-rm -f data/ai_hot.db   # 可选：整库删除（不是“只删今天”）；放开 cooldown 内已见 URL
-                       # 去重只看近 24h，不会重写 content/digests/ 历史归档
-python -m src.main --llm qwen && python -m src.publish && python -m src.site_build
-# publish 会覆盖写入 content/digests/YYYY-MM-DD.{en,zh}.md
-
-# 仅增量译中文（如 resummarize 改完 EN 后）：python -m src.translate
-
-# 口播稿 + TTS 播放列表（需 edge-tts）
-pip install -e ".[speak]"
-python -m src.speak                             # 默认中英各生成（已有 mp3 跳过）
-python -m src.speak --url 'https://example.com/x'  # 只重生成该 URL 的 mp3（中英）
-python -m src.speak --lang zh --script-only   # 只写 out/speak.zh.md
-python -m src.speak --lang en                 # 只生成英文 TTS
-python -m src.speak --lang zh                 # 只生成中文 TTS
-python -m src.speak --force                   # 强制全量重生成（中英）
-python -m src.speak --limit 3                 # 调试前 3 条
-# 播放：打开 out/audio/<lang>/<UTC-day>/playlist.m3u
-# 站点伴读（中/英桌面+手机）；垫乐：content/audio/bgm.mp3（口播时自动压低）
-python -m src.site_build
-# 电脑浏览器打开（不要用手机局域网 IP）：
-#   http://127.0.0.1:8766/zh/  或  http://127.0.0.1:8766/
-# 上线：提交 content/audio 后 push main → Cloudflare 构建会带上伴读
 ```
 
-> 依赖：本机 Ollama 可用。中文源（如量子位）英文化失败时保留原文并打 warning。
-> 云端定时（推荐）：GitHub Actions `digest-schedule.yml`，港时 **07:00 / 12:00 / 21:00**（UTC `0 23,4,13 * * *`），走 OpenRouter；需 Repo Secret `OPENROUTER_API_KEY`。可在 Actions 里手动 Run workflow。
-> 本机 24h 备选 cron（港时同点，换成本机路径）：
+质量闭环：`pytest` · `mypy src` · `ruff check src`
+
+## Admin Portal（本地编辑）
+
+浏览器管理热搜与 Digest，避免手改 JSON/Markdown。
 
 ```bash
-0 7,12,21 * * * cd /path/to/ai_hot && .venv/bin/python -m src.main --llm openrouter && .venv/bin/python -m src.publish && DAY=$(date -u +%Y-%m-%d) && git add content/digests && git commit -m "content: archive digest $DAY" && git push >> /tmp/ai_hot.log 2>&1
+pip install -e ".[admin,dev]"
+python -m src.admin
+# → http://127.0.0.1:8787/
 ```
 
-## 静态站（旁路发布）
+| 功能 | 说明 |
+|------|------|
+| 今日热搜 | CRUD `content/hot_topics/latest.json` |
+| Digest 归档 | 按日编辑 `content/digests/YYYY-MM-DD.{en,zh}.md` |
+| 翻译全部标题 | 批量补 `title_zh`（跳过已有） |
+| **ADHD 摘要** | 只生成中文 ADHD（约 30 次 LLM/轮） |
+| **ADHD Summary** | 只生成英文 ADHD（约 30 次 LLM/轮） |
+| 行内 摘要 / EN | 单条按语种生成 |
+| **停止** | 遮罩层红色按钮；每条成功后立即落盘，已完成的保留 |
+| 重建站点 | 只读本地 `content/` 构建 `public/`（不重新 probe） |
+| 发布推送 | `git add content/*` → commit → push |
 
-`out/` 不进 git。要上网时手动归档 → 本地预览 → push（Actions 部署 Cloudflare）。
+**建议流程：** 编辑/生成 ADHD → **重建站点** 预览 → **发布推送** 上线。
+
+> 翻译与 ADHD 任务互斥（同时只跑一个）。中断后再点同语种按钮，只处理缺失条目。
+
+## CLI 流水线
+
+### Digest：生成 → 归档 → 伴读 → push
 
 ```bash
-# 1) 按 UTC 日归档到 content/digests/YYYY-MM-DD.{en,zh}.md（同日覆盖为当日累计全文）
-python -m src.publish
-# 指定日期：python -m src.publish --day 2026-09-10
-
-# 2) 本地构建预览
-python -m src.site_build
-# 打开 public/index.html 、 public/zh/index.html
-
-# 3) 手动提交并推送（触发 Actions）
-git add content/digests
-git commit -m "content: archive digest YYYY-MM-DD"
-git push
+python -m src.main --llm qwen && python -m src.publish && python -m src.speak \
+  && DAY=$(date -u +%Y-%m-%d) \
+  && git add content/digests content/audio \
+  && git commit -m "content: archive digest $DAY" && git push
 ```
 
-### Cloudflare 一次性配置
+### Digest：单条/批量 ADHD 精写
 
-仓库根目录有 `wrangler.toml`（项目名 `ai-hot`，静态目录 `public/`）。Dashboard 里的 `ai-hot` 是 **Worker**，不是经典 Pages——Deploy 用 `wrangler deploy`，不要用 `wrangler pages deploy`。
+```bash
+# 单条
+URL='https://example.com/article'
+python -m src.deep_summarize --url "$URL" \
+  && python -m src.publish && python -m src.speak --url "$URL" \
+  && git add content/digests content/audio && git commit -m "content: adhd summarize" && git push
 
-**方式 A：Cloudflare 直连 Git（当前用法）**
+# 批量（重复 --url；speak 会重生成这些条的中英 mp3）
+URLS=(
+  'https://example.com/a'
+  'https://example.com/b'
+)
+ARGS=(); for u in "${URLS[@]}"; do ARGS+=(--url "$u"); done
+python -m src.deep_summarize "${ARGS[@]}" \
+  && python -m src.publish && python -m src.speak "${ARGS[@]}" \
+  && git add content/digests content/audio && git commit -m "content: adhd summarize" && git push
+```
 
-1. Workers & Pages → 项目 `ai-hot` → Settings → Builds
-2. Build command：`pip install -e . && python -m src.site_build`
-3. Deploy command：`npx wrangler deploy`
-4. Root directory：留空（不要填 `/`）
-5. Variables：`CLOUDFLARE_API_TOKEN`（Edit Cloudflare Workers 模板即可）
+### 今日热搜（CLI）
 
-**方式 B：GitHub Actions**
+```bash
+python -m src.hot_topics_probe --top 30 --save          # 拉榜
+python -m src.deep_summarize --hot-topics --llm qwen    # ADHD 中+英（CLI 无分语种）
+python -m src.site_build                                # 本地预览
+```
 
-1. Repo secrets：`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`
-2. Workflow：`.github/workflows/deploy-cloudflare.yml`（`content/**` 或站点代码变更时构建并部署）
+快照：`content/hot_topics/latest.json`。`config.yaml` → `hot_topics.deep_summarize: true` 时 `site_build` 可自动精写（`deep_summarize_top_n: 0` = 全部）。
 
-自定义域在项目 Settings → Domains 绑定。
+### 其他常用
 
-**不做：** GitHub Pages 主站、自动 `git push`（后续再上）。
+```bash
+python -m src.main --llm openrouter          # 云端 LLM（需 OPENROUTER_API_KEY）
+python -m src.translate                      # 增量译中文
+python -m src.resummarize --llm qwen         # 重写 junk 摘要
+pip install -e ".[speak]" && python -m src.speak   # TTS 伴读
+```
+
+## 发布
+
+`out/` 不进 git。归档 → 本地构建 → push（Actions 部署 Cloudflare）。
+
+```bash
+python -m src.publish              # → content/digests/YYYY-MM-DD.{en,zh}.md
+python -m src.site_build           # → public/
+git add content/digests && git commit -m "content: archive digest YYYY-MM-DD" && git push
+```
+
+**Cloudflare（当前）：** Workers + `wrangler.toml`。Build：`pip install -e . && python -m src.site_build`；Deploy：`npx wrangler deploy`。详见仓库内 wrangler / Actions 配置。
+
+定时：GitHub Actions `digest-schedule.yml`，港时 **07:00 / 12:00 / 21:00**（需 Secret `OPENROUTER_API_KEY`）。
 
 ## 配置
 
-- 业务阈值 / RSS / 站点：`config.yaml`（可进 git）
-- 密钥 / 环境：`.env`（勿提交）；Repo Secret `OPENROUTER_API_KEY` 供 Actions 定时；本地可设 `LLM_PROVIDER=openrouter`
-- 静态站含 About / Privacy / Disclosure；`site.affiliate_enabled` 已开。PartnerStack 前请在 `config.yaml` 填 `owner_name` / `contact_email` 后重新部署。
-- Anthropic 无官方 RSS，当前用社区镜像，可在 `config.yaml` 替换
+- 业务阈值 / RSS / 站点：`config.yaml`
+- 密钥：`.env`（勿提交）；Actions 用 `OPENROUTER_API_KEY`
+- Threads 热搜：`.env` 的 `THREADS_ACCESS_TOKEN` + `config.yaml` `threads.enabled: true`
 
-## 质量闭环
+## 扫描源
 
-```bash
-pytest
-mypy src
-ruff check src && ruff format --check src
-```
+均在 `config.yaml`：HN · Reddit · Google News RSS · OpenAI / Google AI / DeepMind / Anthropic（镜像）/ Hugging Face / NVIDIA / Apple / 量子位 等。
 
-## v1 非目标
+**未扫（后置）：** X/Twitter、国内热搜、推送渠道。
 
-推送、数字人视频/唇形、发帖（YT/抖音/小红书）、接 ai_host、AdSense。
-口播稿 + TTS 播放列表可用（`python -m src.speak`）。
-联盟 CTA 仅骨架（默认关），不自动匹配商品。
+## 非目标（v1）
 
-## 热门话题 Probe（跨源打分）
-
-免费源：HN + Reddit JSON + Google News RSS；（可选）Google Trends 日榜/related、Threads Keyword Search。
-
-```bash
-# 终端查看 Top 20
-python -m src.hot_topics_probe --top 20 --save
-
-# 构建静态站（自动 probe + 写入「今日热搜」页）
-python -m src.site_build
-# 打开 public/zh/hot.html 或 public/hot.html
-
-# 对热搜 Top 5 跑 ADHD 精写（需本地 Ollama 或 OpenRouter）
-python -m src.hot_topics_probe --top 20 --save
-python -m src.deep_summarize --hot-topics --llm qwen
-python -m src.site_build
-
-# 单条热搜 URL
-python -m src.deep_summarize --hot-topics --url 'https://example.com/article' --llm qwen
-```
-
-站点导航 Tab：**今日热搜**（中文）/ **Trending**（英文）。快照默认写入 `content/hot_topics/latest.json`。  
-`config.yaml` → `hot_topics.deep_summarize: true` 时，`site_build` 会自动精写热搜快照（`deep_summarize_top_n: 0` = 全部；设正整数则只精写前 N 条）。
-
-Threads 需 `.env` 的 `THREADS_ACCESS_TOKEN` 且 `config.yaml` 中 `threads.enabled: true`。Trends 失败会自动跳过。
-
-## 当前扫描源
-
-均在 `config.yaml`，可随时增删：
-
-
-| 源   | 平台 / 站点              | 入口                                                                                                                                                                                       |
-| --- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| HN  | Hacker News          | Firebase API Top 30（`score≥100` 且 `comments≥20`）                                                                                                                                         |
-| Reddit | r/MachineLearning 等 | 公开 JSON，失败回退 Atom RSS（`top?t=day`，每轮 `max_new_total`） |
-| Google News | AI 中英查询 RSS | `news.google.com/rss/search`（每轮 `max_new_total`） |
-| RSS | OpenAI News          | [https://openai.com/news/rss.xml](https://openai.com/news/rss.xml)                                                                                                                       |
-| RSS | Google AI Blog       | [https://blog.google/innovation-and-ai/technology/ai/rss/](https://blog.google/innovation-and-ai/technology/ai/rss/)                                                                     |
-| RSS | Google DeepMind Blog | [https://deepmind.google/blog/rss.xml](https://deepmind.google/blog/rss.xml)                                                                                                             |
-| RSS | Anthropic News（社区镜像） | [https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml](https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml) |
-| RSS | Hugging Face Blog    | [https://huggingface.co/blog/feed.xml](https://huggingface.co/blog/feed.xml)                                                                                                             |
-| RSS | NVIDIA AI Platforms  | [https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml](https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml)                                                         |
-| RSS | Apple Newsroom       | [https://www.apple.com/newsroom/rss-feed.rss](https://www.apple.com/newsroom/rss-feed.rss)                                                                                               |
-| RSS | Apple ML Research    | [https://machinelearning.apple.com/rss.xml](https://machinelearning.apple.com/rss.xml)（展示 tag：`Paper` / `论文`）                                                                            |
-| RSS | 量子位（关键词过滤）           | [https://www.qbitai.com/feed](https://www.qbitai.com/feed)                                                                                                                               |
-
-
-关键词（仅 `qbitai`）：见 `config.yaml` 中该 feed 的 `keywords`（MiniMax / Seedance / Kimi / 通义 等）。
-
-**未扫（后置）：** X/Twitter、Seed/MiniMax 官方 HTML、国内热搜、推送渠道。
+推送、数字人视频、自动发帖、AdSense。口播 + TTS 可用（`python -m src.speak`）。

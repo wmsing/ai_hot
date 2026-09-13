@@ -21,6 +21,28 @@ from src.models import (
 logger = logging.getLogger(__name__)
 
 
+def load_arena_boards_from_cache(
+    cfg: LeaderboardConfig,
+    *,
+    cache_dir: Path,
+) -> list[ArenaLeaderboard]:
+    """仅从本地缓存读 Arena 榜，不访问网络。"""
+    if not cfg.enabled or not cfg.boards:
+        return []
+    results: list[ArenaLeaderboard] = []
+    for board in cfg.boards:
+        name = board.strip()
+        if not name:
+            continue
+        payload = _load_cache(cache_dir, name)
+        if payload is None:
+            continue
+        snap = parse_arena_payload(payload, cfg, board=name)
+        if snap is not None:
+            results.append(snap)
+    return results
+
+
 def fetch_arena_boards(
     cfg: LeaderboardConfig,
     http: HttpConfig | None = None,

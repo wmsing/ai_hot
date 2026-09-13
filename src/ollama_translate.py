@@ -13,7 +13,12 @@ from src.digest import (
     parse_hot_items,
     write_digest,
 )
-from src.llm import build_llm_runtime, resolve_provider, runtime_from_ollama
+from src.llm import (
+    build_llm_runtime,
+    resolve_llm_model,
+    resolve_provider,
+    runtime_from_ollama,
+)
 from src.models import AppConfig, HotItem, LlmRuntime, OllamaConfig
 from src.ollama_client import llm_chat
 from src.textutil import contains_cjk
@@ -39,6 +44,7 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
 
     已有 digest.zh.md 中同 URL 条目复用 title/summary，只翻译新增 URL。
     新增条目按 ollama.translate_batch_size 分批调用 LLM，避免大包超时。
+    每批成功后立即写入 digest.zh.md，中断后重跑会跳过已落盘的中文 URL。
     model 非空时覆盖 config 默认模型；含 `/` 或 `:free` 时走 openrouter。
     """
     src = Path(config.paths.digest_path)
@@ -62,10 +68,13 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
             need.append(item)
 
     provider = resolve_provider(model, config)
+    resolved_model = (
+        resolve_llm_model(model, config, provider=provider) if model else None
+    )
     runtime = build_llm_runtime(
         config,
         provider=provider,
-        model=model,
+        model=resolved_model,
         api_key=settings.openrouter_api_key,
     )
     batch_size = max(1, int(config.ollama.translate_batch_size))
@@ -94,7 +103,28 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
             chinese_chunk = translate_markdown(english_chunk, runtime)
             _, translated_items = parse_hot_items(chinese_chunk)
             translated_by_url.update(_align_translated(batch, translated_items))
+            final = _build_final_items(en_items, translated_by_url, zh_by_url)
+            write_digest(dst, final, generated_at=generated_at)
+            logger.info(
+                "checkpoint batch %s/%s wrote %s (items=%s)",
+                batch_i,
+                total_batches,
+                dst,
+                len(final),
+            )
+    else:
+        final = _build_final_items(en_items, translated_by_url, zh_by_url)
+        write_digest(dst, final, generated_at=generated_at)
+        logger.info("wrote %s (items=%s)", dst, len(final))
+    return dst
 
+
+def _build_final_items(
+    en_items: list[HotItem],
+    translated_by_url: dict[str, HotItem],
+    zh_by_url: dict[str, HotItem],
+) -> list[HotItem]:
+    """按英文 digest 顺序合并：本轮新译 > 已有中文 > 英文占位。"""
     final: list[HotItem] = []
     for item in en_items:
         if item.url in translated_by_url:
@@ -113,19 +143,22 @@ def translate_digest_file(config: AppConfig, *, model: str | None = None) -> Pat
             )
         else:
             final.append(item)
-
-    write_digest(dst, final, generated_at=generated_at)
-    logger.info("wrote %s (items=%s)", dst, len(final))
-    return dst
+    return final
 
 
 def _usable_zh(item: HotItem) -> bool:
-    """已有中文 digest 条目：title 或 summary 含汉字才复用，避免英文占位被跳过。"""
+    """已有中文 digest 条目：标题必须含汉字；摘要/口播若存在也需含汉字。"""
     if not item.title.strip():
+        return False
+    if not contains_cjk(item.title):
         return False
     summary = (item.summary or "").strip()
     speak = (item.speak_summary or "").strip()
-    return contains_cjk(item.title) or contains_cjk(summary) or contains_cjk(speak)
+    if summary and not contains_cjk(summary):
+        return False
+    if speak and not contains_cjk(speak):
+        return False
+    return True
 
 
 def _align_translated(

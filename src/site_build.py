@@ -15,8 +15,10 @@ from pathlib import Path
 from src.config import load_app_config
 from src.deep_summarize import hot_topic_display_title
 from src.digest import _parse_score_line, has_usable_digest_summary
-from src.leaderboard import fetch_arena_boards
+from src.digest_days import DayFiles, list_digest_days
+from src.leaderboard import fetch_arena_boards, load_arena_boards_from_cache
 from src.models import (
+    AppConfig,
     ArenaLeaderboard,
     DigestDocument,
     DigestItem,
@@ -27,7 +29,6 @@ from src.models import (
 from src.site_parse import parse_digest_markdown
 from src.timeutil import format_published, parse_published
 
-_DIGEST_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})\.(en|zh)\.md$")
 _ITEM_MP3_RE = re.compile(r"^(\d{3})\.mp3$")
 _YT_WATCH_RE = re.compile(
     r"(?:youtube\.com/watch\?(?:[^#]*&)?v=|youtu\.be/)([A-Za-z0-9_-]{11})",
@@ -97,13 +98,6 @@ _BOARD_TITLES: dict[str, tuple[str, str]] = {
 
 
 @dataclass(frozen=True)
-class DayFiles:
-    day: date
-    en: Path | None
-    zh: Path | None
-
-
-@dataclass(frozen=True)
 class TimelineEntry:
     """首页时间线条目：group_day 为 UTC 发布日（sticky 用）。"""
 
@@ -149,7 +143,7 @@ def build_site(
     """
     cfg = site if site is not None else SiteConfig()
     boards = arena_boards if arena_boards is not None else []
-    days = _scan_days(content_dir)
+    days = list_digest_days(content_dir)
     origin = _origin(cfg)
     sitemap_urls: list[str] = []
     if output_dir.exists():
@@ -427,25 +421,6 @@ def _links_root(lang: str, *, lang_other: str) -> PageLinks:
         lang_other=lang_other,
         brand_home="index.html",
     )
-
-
-def _scan_days(content_dir: Path) -> list[DayFiles]:
-    if not content_dir.is_dir():
-        return []
-    by_day: dict[date, dict[str, Path]] = {}
-    for path in sorted(content_dir.iterdir()):
-        if not path.is_file():
-            continue
-        match = _DIGEST_NAME_RE.match(path.name)
-        if not match:
-            continue
-        day = date.fromisoformat(match.group(1))
-        by_day.setdefault(day, {})[match.group(2)] = path
-    return [
-        DayFiles(day=day, en=files.get("en"), zh=files.get("zh"))
-        for day in sorted(by_day.keys(), reverse=True)
-        for files in [by_day[day]]
-    ]
 
 
 def _load_doc(path: Path | None) -> DigestDocument | None:
@@ -2796,6 +2771,39 @@ def _stylesheet() -> str:
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build AI Hot Digest static site.")
     return parser.parse_args(argv)
+
+
+def build_site_from_content(config: AppConfig | None = None) -> Path:
+    """仅从本地 content/ 生成 public/，不拉取热搜或 Arena。"""
+    from src.hot_topics_probe import load_hot_topics_snapshot
+
+    cfg = config or load_app_config()
+    boards = load_arena_boards_from_cache(
+        cfg.leaderboard,
+        cache_dir=Path(cfg.paths.arena_cache_dir),
+    )
+    hot_path = Path(cfg.paths.hot_topics_path)
+    hot_snapshot = load_hot_topics_snapshot(hot_path) or HotTopicSnapshot()
+    output_dir = Path(cfg.paths.site_output_dir).resolve()
+
+    def _audio_base(path: Path) -> Path:
+        return path.parent if path.name in {"zh", "en"} else path
+
+    content_audio = _audio_base(Path(cfg.paths.content_audio_dir))
+    speak_audio = _audio_base(Path(cfg.paths.speak_audio_dir))
+    build_site(
+        content_dir=Path(cfg.paths.content_digests_dir),
+        output_dir=output_dir,
+        site=cfg.site,
+        arena_boards=boards,
+        hot_topics=hot_snapshot,
+        audio_dirs_by_lang={
+            "zh": [content_audio / "zh", speak_audio / "zh"],
+            "en": [content_audio / "en", speak_audio / "en"],
+        },
+        bgm_path=content_audio / "bgm.mp3",
+    )
+    return output_dir
 
 
 def main(argv: list[str] | None = None) -> int:

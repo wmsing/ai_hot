@@ -1,0 +1,365 @@
+:root {
+  --bg: #0d0f17;
+  --bg-elev: rgba(255, 255, 255, 0.05);
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #a5b4fc;
+  --accent-hot: #c4b5fd;
+  --line: rgba(255, 255, 255, 0.12);
+  --danger: #f87171;
+  --ok: #4ade80;
+  --radius: 12px;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(165, 180, 252, 0.08), transparent);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.meta {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.tab.active {
+  color: var(--ink);
+  border-color: var(--accent);
+  background: var(--bg-elev);
+}
+
+main {
+  padding: 1rem 1.5rem 2rem;
+}
+
+.panel {
+  display: none;
+}
+
+.panel.active {
+  display: block;
+  position: relative;
+}
+
+.panel-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(8, 10, 18, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.panel-busy-overlay.hidden {
+  display: none;
+}
+
+.panel-busy-card {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  padding: 1.5rem 2rem;
+  border: 1px solid rgba(165, 180, 252, 0.35);
+  border-radius: calc(var(--radius) + 4px);
+  background: rgba(22, 26, 40, 0.98);
+  color: var(--ink);
+  min-width: 240px;
+  max-width: min(360px, 92vw);
+  text-align: center;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+.panel-busy-card p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid rgba(148, 163, 184, 0.22);
+  border-top-color: #c4b5fd;
+  border-right-color: #a5b4fc;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  box-shadow: 0 0 18px rgba(165, 180, 252, 0.35);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body.panel-busy-open {
+  overflow: hidden;
+}
+
+.panel.is-busy {
+  pointer-events: none;
+  user-select: none;
+}
+
+.panel.is-busy .panel-busy-overlay {
+  pointer-events: auto;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.toolbar label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.toolbar select {
+  margin-left: 0.5rem;
+  background: var(--bg-elev);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+}
+
+.btn {
+  background: var(--bg-elev);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: transparent;
+}
+
+.btn.ghost {
+  background: transparent;
+}
+
+.btn.danger {
+  color: var(--danger);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.cell-title {
+  max-width: 280px;
+  word-break: break-word;
+}
+
+.cell-url {
+  max-width: 220px;
+  word-break: break-all;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.cell-feed {
+  max-width: 140px;
+  word-break: break-word;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.audio-cell {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 180px;
+}
+
+.audio-cell audio {
+  width: 180px;
+  height: 28px;
+}
+
+.audio-link {
+  color: var(--accent);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.audio-link:hover {
+  text-decoration: underline;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: 1px solid var(--line);
+}
+
+.badge.ok {
+  color: var(--ok);
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.badge.no {
+  color: var(--muted);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.job-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+  max-width: 280px;
+}
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #12151f;
+  color: var(--ink);
+  width: min(640px, 92vw);
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+#edit-form {
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+#edit-form h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.edit-fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.edit-fields label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.edit-fields input,
+.edit-fields textarea {
+  width: 100%;
+  background: var(--bg-elev);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+
+.edit-fields textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}

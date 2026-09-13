@@ -758,6 +758,107 @@ def test_translate_digest_file_batches_llm_calls(
     assert "条目 5" in out
 
 
+def test_translate_digest_file_checkpoint_after_each_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.digest import write_digest as real_write_digest
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    blocks = [
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\nSelected: 4\n"
+    ]
+    for i in range(1, 5):
+        blocks.append(
+            f"## {i}. Item {i}\n\n- source: `hn`\n"
+            f"- url: https://ex.example/{i}\n- summary: body {i}\n"
+        )
+    src.write_text("\n".join(blocks), encoding="utf-8")
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct", translate_batch_size=2),
+    )
+    writes: list[int] = []
+
+    def _tracking_write_digest(path, items, **kwargs: object) -> None:
+        writes.append(len(items))
+        real_write_digest(path, items, **kwargs)
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        assert isinstance(llm, LlmRuntime)
+        return text.replace("Item ", "条目 ")
+
+    monkeypatch.setattr("src.ollama_translate.write_digest", _tracking_write_digest)
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg)
+    assert writes == [4, 4]
+    final = dst.read_text(encoding="utf-8")
+    assert "条目 4" in final
+    assert "Item 4" not in final
+
+
+def test_translate_digest_file_resumes_after_partial_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    src.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+        "Selected: 4\n\n"
+        "## 1. Item 1\n\n- source: `hn`\n- url: https://ex.example/1\n"
+        "- summary: body 1\n\n"
+        "## 2. Item 2\n\n- source: `hn`\n- url: https://ex.example/2\n"
+        "- summary: body 2\n\n"
+        "## 3. Item 3\n\n- source: `hn`\n- url: https://ex.example/3\n"
+        "- summary: body 3\n\n"
+        "## 4. Item 4\n\n- source: `hn`\n- url: https://ex.example/4\n"
+        "- summary: body 4\n",
+        encoding="utf-8",
+    )
+    dst.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+        "Selected: 4\n\n"
+        "## 1. 条目 1\n\n- source: `hn`\n- url: https://ex.example/1\n"
+        "- summary: 正文 1\n\n"
+        "## 2. 条目 2\n\n- source: `hn`\n- url: https://ex.example/2\n"
+        "- summary: 正文 2\n\n"
+        "## 3. Item 3\n\n- source: `hn`\n- url: https://ex.example/3\n"
+        "- summary: body 3\n\n"
+        "## 4. Item 4\n\n- source: `hn`\n- url: https://ex.example/4\n"
+        "- summary: body 4\n",
+        encoding="utf-8",
+    )
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct", translate_batch_size=2),
+    )
+    calls: list[str] = []
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        calls.append(text)
+        assert isinstance(llm, LlmRuntime)
+        assert "https://ex.example/1" not in text
+        assert "https://ex.example/2" not in text
+        assert "https://ex.example/3" in text
+        assert "https://ex.example/4" in text
+        return text.replace("Item ", "条目 ").replace("body ", "正文 ")
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg)
+    assert len(calls) == 1
+    out = dst.read_text(encoding="utf-8")
+    assert "条目 3" in out
+    assert "正文 4" in out
+    assert "Item 4" not in out
+
+
 def test_translate_digest_file_retries_english_placeholder_zh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -801,6 +902,75 @@ def test_translate_digest_file_retries_english_placeholder_zh(
     assert "已是中文" in out
     assert "已是中文摘要" in out
     assert "still english summary" not in out
+
+
+def test_usable_zh_requires_cjk_title() -> None:
+    from src.models import HotItem
+    from src.ollama_translate import _usable_zh
+
+    assert not _usable_zh(
+        HotItem(
+            source="hn",
+            title="Apple unveils iPhone Duo",
+            url="https://a.example/x",
+            summary="苹果发布新款 iPhone。",
+        )
+    )
+    assert _usable_zh(
+        HotItem(
+            source="hn",
+            title="苹果发布 iPhone Duo",
+            url="https://a.example/x",
+            summary="苹果发布新款 iPhone。",
+        )
+    )
+
+
+def test_translate_digest_file_retries_english_title_with_chinese_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    src.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. Apple unveils iPhone Duo\n\n- source: `rss:apple_newsroom`\n"
+        "- url: https://a.example/iphone\n"
+        "- summary: Apple shipped a new iPhone model.\n",
+        encoding="utf-8",
+    )
+    dst.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+        "Selected: 1\n\n"
+        "## 1. Apple unveils iPhone Duo\n\n- source: `rss:apple_newsroom`\n"
+        "- url: https://a.example/iphone\n"
+        "- summary: 苹果发布了新款 iPhone。\n",
+        encoding="utf-8",
+    )
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3:4b-instruct"),
+    )
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        assert "Apple unveils iPhone Duo" in text
+        return (
+            "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T01:00:00+00:00\n"
+            "Selected: 1\n\n"
+            "## 1. 苹果发布 iPhone Duo\n\n- source: `rss:apple_newsroom`\n"
+            "- url: https://a.example/iphone\n"
+            "- summary: 苹果发布了新款 iPhone。\n"
+        )
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg)
+    out = dst.read_text(encoding="utf-8")
+    assert "苹果发布 iPhone Duo" in out
+    assert "Apple unveils iPhone Duo" not in out
 
 
 def test_translate_digest_file_no_llm_when_all_reused(
@@ -879,6 +1049,43 @@ def test_translate_digest_file_model_override(
     assert seen == ["nvidia/nemotron-3-ultra-550b-a55b:free"]
 
 
+def test_translate_digest_file_resolves_qwen_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.models import AppConfig, LlmRuntime, OllamaConfig, PathsConfig
+    from src.ollama_translate import translate_digest_file
+
+    src = tmp_path / "digest.md"
+    dst = tmp_path / "digest.zh.md"
+    src.write_text(
+        "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+        "Selected: 1\n\n## 1. Hi\n\n- source: `hn`\n"
+        "- url: https://y.com\n- summary: hi\n",
+        encoding="utf-8",
+    )
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(src), digest_zh_path=str(dst)),
+        ollama=OllamaConfig(model="qwen3.5:9b"),
+    )
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+    seen: list[str] = []
+
+    def _fake_translate(text: str, llm: LlmRuntime | OllamaConfig) -> str:
+        assert isinstance(llm, LlmRuntime)
+        seen.append(llm.model)
+        assert llm.provider == "ollama"
+        return (
+            "# ai_hot digest\n\nGenerated (UTC): 2026-09-11T00:00:00+00:00\n"
+            "Selected: 1\n\n## 1. 嗨\n\n- source: `hn`\n"
+            "- url: https://y.com\n- summary: 嗨\n"
+        )
+
+    monkeypatch.setattr("src.ollama_translate.translate_markdown", _fake_translate)
+    translate_digest_file(cfg, model="qwen")
+    assert seen == ["qwen3.5:9b"]
+
+
 def test_translate_cli_model_flag() -> None:
     from src.translate import _parse_args
 
@@ -914,7 +1121,7 @@ def test_main_runs_translate_after_digest(
     )
 
     assert main(["--llm", "qwen"]) == 0
-    assert calls == ["qwen"]
+    assert calls == ["qwen3:4b-instruct"]
 
     calls.clear()
     assert main(["--llm", "qwen", "--no-translate"]) == 0

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Hot Admin</title>
+    <link rel="stylesheet" href="/static/admin.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>AI Hot Admin</h1>
+        <p class="meta" id="meta-line">本地管理 · 热搜 + Digest</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="btn-build" class="btn primary" title="仅用本地 content/ 生成 public/，不拉取新热搜">重建站点</button>
+        <button id="btn-publish" class="btn">发布推送</button>
+        <span id="job-status" class="job-status"></span>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="hot">今日热搜</button>
+      <button class="tab" data-tab="digest">Digest 归档</button>
+    </nav>
+
+    <main>
+      <section id="panel-hot" class="panel active">
+        <div
+          id="hot-busy-overlay"
+          class="panel-busy-overlay hidden"
+          role="status"
+          aria-live="polite"
+          aria-hidden="true"
+        >
+          <div class="panel-busy-card">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="hot-busy-label">热搜 LLM 任务进行中…</p>
+            <button type="button" id="btn-hot-stop" class="btn danger hidden">停止</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button id="btn-hot-add" class="btn">新增条目</button>
+          <button id="btn-hot-translate-all" class="btn">翻译全部标题</button>
+          <button id="btn-hot-adhd-zh-all" class="btn">ADHD 摘要</button>
+          <button id="btn-hot-adhd-en-all" class="btn">ADHD Summary</button>
+          <button id="btn-hot-refresh" class="btn ghost">刷新</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>heat</th>
+                <th>title</th>
+                <th>title_zh</th>
+                <th>feed</th>
+                <th>ADHD</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="hot-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="panel-digest" class="panel">
+        <div
+          id="digest-busy-overlay"
+          class="panel-busy-overlay hidden"
+          role="status"
+          aria-live="polite"
+          aria-hidden="true"
+        >
+          <div class="panel-busy-card">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="digest-busy-label">Digest LLM 任务进行中…</p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <label>
+            日期
+            <select id="digest-day"></select>
+          </label>
+          <button id="btn-digest-add" class="btn">新增条目</button>
+          <button id="btn-digest-refresh" class="btn ghost">刷新</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>tag</th>
+                <th>feed</th>
+                <th>title (en)</th>
+                <th>title (zh)</th>
+                <th>url</th>
+                <th>mp3</th>
+                <th>ADHD</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="digest-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="edit-dialog">
+      <form id="edit-form" method="dialog">
+        <h2 id="edit-title">编辑</h2>
+        <div id="edit-fields" class="edit-fields"></div>
+        <div class="dialog-actions">
+          <button type="button" id="btn-cancel" class="btn ghost">取消</button>
+          <button type="submit" class="btn primary">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/admin.js"></script>
+  </body>
+</html>
