@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 
 import httpx
 
+from src.google_news_url import decode_google_news_url, is_google_news_article_url
 from src.textutil import strip_html, truncate
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,15 @@ class _MetaParser(HTMLParser):
                 self.meta_description = content
 
 
+def _resolve_fetch_url(client: httpx.Client, url: str) -> str:
+    target = url.strip()
+    if is_google_news_article_url(target):
+        decoded = decode_google_news_url(client, target)
+        if decoded:
+            return decoded
+    return target
+
+
 def fetch_page_snippet(
     client: httpx.Client,
     url: str,
@@ -62,7 +72,7 @@ def fetch_page_snippet(
     max_chars: int = _DEFAULT_SNIPPET_CHARS,
 ) -> str | None:
     """抓取 URL，返回 OG/meta/正文片段；失败或无可用文本则 None。"""
-    target = url.strip()
+    target = _resolve_fetch_url(client, url)
     if not target.startswith(("http://", "https://")):
         return None
     try:
@@ -86,7 +96,7 @@ def fetch_page_body(
     max_chars: int = _DEFAULT_BODY_CHARS,
 ) -> str | None:
     """抓取 URL，返回 article/main 优先的长正文；失败或过短则 None。"""
-    target = url.strip()
+    target = _resolve_fetch_url(client, url)
     if not target.startswith(("http://", "https://")):
         return None
     try:

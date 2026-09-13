@@ -9,6 +9,7 @@ from urllib.parse import quote_plus, urlencode
 import feedparser
 import httpx
 
+from src.google_news_url import decode_google_news_url
 from src.models import GoogleNewsConfig, GoogleNewsQuery, HotItem
 from src.textutil import strip_html, truncate
 from src.timeutil import from_rss_entry
@@ -59,6 +60,13 @@ def fetch_google_news_candidates(
             link = str(getattr(entry, "link", "") or "").strip()
             if not title or not link:
                 continue
+            article_url = decode_google_news_url(client, link) or link
+            if article_url != link:
+                logger.info(
+                    "google_news resolved url name=%s rank=%s",
+                    query.name,
+                    rank,
+                )
             # 位次越前 engagement 越高（供跨源打分）
             engagement = max(cfg.max_per_query - rank + 1, 1) * 10
             summary_raw = str(
@@ -71,7 +79,7 @@ def fetch_google_news_candidates(
                 HotItem(
                     source=f"google_news:{query.name}",
                     title=title,
-                    url=link,
+                    url=article_url,
                     score=engagement,
                     comments=0,
                     summary=summary,
