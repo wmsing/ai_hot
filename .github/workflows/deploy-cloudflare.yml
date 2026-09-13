@@ -32,7 +32,7 @@ jobs:
         run: pip install -e .
 
       - name: Build static site
-        run: python -m src.site_build
+        run: python -m src.site_build --content-only
 
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3

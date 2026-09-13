@@ -74,3 +74,65 @@ Selected: 1
     assert "Local build" in html
     hot_zh = (public / "zh" / "hot.html").read_text(encoding="utf-8")
     assert "保留中文" in hot_zh
+
+
+def test_site_build_cli_content_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.site_build import main
+
+    content = tmp_path / "content"
+    digests = content / "digests"
+    hot = content / "hot_topics"
+    arena = content / "arena"
+    public = tmp_path / "public"
+    for d in (digests, hot, arena, public):
+        d.mkdir(parents=True)
+
+    (digests / "2026-09-13.en.md").write_text(
+        """# ai_hot digest
+
+Generated (UTC): 2026-09-13T10:00:00+00:00
+Selected: 1
+
+## 1. CLI build
+
+- source: `manual`
+- url: https://example.com/cli
+- summary: cli summary
+""",
+        encoding="utf-8",
+    )
+    (hot / "latest.json").write_text(
+        """{
+  "generated_at": "2026-09-13T10:00:00Z",
+  "items": [{
+    "heat": 1.0,
+    "source": "manual",
+    "title": "CLI hot",
+    "url": "https://example.com/hot-cli",
+    "sources": [],
+    "reason": "test"
+  }]
+}""",
+        encoding="utf-8",
+    )
+
+    def _fail_probe(*args: object, **kwargs: object) -> object:
+        raise AssertionError("run_probe should not run with --content-only")
+
+    monkeypatch.setattr("src.hot_topics_probe.run_probe", _fail_probe)
+    monkeypatch.setenv("AI_HOT_CONFIG", str(tmp_path / "missing-config.yaml"))
+    cfg = AppConfig(
+        paths=PathsConfig(
+            content_digests_dir=str(digests),
+            hot_topics_path=str(hot / "latest.json"),
+            arena_cache_dir=str(arena),
+            site_output_dir=str(public),
+        ),
+        site=SiteConfig(base_url="https://example.com"),
+    )
+    monkeypatch.setattr("src.site_build.load_app_config", lambda: cfg)
+
+    assert main(["--content-only"]) == 0
+    assert "CLI hot" in (public / "hot.html").read_text(encoding="utf-8")

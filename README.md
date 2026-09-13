@@ -101,7 +101,7 @@ python -m src.site_build           # → public/
 git add content/digests && git commit -m "content: archive digest YYYY-MM-DD" && git push
 ```
 
-**Cloudflare（当前）：** Workers + `wrangler.toml`。Build：`pip install -e . && python -m src.site_build`；Deploy：`npx wrangler deploy`。详见仓库内 wrangler / Actions 配置。
+**Cloudflare（当前）：** Workers + `wrangler.toml`。Build：`pip install -e . && python -m src.site_build --content-only`；Deploy：`npx wrangler deploy`。详见仓库内 wrangler / Actions 配置。
 
 定时：GitHub Actions `digest-schedule.yml`，港时 **07:00 / 12:00 / 21:00**（需 Secret `OPENROUTER_API_KEY`）。
 

@@ -2770,6 +2770,11 @@ def _stylesheet() -> str:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build AI Hot Digest static site.")
+    parser.add_argument(
+        "--content-only",
+        action="store_true",
+        help="Only read local content/ (no hot probe or live arena fetch).",
+    )
     return parser.parse_args(argv)
 
 
@@ -2806,8 +2811,21 @@ def build_site_from_content(config: AppConfig | None = None) -> Path:
     return output_dir
 
 
+def _print_build_paths(output_dir: Path) -> None:
+    home = output_dir / "index.html"
+    home_zh = output_dir / "zh" / "index.html"
+    print(f"[ai_hot] site built → {output_dir}/")
+    print(f"[ai_hot] open: {home.as_uri()}")
+    if home_zh.is_file():
+        print(f"[ai_hot] open zh: {home_zh.as_uri()}")
+
+
 def main(argv: list[str] | None = None) -> int:
-    _parse_args(argv)
+    args = _parse_args(argv)
+    if args.content_only:
+        output_dir = build_site_from_content()
+        _print_build_paths(output_dir)
+        return 0
     config = load_app_config()
     boards = fetch_arena_boards(
         config.leaderboard,
@@ -2868,12 +2886,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         bgm_path=content_audio / "bgm.mp3",
     )
-    home = output_dir / "index.html"
-    home_zh = output_dir / "zh" / "index.html"
-    print(f"[ai_hot] site built → {output_dir}/")
-    print(f"[ai_hot] open: {home.as_uri()}")
-    if home_zh.is_file():
-        print(f"[ai_hot] open zh: {home_zh.as_uri()}")
+    _print_build_paths(output_dir)
     return 0
 
 
