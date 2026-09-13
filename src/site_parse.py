@@ -43,6 +43,15 @@ def _append_multiline_field(current: dict[str, str | int], line: str) -> None:
         current[last] = f"{prev}\n{line}".strip() if prev else line
 
 
+def _append_multiline_blank(current: dict[str, str | int]) -> None:
+    """保留 summary / speak 段落之间的空行。"""
+    last = current.get("_last_field")
+    if isinstance(last, str) and last in {"summary", "speak_summary"}:
+        prev = str(current.get(last, ""))
+        if prev:
+            current[last] = f"{prev}\n"
+
+
 def parse_digest_markdown(text: str) -> DigestDocument:
     """容错解析 digest markdown；缺字段时留空。"""
     lines = text.splitlines()
@@ -64,8 +73,8 @@ def parse_digest_markdown(text: str) -> DigestDocument:
                 url=str(current.get("url", "")),
                 published=str(current.get("published", "")),
                 score_line=str(current.get("score_line", "")),
-                summary=str(current.get("summary", "")),
-                speak_summary=str(current.get("speak_summary", "")).strip(),
+                summary=str(current.get("summary", "")).rstrip("\n"),
+                speak_summary=str(current.get("speak_summary", "")).strip().rstrip("\n"),
                 tag=str(current.get("tag", "")).strip(),
                 reason=str(current.get("reason", "")),
                 affiliate_url=str(current.get("affiliate_url", "")).strip(),
@@ -77,6 +86,8 @@ def parse_digest_markdown(text: str) -> DigestDocument:
     for raw in lines:
         line = raw.strip()
         if not line:
+            if current is not None:
+                _append_multiline_blank(current)
             continue
         if line.startswith("# ") and not line.startswith("## "):
             title = line[2:].strip()

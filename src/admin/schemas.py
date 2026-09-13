@@ -45,9 +45,19 @@ class AdhdHotTopicRequest(BaseModel):
 
 
 class AdhdHotTopicsAllRequest(BaseModel):
+    urls: list[str] | None = None
     force: bool = False
     llm: str | None = None
     lang: AdhdLang = "zh"
+
+
+class PullDataRequest(BaseModel):
+    llm: str | None = None
+
+
+class CopyHotTopicToDigestRequest(BaseModel):
+    url: str
+    day: str | None = None
 
 
 class TranslateHotTopicTitlesRequest(BaseModel):
@@ -56,9 +66,34 @@ class TranslateHotTopicTitlesRequest(BaseModel):
     llm: str | None = None
 
 
+class TranslateDigestTitlesRequest(BaseModel):
+    indices: list[int] | None = None
+    force: bool = False
+    llm: str | None = None
+
+
+class TranslateDigestSummariesRequest(BaseModel):
+    indices: list[int] | None = None
+    force: bool = False
+    llm: str | None = None
+
+
 class AdhdDigestRequest(BaseModel):
     force: bool = False
     llm: str | None = None
+
+
+class AdhdDigestBatchRequest(BaseModel):
+    indices: list[int]
+    force: bool = False
+    llm: str | None = None
+
+
+class DigestSpeakRequest(BaseModel):
+    indices: list[int] | None = None
+    urls: list[str] | None = None
+    langs: list[Literal["en", "zh"]] | None = None
+    force: bool = False
 
 
 class DigestItemCreate(BaseModel):
@@ -91,11 +126,15 @@ class DigestItemUpdate(BaseModel):
     image_url: str | None = None
 
 
+AudioSyncStatus = Literal["ok", "stale", "missing"]
+
+
 class AudioFileOut(BaseModel):
     content_path: str | None = None
     out_path: str | None = None
     play_url: str | None = None
     exists: bool = False
+    sync_status: AudioSyncStatus = "missing"
 
 
 class MergedDigestItemOut(BaseModel):
@@ -113,6 +152,9 @@ class MergedDigestItemOut(BaseModel):
     tag: str = ""
     image_url: str = ""
     has_adhd: bool = False
+    hot_topic_match: bool = False
+    can_copy_hot_adhd: bool = False
+    archive_day: str | None = None
     audio_en: AudioFileOut = Field(default_factory=AudioFileOut)
     audio_zh: AudioFileOut = Field(default_factory=AudioFileOut)
 
@@ -120,6 +162,11 @@ class MergedDigestItemOut(BaseModel):
 class DigestDayOut(BaseModel):
     day: str
     generated_at: str
+    items: list[MergedDigestItemOut]
+
+
+class DigestTimelineDayOut(BaseModel):
+    published_day: str
     items: list[MergedDigestItemOut]
 
 

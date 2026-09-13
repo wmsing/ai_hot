@@ -79,7 +79,10 @@ def run_job(job: Job, fn: Callable[[], dict[str, Any]]) -> None:
             result = fn()
             with _lock:
                 job.result = result
-                _set_status(job, "done", "ok")
+                if job.cancel_requested:
+                    _set_status(job, "cancelled", "stopped by user")
+                else:
+                    _set_status(job, "done", "ok")
         except Exception as exc:
             with _lock:
                 _set_status(job, "error", str(exc))

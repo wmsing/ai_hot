@@ -68,6 +68,26 @@ Selected: 1
     assert doc.items[0].speak_summary == "一句话总结 第二行亮点"
 
 
+def test_parse_multiline_summary_preserves_blank_lines() -> None:
+    from src.site_parse import parse_digest_markdown
+
+    text = """# ai_hot digest
+
+Generated (UTC): 2026-09-12T00:00:00+00:00
+Selected: 1
+
+## 1. Title
+
+- source: `hn`
+- url: https://example.com/x
+- summary: line one
+
+line two
+"""
+    doc = parse_digest_markdown(text)
+    assert doc.items[0].summary == "line one\n\nline two"
+
+
 def test_parse_adhd_summary_bullet_lines() -> None:
     from src.site_parse import parse_digest_markdown
 

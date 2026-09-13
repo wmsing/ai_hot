@@ -190,6 +190,75 @@ def test_normalize_adhd_summary_strips_tldr() -> None:
     assert "🔥 Key takeaways\n" in en_out
 
 
+def test_deep_summarize_persists_each_item_before_stop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src import deep_summarize as mod
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    en = tmp_path / "digest.md"
+    zh = tmp_path / "digest.zh.md"
+    a = "https://example.com/a"
+    b = "https://example.com/b"
+    generated = datetime(2026, 9, 12, 12, 0, tzinfo=timezone.utc)
+    write_digest(
+        en,
+        [
+            _item(a, "First EN", "old en a"),
+            _item(b, "Second EN", "old en b"),
+        ],
+        generated_at=generated,
+    )
+    write_digest(
+        zh,
+        [
+            _item(a, "第一条", "旧摘要 A"),
+            _item(b, "第二条", "旧摘要 B"),
+        ],
+        generated_at=generated,
+    )
+    cfg = AppConfig(
+        paths=PathsConfig(digest_path=str(en), digest_zh_path=str(zh)),
+        ollama=OllamaConfig(model="qwen3.5:9b"),
+    )
+    calls = {"n": 0}
+
+    def _fake_fetch(client: object, url: str, *, max_chars: int = 8000) -> str:
+        return "Article body with enough text for ADHD summarization. " * 12
+
+    def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
+        if "核心亮点" in system:
+            return "⚡️ 一句话总结\n第一条已写入。\n\n🔥 核心亮点\n✅ 一点\n"
+        return "⚡️ One-liner\nFirst item saved.\n\n🔥 Key takeaways\n✅ One\n"
+
+    def _should_stop() -> bool:
+        calls["n"] += 1
+        return calls["n"] > 1
+
+    _, _, n = mod.deep_summarize_digest(
+        cfg,
+        urls=[a, b],
+        runtime=LlmRuntime(
+            provider="ollama",
+            model="qwen3.5:9b",
+            base_url="http://127.0.0.1:11434",
+            timeout_seconds=1,
+            api_key="",
+        ),
+        client=object(),  # type: ignore[arg-type]
+        fetch_body=_fake_fetch,
+        chat=_fake_chat,
+        should_stop=_should_stop,
+    )
+    assert n == 1
+    zh_text = zh.read_text(encoding="utf-8")
+    en_text = en.read_text(encoding="utf-8")
+    assert "一句话总结" in zh_text
+    assert "One-liner" in en_text
+    assert "旧摘要 B" in zh_text
+    assert "old en b" in en_text
+
+
 def test_deep_summarize_requires_url_in_digest(tmp_path: Path) -> None:
     from src import deep_summarize as mod
 

@@ -10,24 +10,32 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.admin.schemas import (
+    AdhdDigestBatchRequest,
     AdhdDigestRequest,
     AdhdHotTopicRequest,
     AdhdHotTopicsAllRequest,
     AudioFileOut,
+    CopyHotTopicToDigestRequest,
     DigestDayOut,
     DigestItemCreate,
     DigestItemUpdate,
+    DigestSpeakRequest,
+    DigestTimelineDayOut,
     HotTopicCreate,
     HotTopicUpdate,
     JobOut,
     MergedDigestItemOut,
     PublishRequest,
+    PullDataRequest,
+    TranslateDigestSummariesRequest,
+    TranslateDigestTitlesRequest,
     TranslateHotTopicTitlesRequest,
     UrlBody,
 )
 from src.admin.services.adhd import (
     generate_all_hot_topic_adhd,
     generate_digest_adhd,
+    generate_digest_adhd_batch,
     generate_hot_topic_adhd,
     run_site_build,
 )
@@ -35,6 +43,15 @@ from src.admin.services.audio import (
     AudioFileInfo,
     resolve_item_audio,
     resolve_play_path,
+)
+from src.admin.services.copy_hot_to_digest import (
+    build_hot_topics_url_index,
+    copy_hot_topic_to_digest,
+    match_hot_topic_for_digest,
+)
+from src.admin.services.digest_timeline import (
+    list_published_days,
+    rows_for_published_day,
 )
 from src.admin.services.jobs import (
     HotTopicsBusyError,
@@ -46,12 +63,20 @@ from src.admin.services.jobs import (
     run_hot_topics_llm_job,
     run_job,
 )
+from src.admin.services.probe import run_pull_data
 from src.admin.services.publish import publish_push, publish_status
-from src.admin.services.translate import translate_all_hot_topic_titles
+from src.admin.services.speak import digest_audio_status, run_digest_speak
+from src.admin.services.translate import (
+    translate_all_hot_topic_titles,
+    translate_digest_day_summaries,
+    translate_digest_day_titles,
+)
 from src.admin.stores import digest as digest_store
 from src.admin.stores import hot_topics as hot_topics_store
 from src.config import load_app_config
-from src.models import HotTopicSnapshot
+from src.models import DigestItem, HotTopicSnapshot, HotTopicSnapshotItem
+from src.normalize import normalize_url
+from src.speak_fingerprint import speak_voice_rate
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -70,16 +95,54 @@ def _audio_out(info: AudioFileInfo) -> AudioFileOut:
         out_path=info.out_path,
         play_url=info.play_url,
         exists=info.exists,
+        sync_status=info.sync_status,
     )
+
+
+def _hot_topics_index() -> dict[str, HotTopicSnapshotItem]:
+    return build_hot_topics_url_index(_hot_topics_path())
 
 
 def _merged_out(
     item: digest_store.MergedDigestItem,
     *,
     day: date,
+    hot_topics_by_url: dict[str, HotTopicSnapshotItem] | None = None,
+    archive_day: date | None = None,
 ) -> MergedDigestItemOut:
     config = load_app_config()
-    audio = resolve_item_audio(config.paths, day=day, index=item.index)
+    voice_en, rate = speak_voice_rate(config, "en")
+    voice_zh, _ = speak_voice_rate(config, "zh")
+    en_item = DigestItem(
+        index=item.index,
+        title=item.title_en,
+        url=item.url,
+        source=item.source,
+        summary=item.summary_en,
+        speak_summary=item.speak_en,
+    )
+    zh_item = DigestItem(
+        index=item.index,
+        title=item.title_zh,
+        url=item.url,
+        source=item.source,
+        summary=item.summary_zh,
+        speak_summary=item.speak_zh,
+    )
+    audio = resolve_item_audio(
+        config.paths,
+        day=day,
+        index=item.index,
+        item_en=en_item,
+        item_zh=zh_item,
+        voice_en=voice_en,
+        voice_zh=voice_zh,
+        rate=rate,
+    )
+    hot_item = None
+    if hot_topics_by_url is not None:
+        hot_item = hot_topics_by_url.get(normalize_url(item.url))
+    hot_match, can_copy = match_hot_topic_for_digest(item, hot_item)
     return MergedDigestItemOut(
         index=item.index,
         title_en=item.title_en,
@@ -96,6 +159,9 @@ def _merged_out(
         image_url=item.image_url,
         has_adhd=digest_store.has_adhd_summary(item.summary_en)
         or digest_store.has_adhd_summary(item.summary_zh),
+        hot_topic_match=hot_match,
+        can_copy_hot_adhd=can_copy,
+        archive_day=(archive_day or day).isoformat(),
         audio_en=_audio_out(audio["en"]),
         audio_zh=_audio_out(audio["zh"]),
     )
@@ -144,6 +210,21 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    @app.post("/api/hot-topics/items/copy-to-digest")
+    def hot_topic_copy_to_digest(
+        body: CopyHotTopicToDigestRequest,
+    ) -> dict[str, object]:
+        config = load_app_config()
+        day_value = date.fromisoformat(body.day) if body.day else None
+        try:
+            return copy_hot_topic_to_digest(
+                config,
+                day=day_value,
+                url=body.url,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     @app.post("/api/hot-topics/translate-titles", response_model=JobOut)
     def hot_topic_translate_titles(body: TranslateHotTopicTitlesRequest) -> JobOut:
         config = load_app_config()
@@ -178,6 +259,7 @@ def create_app() -> FastAPI:
         def _run() -> dict[str, object]:
             return generate_all_hot_topic_adhd(
                 config,
+                urls=body.urls,
                 force=body.force,
                 llm_flag=body.llm,
                 lang=body.lang,
@@ -227,6 +309,110 @@ def create_app() -> FastAPI:
     def digest_days() -> list[str]:
         return [d.isoformat() for d in digest_store.list_days(_digests_dir())]
 
+    @app.get("/api/digest-timeline/days")
+    def digest_timeline_days() -> list[str]:
+        return [d.isoformat() for d in list_published_days(_digests_dir())]
+
+    @app.get(
+        "/api/digest-timeline/{published_day}",
+        response_model=DigestTimelineDayOut,
+    )
+    def digest_timeline_day(published_day: str) -> DigestTimelineDayOut:
+        day_value = date.fromisoformat(published_day)
+        hot_index = _hot_topics_index()
+        rows = rows_for_published_day(_digests_dir(), day_value)
+        return DigestTimelineDayOut(
+            published_day=published_day,
+            items=[
+                _merged_out(
+                    row.item,
+                    day=row.archive_day,
+                    archive_day=row.archive_day,
+                    hot_topics_by_url=hot_index,
+                )
+                for row in rows
+            ],
+        )
+
+    @app.post(
+        "/api/digest-timeline/{published_day}/translate-titles",
+        response_model=JobOut,
+    )
+    def digest_timeline_translate_titles(
+        published_day: str, body: TranslateDigestTitlesRequest
+    ) -> JobOut:
+        config = load_app_config()
+        published_value = date.fromisoformat(published_day)
+        job = create_job("digest_timeline_translate_titles")
+
+        def _run() -> dict[str, object]:
+            rows = rows_for_published_day(_digests_dir(), published_value)
+            index_filter = {idx for idx in (body.indices or []) if idx > 0}
+            by_archive: dict[date, list[int]] = {}
+            for row in rows:
+                if index_filter and row.item.index not in index_filter:
+                    continue
+                by_archive.setdefault(row.archive_day, []).append(row.item.index)
+            changed = 0
+            for archive_day, indices in by_archive.items():
+                result = translate_digest_day_titles(
+                    config,
+                    day=archive_day,
+                    indices=indices,
+                    force=body.force,
+                    llm_flag=body.llm,
+                    should_stop=lambda: job_should_stop(job.id),
+                )
+                changed += int(str(result["changed"]))
+            return {"published_day": published_day, "changed": changed}
+
+        run_job(job, _run)
+        return JobOut(
+            id=job.id,
+            kind=job.kind,
+            status=job.status,
+            message=job.message,
+            result=job.result,
+        )
+
+    @app.post(
+        "/api/digest-timeline/{published_day}/translate-summaries",
+        response_model=JobOut,
+    )
+    def digest_timeline_translate_summaries(
+        published_day: str, body: TranslateDigestSummariesRequest
+    ) -> JobOut:
+        config = load_app_config()
+        published_value = date.fromisoformat(published_day)
+        job = create_job("digest_timeline_translate_summaries")
+
+        def _run() -> dict[str, object]:
+            rows = rows_for_published_day(_digests_dir(), published_value)
+            by_archive: dict[date, list[int]] = {}
+            for row in rows:
+                by_archive.setdefault(row.archive_day, []).append(row.item.index)
+            changed = 0
+            for archive_day, indices in by_archive.items():
+                result = translate_digest_day_summaries(
+                    config,
+                    day=archive_day,
+                    indices=indices,
+                    force=body.force,
+                    llm_flag=body.llm,
+                    should_stop=lambda: job_should_stop(job.id),
+                )
+                changed += int(str(result["changed"]))
+            return {"published_day": published_day, "changed": changed}
+
+        run_job(job, _run)
+        return JobOut(
+            id=job.id,
+            kind=job.kind,
+            status=job.status,
+            message=job.message,
+            result=job.result,
+        )
+
     @app.get("/api/digests/{day}", response_model=DigestDayOut)
     def digest_day(day: str) -> DigestDayOut:
         try:
@@ -237,7 +423,10 @@ def create_app() -> FastAPI:
         return DigestDayOut(
             day=view.day.isoformat(),
             generated_at=view.generated_at,
-            items=[_merged_out(item, day=day_value) for item in view.items],
+            items=[
+                _merged_out(item, day=day_value, hot_topics_by_url=_hot_topics_index())
+                for item in view.items
+            ],
         )
 
     @app.post("/api/digests/{day}/items", response_model=MergedDigestItemOut)
@@ -248,7 +437,11 @@ def create_app() -> FastAPI:
             day_value,
             **body.model_dump(),
         )
-        return _merged_out(item, day=day_value)
+        return _merged_out(
+            item,
+            day=day_value,
+            hot_topics_by_url=_hot_topics_index(),
+        )
 
     @app.put("/api/digests/{day}/items/{index}", response_model=MergedDigestItemOut)
     def put_digest_item(
@@ -266,7 +459,24 @@ def create_app() -> FastAPI:
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return _merged_out(item, day=day_value)
+        return _merged_out(
+            item,
+            day=day_value,
+            hot_topics_by_url=_hot_topics_index(),
+        )
+
+    @app.post("/api/digests/{day}/items/{index}/copy-hot-adhd")
+    def digest_copy_hot_adhd(day: str, index: int) -> dict[str, object]:
+        config = load_app_config()
+        day_value = date.fromisoformat(day)
+        try:
+            url = digest_store.item_url(_digests_dir(), day_value, index)
+        except (FileNotFoundError, ValueError) as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        try:
+            return copy_hot_topic_to_digest(config, day=day_value, url=url)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.delete("/api/digests/{day}/items/{index}")
     def delete_digest_item(day: str, index: int) -> dict[str, bool]:
@@ -275,6 +485,120 @@ def create_app() -> FastAPI:
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return {"ok": True}
+
+    @app.post("/api/digests/{day}/translate-titles", response_model=JobOut)
+    def digest_translate_titles(day: str, body: TranslateDigestTitlesRequest) -> JobOut:
+        config = load_app_config()
+        day_value = date.fromisoformat(day)
+        job = create_job("digest_translate_titles")
+
+        def _run() -> dict[str, object]:
+            return translate_digest_day_titles(
+                config,
+                day=day_value,
+                indices=body.indices,
+                force=body.force,
+                llm_flag=body.llm,
+                should_stop=lambda: job_should_stop(job.id),
+            )
+
+        run_job(job, _run)
+        return JobOut(
+            id=job.id,
+            kind=job.kind,
+            status=job.status,
+            message=job.message,
+            result=job.result,
+        )
+
+    @app.post("/api/digests/{day}/translate-summaries", response_model=JobOut)
+    def digest_translate_summaries(
+        day: str, body: TranslateDigestSummariesRequest
+    ) -> JobOut:
+        config = load_app_config()
+        day_value = date.fromisoformat(day)
+        job = create_job("digest_translate_summaries")
+
+        def _run() -> dict[str, object]:
+            return translate_digest_day_summaries(
+                config,
+                day=day_value,
+                indices=body.indices,
+                force=body.force,
+                llm_flag=body.llm,
+                should_stop=lambda: job_should_stop(job.id),
+            )
+
+        run_job(job, _run)
+        return JobOut(
+            id=job.id,
+            kind=job.kind,
+            status=job.status,
+            message=job.message,
+            result=job.result,
+        )
+
+    @app.get("/api/digests/{day}/audio-status")
+    def digest_audio_status_route(day: str) -> dict[str, object]:
+        config = load_app_config()
+        day_value = date.fromisoformat(day)
+        try:
+            return digest_audio_status(config, day=day_value)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/digests/{day}/items/speak", response_model=JobOut)
+    def digest_speak(day: str, body: DigestSpeakRequest) -> JobOut:
+        config = load_app_config()
+        day_value = date.fromisoformat(day)
+        job = create_job("digest_speak")
+
+        def _run() -> dict[str, object]:
+            return run_digest_speak(
+                config,
+                day=day_value,
+                indices=body.indices,
+                urls=body.urls,
+                langs=body.langs,
+                force=body.force,
+                should_stop=lambda: job_should_stop(job.id),
+            )
+
+        run_job(job, _run)
+        return JobOut(
+            id=job.id,
+            kind=job.kind,
+            status=job.status,
+            message=job.message,
+            result=job.result,
+        )
+
+    @app.post("/api/digests/{day}/items/adhd-batch", response_model=JobOut)
+    def digest_adhd_batch(day: str, body: AdhdDigestBatchRequest) -> JobOut:
+        config = load_app_config()
+        day_value = date.fromisoformat(day)
+        if not body.indices:
+            raise HTTPException(status_code=400, detail="indices required")
+        job = create_job("digest_adhd_batch")
+
+        def _run() -> dict[str, object]:
+            return generate_digest_adhd_batch(
+                config,
+                day=day_value,
+                indices=body.indices,
+                force=body.force,
+                llm_flag=body.llm,
+                should_stop=lambda: job_should_stop(job.id),
+            )
+
+        run_job(job, _run)
+        return JobOut(
+            id=job.id,
+            kind=job.kind,
+            status=job.status,
+            message=job.message,
+            result=job.result,
+        )
 
     @app.post("/api/digests/{day}/items/{index}/adhd", response_model=JobOut)
     def digest_adhd(day: str, index: int, body: AdhdDigestRequest) -> JobOut:
@@ -315,6 +639,23 @@ def create_app() -> FastAPI:
 
         def _run() -> dict[str, object]:
             return publish_push(message=body.message)
+
+        run_job(job, _run)
+        return JobOut(
+            id=job.id,
+            kind=job.kind,
+            status=job.status,
+            message=job.message,
+            result=job.result,
+        )
+
+    @app.post("/api/pull", response_model=JobOut)
+    def pull_data(body: PullDataRequest) -> JobOut:
+        config = load_app_config()
+        job = create_job("pull")
+
+        def _run() -> dict[str, object]:
+            return run_pull_data(config, llm_flag=body.llm)
 
         run_job(job, _run)
         return JobOut(
@@ -380,9 +721,14 @@ def create_app() -> FastAPI:
             result=job.result,
         )
 
-    @app.get("/")
-    def index() -> FileResponse:
+    def _admin_index() -> FileResponse:
         return FileResponse(_STATIC_DIR / "index.html")
+
+    @app.get("/")
+    @app.get("/digest")
+    @app.get("/digest/{day}")
+    def index(day: str | None = None) -> FileResponse:
+        return _admin_index()
 
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
     return app

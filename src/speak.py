@@ -11,8 +11,16 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from src.config import load_app_config, settings
-from src.models import AppConfig, DigestDocument
+from src.models import AppConfig, DigestDocument, DigestItem
 from src.site_parse import parse_digest_markdown
+from src.speak_fingerprint import (
+    archive_mp3_path,
+    needs_tts_regeneration,
+    speak_clip_fingerprint,
+    speak_clip_text,
+    speak_voice_rate,
+    write_mp3_meta,
+)
 from src.speak_script import SpeakLang, format_item_speak, format_speak_document
 from src.speak_tts import synthesize
 
@@ -280,6 +288,91 @@ def run_speak(
     )
 
     return speak_path, audio_dir
+
+
+def _archive_digest_path(content_digests_dir: Path, day: date, lang: SpeakLang) -> Path:
+    return content_digests_dir / f"{day.isoformat()}.{lang}.md"
+
+
+def _item_matches_filter(
+    item: DigestItem,
+    *,
+    index_set: set[int] | None,
+    url_keys: set[str] | None,
+) -> bool:
+    if index_set is not None and item.index not in index_set:
+        return False
+    if url_keys is not None and _normalize_url(item.url) not in url_keys:
+        return False
+    return True
+
+
+def run_speak_archive(
+    config: AppConfig,
+    *,
+    day: date,
+    lang: SpeakLang,
+    indices: list[int] | None = None,
+    urls: list[str] | None = None,
+    force: bool = False,
+) -> dict[str, object]:
+    """从 content/digests 归档生成 mp3 到 content/audio（按归档日目录）。
+
+    仅当 force 或指纹 stale/missing 时重合成；indices/urls 为空则处理当日全部条目。
+    """
+    digests_dir = Path(config.paths.content_digests_dir)
+    src = _archive_digest_path(digests_dir, day, lang)
+    if not src.is_file():
+        raise FileNotFoundError(f"archive digest not found: {src}")
+    doc = parse_digest_markdown(src.read_text(encoding="utf-8"))
+    index_set = set(indices) if indices is not None else None
+    url_keys = (
+        {_normalize_url(u) for u in urls if u.strip()} if urls is not None else None
+    )
+    voice, rate = speak_voice_rate(config, lang)
+    generated = 0
+    skipped = 0
+    for item in doc.items:
+        if index_set is not None or url_keys is not None:
+            if not _item_matches_filter(item, index_set=index_set, url_keys=url_keys):
+                skipped += 1
+                continue
+        mp3_path = archive_mp3_path(
+            config.paths.content_audio_dir,
+            lang=lang,
+            day=day,
+            index=item.index,
+        )
+        if not needs_tts_regeneration(
+            item,
+            lang=lang,
+            mp3_path=mp3_path,
+            voice=voice,
+            rate=rate,
+            force=force,
+        ):
+            skipped += 1
+            continue
+        clip = speak_clip_text(item, lang=lang)
+        if not clip.strip():
+            skipped += 1
+            continue
+        mp3_path.parent.mkdir(parents=True, exist_ok=True)
+        synthesize(clip, mp3_path, voice=voice, rate=rate)
+        write_mp3_meta(
+            mp3_path,
+            hash_value=speak_clip_fingerprint(clip, voice=voice, rate=rate),
+            voice=voice,
+            rate=rate,
+        )
+        generated += 1
+        logger.info("archive tts %s #%s → %s", lang, item.index, mp3_path)
+    return {
+        "day": day.isoformat(),
+        "lang": lang,
+        "generated": generated,
+        "skipped": skipped,
+    }
 
 
 def _write_playlist(path: Path, clips: list[Path]) -> None:

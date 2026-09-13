@@ -13,7 +13,8 @@
         <p class="meta" id="meta-line">本地管理 · 热搜 + Digest</p>
       </div>
       <div class="topbar-actions">
-        <button id="btn-build" class="btn primary" title="仅用本地 content/ 生成 public/，不拉取新热搜">重建站点</button>
+        <button id="btn-pull" class="btn" title="从 HN/RSS 等拉取新数据，归档到 content/（覆盖当日 digest）">拉取数据</button>
+        <button id="btn-build" class="btn primary" title="仅用本地 content/ 生成 public/，不拉取新数据">重建站点</button>
         <button id="btn-publish" class="btn">发布推送</button>
         <span id="job-status" class="job-status"></span>
       </div>
@@ -44,12 +45,17 @@
           <button id="btn-hot-translate-all" class="btn">翻译全部标题</button>
           <button id="btn-hot-adhd-zh-all" class="btn">ADHD 摘要</button>
           <button id="btn-hot-adhd-en-all" class="btn">ADHD Summary</button>
+          <button id="btn-hot-adhd-zh-selected" class="btn" disabled>ADHD 选中</button>
+          <button id="btn-hot-adhd-en-selected" class="btn" disabled>ADHD Selected</button>
           <button id="btn-hot-refresh" class="btn ghost">刷新</button>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th class="col-check">
+                  <input type="checkbox" id="hot-select-all" aria-label="全选热搜" />
+                </th>
                 <th>heat</th>
                 <th>title</th>
                 <th>title_zh</th>
@@ -76,23 +82,44 @@
             <p id="digest-busy-label">Digest LLM 任务进行中…</p>
           </div>
         </div>
+        <div
+          id="digest-speak-busy-overlay"
+          class="panel-busy-overlay hidden"
+          role="status"
+          aria-live="polite"
+          aria-hidden="true"
+        >
+          <div class="panel-busy-card">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="digest-speak-busy-label">口播 mp3 生成中…</p>
+          </div>
+        </div>
         <div class="toolbar">
           <label>
-            日期
+            发布日
             <select id="digest-day"></select>
           </label>
           <button id="btn-digest-add" class="btn">新增条目</button>
+          <button id="btn-digest-translate-all" class="btn">翻译全部标题</button>
+          <button id="btn-digest-translate-summaries" class="btn">翻译全部摘要</button>
+          <button id="btn-digest-adhd-selected" class="btn" disabled>ADHD 选中</button>
+          <button id="btn-digest-speak-stale" class="btn">生成过期 mp3</button>
+          <button id="btn-digest-speak-selected" class="btn" disabled>生成选中 mp3</button>
           <button id="btn-digest-refresh" class="btn ghost">刷新</button>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th class="col-check">
+                  <input type="checkbox" id="digest-select-all" aria-label="全选 Digest" />
+                </th>
                 <th>#</th>
-                <th>tag</th>
                 <th>feed</th>
                 <th>title (en)</th>
                 <th>title (zh)</th>
+                <th>summary (en)</th>
+                <th>summary (zh)</th>
                 <th>url</th>
                 <th>mp3</th>
                 <th>ADHD</th>

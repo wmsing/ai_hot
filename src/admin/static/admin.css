@@ -161,6 +161,23 @@ body.panel-busy-open {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.col-check {
+  width: 2.25rem;
+  text-align: center;
+}
+
+.col-check input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .toolbar label {
@@ -243,6 +260,16 @@ tr:hover td {
   word-break: break-word;
 }
 
+.cell-summary {
+  display: block;
+  max-width: 280px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
 .cell-url {
   max-width: 220px;
   word-break: break-all;
@@ -293,6 +320,18 @@ tr:hover td {
 
 .badge.no {
   color: var(--muted);
+}
+
+.badge.stale {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.audio-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
 }
 
 .row-actions {
@@ -355,6 +394,13 @@ dialog::backdrop {
 .edit-fields textarea {
   min-height: 5rem;
   resize: vertical;
+  white-space: pre-wrap;
+}
+
+.edit-fields textarea.textarea-multiline {
+  min-height: 10rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.45;
 }
 
 .dialog-actions {

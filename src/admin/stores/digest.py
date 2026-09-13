@@ -10,6 +10,7 @@ from src.digest import write_digest_preserving_indices
 from src.digest_days import day_paths, day_write_paths, list_digest_days
 from src.models import DigestDocument, DigestItem
 from src.site_parse import parse_digest_markdown
+from src.speak_fingerprint import invalidate_archive_item_audio
 
 
 @dataclass(frozen=True)
@@ -264,6 +265,19 @@ def update_item(
             zh_doc,
             sorted(zh_map.values(), key=lambda it: it.index),
             generated_at=generated_at,
+        )
+    content_fields = (
+        title_en,
+        summary_en,
+        summary_zh,
+        speak_en,
+        speak_zh,
+    )
+    if any(v is not None for v in content_fields):
+        invalidate_archive_item_audio(
+            content_dir.parent / "audio",
+            day=day,
+            index=index,
         )
     return _merge_item(index, en_item, zh_item)
 

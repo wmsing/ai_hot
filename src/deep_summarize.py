@@ -361,6 +361,49 @@ def _hot_topic_has_adhd_summary(item: HotTopicSnapshotItem) -> bool:
     return bool(zh and en and contains_cjk(zh))
 
 
+def _build_zh_digest_items(
+    en_items: list[HotItem], zh_by_url: dict[str, HotItem]
+) -> list[HotItem]:
+    final_zh: list[HotItem] = []
+    for item in en_items:
+        key = _normalize_url(item.url)
+        prev = zh_by_url.get(key)
+        if prev is not None:
+            final_zh.append(
+                item.model_copy(
+                    update={
+                        "title": prev.title,
+                        "summary": prev.summary,
+                        "speak_summary": prev.speak_summary,
+                    }
+                )
+            )
+        else:
+            final_zh.append(item)
+    return final_zh
+
+
+def _persist_digest_item(
+    *,
+    en_path: Path,
+    zh_path: Path,
+    en_items: list[HotItem],
+    zh_by_url: dict[str, HotItem],
+    generated_at: datetime,
+    key: str,
+    en_item: HotItem,
+    zh_item: HotItem,
+) -> None:
+    for idx, item in enumerate(en_items):
+        if _normalize_url(item.url) == key:
+            en_items[idx] = en_item
+            break
+    zh_by_url[key] = zh_item
+    final_zh = _build_zh_digest_items(en_items, zh_by_url)
+    write_digest(en_path, en_items, generated_at=generated_at)
+    write_digest(zh_path, final_zh, generated_at=generated_at)
+
+
 def deep_summarize_digest(
     config: AppConfig,
     *,
@@ -373,8 +416,12 @@ def deep_summarize_digest(
     runtime: LlmRuntime | None = None,
     fetch_body: FetchBodyFn | None = None,
     chat: ChatFn | None = None,
+    should_stop: ShouldStopFn | None = None,
 ) -> tuple[Path, Path, int]:
-    """对指定 URL 抓全文并写回 en/zh digest；返回 (en_path, zh_path, changed)。"""
+    """对指定 URL 抓全文并写回 en/zh digest（逐条落盘）。
+
+    返回 (en_path, zh_path, changed)。
+    """
     url_list = [_normalize_url(u) for u in urls if u.strip()]
     if not url_list:
         raise ValueError("at least one --url is required")
@@ -419,11 +466,13 @@ def deep_summarize_digest(
     owns_client = client is None
     http = client or build_client(config.http)
     changed = 0
-    en_updates: dict[str, HotItem] = {}
-    zh_updates: dict[str, HotItem] = {}
+    stopped = False
 
     try:
         for key in url_list:
+            if should_stop and should_stop():
+                stopped = True
+                break
             item = en_by_url[key]
             url = item.url.strip()
             logger.info(
@@ -455,51 +504,46 @@ def deep_summarize_digest(
             else:
                 zh_title = item.title
             speak_zh = speak_plain(zh_summary)
-            en_updates[url] = item.model_copy(
+            en_item = item.model_copy(
                 update={
                     "summary": en_summary,
                     "speak_summary": speak_plain(en_summary) or None,
                 }
             )
-            zh_updates[url] = item.model_copy(
+            zh_item = item.model_copy(
                 update={
                     "title": zh_title,
                     "summary": zh_summary,
                     "speak_summary": speak_zh or None,
                 }
             )
+            _persist_digest_item(
+                en_path=en_path,
+                zh_path=zh_path,
+                en_items=en_items,
+                zh_by_url=zh_by_url,
+                generated_at=generated_at,
+                key=key,
+                en_item=en_item,
+                zh_item=zh_item,
+            )
+            en_by_url[key] = en_item
             changed += 1
+            logger.info(
+                "deep_summarize wrote item url=%s changed=%s",
+                url[:120],
+                changed,
+            )
     finally:
         if owns_client:
             http.close()
 
+    if stopped:
+        logger.info("deep_summarize digest stopped early changed=%s", changed)
     if not changed:
         logger.info("deep_summarize: nothing written")
         return en_path, zh_path, 0
 
-    final_en = [en_updates.get(item.url, item) for item in en_items]
-    write_digest(en_path, final_en, generated_at=generated_at)
-
-    final_zh: list[HotItem] = []
-    for item in final_en:
-        key = _normalize_url(item.url)
-        if item.url in zh_updates:
-            final_zh.append(zh_updates[item.url])
-            continue
-        prev = zh_by_url.get(key)
-        if prev is not None:
-            final_zh.append(
-                item.model_copy(
-                    update={
-                        "title": prev.title,
-                        "summary": prev.summary,
-                        "speak_summary": prev.speak_summary,
-                    }
-                )
-            )
-        else:
-            final_zh.append(item)
-    write_digest(zh_path, final_zh, generated_at=generated_at)
     logger.info(
         "deep_summarize wrote en=%s zh=%s changed=%s",
         en_path,
