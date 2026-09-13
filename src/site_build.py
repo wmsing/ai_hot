@@ -2144,11 +2144,10 @@ def _render_hot_item(item: HotTopicSnapshotItem, lang: str, *, index: int) -> st
         )
     else:
         bits.append(f"<h2>{title}</h2>")
-    summary = (
-        (item.summary_zh or item.summary or "")
-        if lang == "zh"
-        else (item.summary_en or item.summary or "")
-    ).strip()
+    if lang == "zh":
+        summary = (item.summary_zh or "").strip()
+    else:
+        summary = (item.summary_en or item.summary or "").strip()
     if summary:
         bits.append(f'<p class="summary">{_format_summary_html(summary)}</p>')
     if url:
@@ -2168,8 +2167,8 @@ def _render_hot_page(lang: str, site: SiteConfig, snapshot: HotTopicSnapshot) ->
         heading = "Trending Today"
         intro = (
             "Cross-source AI hot topics ranked by engagement, recency, and source "
-            "weight. Refreshed on each site build from HN, Reddit, Google News, "
-            "and optional Google Trends / Threads."
+            "weight. Served from published content/hot_topics/latest.json after "
+            "admin edits are pushed and deployed."
         )
         empty = "No trending topics available right now. Run the hot topics probe."
         updated = "Updated"
@@ -2178,8 +2177,8 @@ def _render_hot_page(lang: str, site: SiteConfig, snapshot: HotTopicSnapshot) ->
         heading = "今日热搜"
         intro = (
             "跨源 AI 热搜榜：按互动、时效与来源权重综合排序。"
-            "站点每次构建时从 HN、Reddit、Google News 等拉取；"
-            "可选 Google Trends / Threads。"
+            "数据来自已发布的 content/hot_topics/latest.json；"
+            "在 Admin 编辑后需发布推送并等待部署。"
         )
         empty = "暂无热搜数据。请先运行 hot topics probe。"
         updated = "更新于"

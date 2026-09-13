@@ -615,6 +615,38 @@ def test_build_site_hot_page(tmp_path: Path) -> None:
     assert "AI 数学对齐问题" not in zh_h2
 
 
+def test_build_site_hot_page_zh_skips_english_summary_fallback(tmp_path: Path) -> None:
+    content = tmp_path / "digests"
+    _seed_digests(content)
+    out = tmp_path / "public"
+    snapshot = HotTopicSnapshot(
+        generated_at=datetime(2026, 9, 12, 10, 0, tzinfo=timezone.utc),
+        items=[
+            HotTopicSnapshotItem(
+                heat=8.54,
+                source="reddit",
+                title="This seems more probable than it was before.",
+                title_zh="",
+                url="https://www.reddit.com/r/example/comments/abc",
+                score=1516,
+                comments=214,
+                summary="This seems more probable than it was before.",
+                summary_zh="",
+                summary_en="",
+            )
+        ],
+    )
+    build_site(
+        content_dir=content,
+        output_dir=out,
+        site=SiteConfig(base_url="https://example.test"),
+        hot_topics=snapshot,
+    )
+    hot_zh = (out / "zh" / "hot.html").read_text(encoding="utf-8")
+    assert "This seems more probable than it was before." in hot_zh
+    assert '<p class="summary">' not in hot_zh
+
+
 def test_build_site_hot_page_cross_source_badges(tmp_path: Path) -> None:
     content = tmp_path / "digests"
     _seed_digests(content)

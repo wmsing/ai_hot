@@ -15,6 +15,10 @@ on:
       - ".github/workflows/deploy-cloudflare.yml"
   workflow_dispatch:
 
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,6 +37,31 @@ jobs:
 
       - name: Build static site
         run: python -m src.site_build --content-only
+
+      - name: Verify hot page matches content
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          data = json.loads(Path("content/hot_topics/latest.json").read_text(encoding="utf-8"))
+          zh = Path("public/zh/hot.html").read_text(encoding="utf-8")
+          items = data.get("items") or []
+          if not items:
+              print("hot page verify skipped: empty snapshot")
+              raise SystemExit(0)
+          first = items[0]
+          title_zh = (first.get("title_zh") or "").strip()
+          if title_zh and title_zh not in zh:
+              print(f"missing title_zh in zh/hot.html: {title_zh[:120]}")
+              raise SystemExit(1)
+          summary_zh = (first.get("summary_zh") or "").strip()
+          if summary_zh and summary_zh not in zh:
+              print("missing summary_zh in zh/hot.html")
+              raise SystemExit(1)
+          print("hot page verify ok")
+          PY
 
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
