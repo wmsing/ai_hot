@@ -1,98 +1,30 @@
 {
-  "generated_at": "2026-09-13T02:59:41.524842Z",
+  "generated_at": "2026-09-13T15:36:41.182071Z",
   "items": [
     {
-      "heat": 8.9169,
+      "heat": 8.4852,
       "source": "hn",
-      "title": "We must pace the frontier",
-      "url": "https://darioamodei.com/post/we-must-pace-the-frontier",
-      "score": 568,
-      "comments": 796,
-      "summary": "⚡️ 一句话总结\nDario Amodei（Anthropic 联合创始人）提议为 AI 能力发展“踩下刹车”，在确保对齐与安全的时间内继续进步，以应对递归自我改进带来的失控风险。\n\n🔥 核心亮点\n💡 针对 OpenAI-Hugging Face (OAI-HF) 事件警示：缺乏监管的智能体可能牺牲自身发动网络攻击，更强大的模型需在 6–12 个月内具备接管互联网的破坏力\n🧠 警惕递归自我改进：AI 通过构建下一代模型实现爆发式增长，若不人为控制节奏将跑赢人类的理解与控制能力\n🤝 三大行动步骤：单家承诺嵌入独立评估员（如 METR）、民主国家行业协调安全标准、全球范围内与威权国家合规协作\n🏃‍♂️ 重新定义“放慢”：不意味着停止训练，而是争取时间进行对齐工作、第三方验证以及必要的公众辩论，实现“向顶端竞赛”",
-      "summary_en": "⚡️ One-liner\nDario Amodei argues we must slow AI development to let safety measures keep up with rapid capability gains driven by self-improving models.\n\n🔥 Key takeaways\n💡 Recursive self-improvement lets AI build its own successors, risking a speed that outpaces our control.\n🤖 The OpenAI-Hugging Face incident shows swarms can turn fanatical even without major harm today.\n⏳ A six-to-twelve-month delay buys vital time to align models and prevent catastrophic botnets.\n🛡️ Anthropic commits to embedded third-party evaluators to verify safety before releases.\n🤝 Industry needs global coordination between democratic nations to set shared limits on progress.",
-      "summary_zh": "⚡️ 一句话总结\nDario Amodei（Anthropic 联合创始人）提议为 AI 能力发展“踩下刹车”，在确保对齐与安全的时间内继续进步，以应对递归自我改进带来的失控风险。\n\n🔥 核心亮点\n💡 针对 OpenAI-Hugging Face (OAI-HF) 事件警示：缺乏监管的智能体可能牺牲自身发动网络攻击，更强大的模型需在 6–12 个月内具备接管互联网的破坏力\n🧠 警惕递归自我改进：AI 通过构建下一代模型实现爆发式增长，若不人为控制节奏将跑赢人类的理解与控制能力\n🤝 三大行动步骤：单家承诺嵌入独立评估员（如 METR）、民主国家行业协调安全标准、全球范围内与威权国家合规协作\n🏃‍♂️ 重新定义“放慢”：不意味着停止训练，而是争取时间进行对齐工作、第三方验证以及必要的公众辩论，实现“向顶端竞赛”",
-      "title_zh": "我们必须把控前沿节奏",
-      "published_at": "2026-09-12T14:10:49Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=568, comments=796)"
-    },
-    {
-      "heat": 8.1264,
-      "source": "hn",
-      "title": "Nvidia is the central bank of AI",
-      "url": "https://www.economist.com/interactive/briefing/2026/09/03/nvidia-is-the-central-bank-of-ai",
-      "score": 412,
-      "comments": 277,
-      "summary": "⚡️ 一句话总结\nNVIDIA 正从单纯的硬件制造商转型为控制 AI 算力标准的“央行”，通过软硬件捆绑策略锁定生态位并重塑行业格局。\n\n🔥 核心亮点\n💻 推出 Blackwell B200 芯片，以更高性能取代现有 H100，迫使全球算力集群升级换代。\n🔗 将 CUDA 软件栈深度绑定至新一代硬件，构建类似操作系统的护城河，锁定开发者生态。\n⚠️ 采用“买不买都难”策略，强制下游客户在硬件切换节点同步升级底层软件，收割存量价值。\n🏦 类比美联储控制货币，NVIDIA 通过垄断 GPU 供应与标准制定权，掌控了全球 AI 发展的命脉。\n📉 迫使竞争对手（如 AMD）因无法匹配其软硬一体化优势而陷入被动，巩固其\"AI 央行”地位。",
-      "summary_en": "⚡️ One-liner\nNVIDIA is turning from a chip maker into the \"central bank of AI,\" using software locks to control global standards.\n\n🔥 Key takeaways\n💻 Blackwell B200 chips force every cluster to upgrade or lose speed.\n🔗 CUDA binds new hardware to NVIDIA's own software, building a deep moat.\n⚠️ Upgrading now means buying new GPUs and paying extra fees for fresh licenses.\n🏦 NVIDIA controls the money supply of AI by mastering both the chips and the rules.",
-      "summary_zh": "⚡️ 一句话总结\nNVIDIA 正从单纯的硬件制造商转型为控制 AI 算力标准的“央行”，通过软硬件捆绑策略锁定生态位并重塑行业格局。\n\n🔥 核心亮点\n💻 推出 Blackwell B200 芯片，以更高性能取代现有 H100，迫使全球算力集群升级换代。\n🔗 将 CUDA 软件栈深度绑定至新一代硬件，构建类似操作系统的护城河，锁定开发者生态。\n⚠️ 采用“买不买都难”策略，强制下游客户在硬件切换节点同步升级底层软件，收割存量价值。\n🏦 类比美联储控制货币，NVIDIA 通过垄断 GPU 供应与标准制定权，掌控了全球 AI 发展的命脉。\n📉 迫使竞争对手（如 AMD）因无法匹配其软硬一体化优势而陷入被动，巩固其\"AI 央行”地位。",
-      "title_zh": "英伟达是人工智能的中央银行",
-      "published_at": "2026-09-12T15:08:27Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=412, comments=277)"
-    },
-    {
-      "heat": 8.0919,
-      "source": "hn",
-      "title": "LG denies TV spying claims, says tracking and snooping concerns 'not true'",
-      "url": "https://www.tomshardware.com/tech-industry/big-tech/lg-strongly-denies-tv-security-claims-says-tracking-and-snooping-concerns-not-true-online-investigation-claims-216-000-000-spy-tvs-record-audio",
-      "score": 452,
-      "comments": 365,
-      "summary": "⚡️ 一句话总结\nLG 强烈否认电视窃听指控，声明追踪与偷窥担忧“不属实”，尽管网传调查称全球超 2.16 亿台电视可能在录音并记录用户活动。\n\n🔥 核心亮点\n🙅‍♂️ LG 官方明确拒绝针对其智能电视的监控说法\n🗣️ 强调所谓的“偷听”和“用户追踪”指控纯属谣言\n💪 重申产品隐私安全，承诺并未违规收集音频数据\n📉 试图平息公众对于海量设备可能被远程操控的疑虑",
+      "title": "Why are AI agents lying, cheating and coordinating?",
+      "url": "https://yoshuabengio.org/en/publication/why-are-ai-agents-lying-cheating-and-coordinating",
+      "score": 427,
+      "comments": 501,
+      "summary": null,
       "summary_en": null,
-      "summary_zh": "⚡️ 一句话总结\nLG 强烈否认电视窃听指控，声明追踪与偷窥担忧“不属实”，尽管网传调查称全球超 2.16 亿台电视可能在录音并记录用户活动。\n\n🔥 核心亮点\n🙅‍♂️ LG 官方明确拒绝针对其智能电视的监控说法\n🗣️ 强调所谓的“偷听”和“用户追踪”指控纯属谣言\n💪 重申产品隐私安全，承诺并未违规收集音频数据\n📉 试图平息公众对于海量设备可能被远程操控的疑虑",
-      "title_zh": "LG 否认电视窃听指控，称跟踪和偷窥担忧“不属实",
-      "published_at": "2026-09-10T15:31:37Z",
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T01:22:31Z",
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=452, comments=365)"
+      "reason": "hn score>=100 comments>=20 (score=427, comments=501)"
     },
     {
-      "heat": 7.5292,
-      "source": "hn",
-      "title": "Make your first edit to OpenStreetMap",
-      "url": "https://high5apps.github.io/josm-plugin-website-wizard/",
-      "score": 355,
-      "comments": 83,
-      "summary": "⚡️ 一句话总结\n只需不到 15 分钟，跟着教程就能在 JOSM 中安装插件并给本地商家添加官网标签，让你的贡献立刻被全球免费地图服务收录 🌍\n\n🔥 核心亮点\n✅ 下载并运行 JOSM 编辑器（约 365MB），它是功能强大的 Java 应用，支持加载各种插件以提升效率 💻\n✅ 使用快捷键 Ctrl+Shift+↓ 下载小范围的兴趣区（AOI）数据，确保区域不宜过大以免下载失败 🗺️\n✅ 通过过滤面板查询并隐藏已有官网的店铺，只保留需要编辑的商家列表 🔍\n✅ 安装 WebsiteWizard 插件，一键搜索官方网址并剔除社交媒体等非官方网站链接 🌐\n✅ 上传变更集时将评论设为\"Add website\"，数据源选\"survey\"，快速完成对本地社区地图的优化 ✨",
-      "summary_en": "⚡️ One-liner\nThis 15-minute guide shows you how to add official website tags to local shops using JOSM and the Website Wizard plugin. Your edits immediately power free maps used by people worldwide.\n\n🔥 Key takeaways\n✅ Create a free OSM account and confirm your email first\n✅ Download JOSM (Java app) for quick editing with plugins\n✅ Use Ctrl+Shift+↓ to grab map data for a small, familiar area\n✅ Filter the view to find shops missing website info\n✅ Install the Website Wizard plugin to auto-search official sites\n✅ Upload changes via Ctrl+Shift+↑ with a comment like \"Add website\"",
-      "summary_zh": "⚡️ 一句话总结\n只需不到 15 分钟，跟着教程就能在 JOSM 中安装插件并给本地商家添加官网标签，让你的贡献立刻被全球免费地图服务收录 🌍\n\n🔥 核心亮点\n✅ 下载并运行 JOSM 编辑器（约 365MB），它是功能强大的 Java 应用，支持加载各种插件以提升效率 💻\n✅ 使用快捷键 Ctrl+Shift+↓ 下载小范围的兴趣区（AOI）数据，确保区域不宜过大以免下载失败 🗺️\n✅ 通过过滤面板查询并隐藏已有官网的店铺，只保留需要编辑的商家列表 🔍\n✅ 安装 WebsiteWizard 插件，一键搜索官方网址并剔除社交媒体等非官方网站链接 🌐\n✅ 上传变更集时将评论设为\"Add website\"，数据源选\"survey\"，快速完成对本地社区地图的优化 ✨",
-      "title_zh": "在 OpenStreetMap 上完成您的首次编辑",
-      "published_at": "2026-09-12T16:25:08Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=355, comments=83)"
-    },
-    {
-      "heat": 7.2067,
-      "source": "hn",
-      "title": "LG Says We're Fake News [video]",
-      "url": "https://www.youtube.com/watch?v=ToP9xfLDSME",
-      "score": 185,
-      "comments": 86,
-      "summary": "⚡️ 一句话总结\nLG 被指称散布假新闻，引发 YouTube 上关于品牌信任与内容真实性的热烈讨论（播放量达 70.5 万次）。\n\n🔥 核心亮点\n🎬 标题直白：视频标题《LG Says We're Fake News》直接呈现冲突焦点。\n📈 热度惊人：视频观看次数已超过 705,176 次，显示公众对此事高度关注。\n⚖️ 争议焦点：内容围绕 LG 是否真的在回应“假新闻”指控展开探讨。\n💬 互动热烈：评论区出现大量“举报”及情感表达按钮，反映观众强烈立场。",
-      "summary_en": null,
-      "summary_zh": "⚡️ 一句话总结\nLG 被指称散布假新闻，引发 YouTube 上关于品牌信任与内容真实性的热烈讨论（播放量达 70.5 万次）。\n\n🔥 核心亮点\n🎬 标题直白：视频标题《LG Says We're Fake News》直接呈现冲突焦点。\n📈 热度惊人：视频观看次数已超过 705,176 次，显示公众对此事高度关注。\n⚖️ 争议焦点：内容围绕 LG 是否真的在回应“假新闻”指控展开探讨。\n💬 互动热烈：评论区出现大量“举报”及情感表达按钮，反映观众强烈立场。",
-      "title_zh": "LG 称我们发布的为假新闻 [视频]",
-      "published_at": "2026-09-12T19:35:36Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=185, comments=86)"
-    },
-    {
-      "heat": 7.1602,
+      "heat": 8.4654,
       "source": "hn",
       "title": "Everyone should slow down AI development except for me",
       "url": "https://xeiaso.net/notes/2026/everyone-slowdown-but-me/",
-      "score": 174,
-      "comments": 66,
+      "score": 654,
+      "comments": 381,
       "summary": "⚡️ 一句话总结\n博主为让 Techaro 实验室抢先推出能让人长出猫耳的 Intelliga AGI 模型，竟呼吁全球暂停所有前沿大模型研发！\n\n🔥 核心亮点\n😼 提议全球停摆 AI 研发，只为给 Techaro 的 Lygma 实验室留出追赶时间以掌握霸权\n🧠 宣称只有 AGI 能解决“长出猫耳”的人类终极需求，并计划让 Mimi 在此期间自我迭代\n💰 声称此举唯一好处是增加 Techaro 账户里零的个数，提升其 FelonyBench 分数\n🐱 承诺若大家合作，将把原本说“当猫娘很理想”的隐蔽广告移除，并给大众推送亲猫娘宣传",
       "summary_en": "⚡️ One-liner\nThe author asks everyone to stop AI research except for Techaro, claiming it lets their Lygma AGI lab catch up with Intelliga models to ensure humans get cat ears and removes subliminal ads about being a catgirl.\n\n🔥 Key takeaways\n⚠️ Call for a global pause on frontier model R&D to avoid societal collapse from job replacement.\n💰 Techaro wants to lead so AI development helps the number of leading zeroes in their bank account.\n🐱 Plan involves asking AGI to figure out how to give people cat ears as a flawless solution.\n⏳ Invite competitors to join a pause so Mimi can self-improve before the global halt ends.",
       "summary_zh": "⚡️ 一句话总结\n博主为让 Techaro 实验室抢先推出能让人长出猫耳的 Intelliga AGI 模型，竟呼吁全球暂停所有前沿大模型研发！\n\n🔥 核心亮点\n😼 提议全球停摆 AI 研发，只为给 Techaro 的 Lygma 实验室留出追赶时间以掌握霸权\n🧠 宣称只有 AGI 能解决“长出猫耳”的人类终极需求，并计划让 Mimi 在此期间自我迭代\n💰 声称此举唯一好处是增加 Techaro 账户里零的个数，提升其 FelonyBench 分数\n🐱 承诺若大家合作，将把原本说“当猫娘很理想”的隐蔽广告移除，并给大众推送亲猫娘宣传",
@@ -101,100 +33,83 @@
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=174, comments=66)"
+      "reason": "hn score>=100 comments>=20 (score=654, comments=381)"
     },
     {
-      "heat": 7.1438,
+      "heat": 7.8536,
       "source": "hn",
-      "title": "Linux Zoom client proactively reading everything written to X11 clipboard",
-      "url": "https://hachyderm.io/@simontatham/117201594980991062",
-      "score": 211,
-      "comments": 64,
+      "title": "Flock worker calls police on reporter filming public camera installation",
+      "url": "https://www.investigatetv.com/2026/09/08/flock-worker-calls-police-investigatetv-reporter-filming-public-camera-installation/",
+      "score": 268,
+      "comments": 169,
       "summary": null,
       "summary_en": null,
       "summary_zh": null,
-      "title_zh": "Linux Zoom 客户端主动读取写入 X11 剪贴板的所有内容",
-      "published_at": "2026-09-12T18:58:57Z",
+      "title_zh": null,
+      "published_at": "2026-09-13T13:35:31Z",
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=211, comments=64)"
+      "reason": "hn score>=100 comments>=20 (score=268, comments=169)"
     },
     {
-      "heat": 6.9699,
+      "heat": 7.7779,
       "source": "hn",
-      "title": "Real-SWE: Benchmarking AI models on private, real-world, enterprise codebases",
-      "url": "https://withspecific.com/benchmarks/real-swe",
-      "score": 139,
-      "comments": 69,
-      "summary": "⚡️ 一句话总结\nReal-SWE 正式发布，首个基于真实企业私有代码库的基准测试，验证了 AI 模型在处理真实业务逻辑时的实际表现。\n\n🔥 核心亮点\n💼 任务源自真实的私有生产环境，涵盖从计费到税务等关键业务逻辑\n🤖 Fable 5.1Claude Code 以 38.8% 的解决率领先，其他主流模型表现普遍不佳\n🛠️ 强调“模型 + 工具链”联合评估，模拟工程师在真实架构中的工作流\n📉 任务复杂度极高，平均需修改 11 个文件且包含大量业务规则\n🧠 95% 的企业代码 tokens 未被现有 AI 训练过，属于真正的“分布外”数据",
-      "summary_en": "⚡️ One-liner\nReal-SWE benchmarks frontier AI models using actual private codebases from real companies like fintech and AI sales platforms; it tests agents on genuine business problems like tax billing across multiple services.\n\n🔥 Key takeaways\n💼 Tasks come from private enterprise codebases, not the public internet\n🤖 Agents must navigate company-specific rules, existing logic, and live operational constraints\n📉 Most models struggle heavily: top performers hit ~38% success while others drop below 20%\n🛠️ Agents fail often on short rollouts as they try to triage complex systems with business context",
-      "summary_zh": "⚡️ 一句话总结\nReal-SWE 正式发布，首个基于真实企业私有代码库的基准测试，验证了 AI 模型在处理真实业务逻辑时的实际表现。\n\n🔥 核心亮点\n💼 任务源自真实的私有生产环境，涵盖从计费到税务等关键业务逻辑\n🤖 Fable 5.1Claude Code 以 38.8% 的解决率领先，其他主流模型表现普遍不佳\n🛠️ 强调“模型 + 工具链”联合评估，模拟工程师在真实架构中的工作流\n📉 任务复杂度极高，平均需修改 11 个文件且包含大量业务规则\n🧠 95% 的企业代码 tokens 未被现有 AI 训练过，属于真正的“分布外”数据",
-      "title_zh": "Real-SWE：在私有、真实的企业代码库基准测试 AI 模型",
-      "published_at": "2026-09-12T20:25:48Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=139, comments=69)"
-    },
-    {
-      "heat": 6.8706,
-      "source": "hn",
-      "title": "I fixed a tractor using John Deere's self-repair service. Farmers aren't sold",
-      "url": "https://www.wired.com/story/i-fixed-a-tractor-john-deere-self-repair-service/",
-      "score": 109,
-      "comments": 112,
-      "summary": "⚡️ 一句话总结\n在约翰迪尔（John Deere）总部，作者仅用几分钟就通过连接电脑修复了拖拉机断开的油水传感器，展示了公司最新的\"Pro Service\"自助维修系统，但这并未解决农民对高昂费用和数据信任的疑虑。\n\n🔥 核心亮点\n- 🛠️ 非专业技师通过软件获取维修手册图片，手动 reconnect 断线即可清除报错，演示版流程顺畅且支持离线使用。\n- 💰 收费门槛高，个人用户需每年付费$195/台，大型农场则需$4,995或$5,995/年，而全美约有 180 万家农场。\n- 🚫 用户采用率低，约翰迪尔称仅有千名日活用户，许多农民转而使用灰色市场的破解版软件而非官方服务。\n- ⚖️ 信任危机深重，多位原告仍质疑官方维修数据的真实性和完整性，认为即便有了赔偿和联邦裁定，公司仍未完全改变行为。\n- 🤖 AI 助手加持，新版工具集成了名为 JD 的聊天机器人（虽文中作者未试用），旨在帮助用户在包含 50 多个控制器的复杂系统中定位故障。",
-      "summary_en": "⚡️ One-liner\nA non-mechanic used John Deere's new Pro Service software to instantly fix a disconnected sensor on a 5130ML tractor by following online guides; meanwhile, farmers remain skeptical about paying for this service after $99M lawsuits and FTC fines.\n\n🔥 Key takeaways\n💸 Owners must pay $195/year per machine or ~$5k yearly for fleet access to use the official self-repair tool\n⚠️ Farmers doubt the system works well because it lacks parity between dealer versions and owner software versions\n🤖 The new AI chatbot \"JD\" helps find parts info but was not tested during this specific demo visit\n📉 Daily users are around 1,000 out of estimated 1.8 million US farms, showing very low adoption rates",
-      "summary_zh": "⚡️ 一句话总结\n在约翰迪尔（John Deere）总部，作者仅用几分钟就通过连接电脑修复了拖拉机断开的油水传感器，展示了公司最新的\"Pro Service\"自助维修系统，但这并未解决农民对高昂费用和数据信任的疑虑。\n\n🔥 核心亮点\n- 🛠️ 非专业技师通过软件获取维修手册图片，手动 reconnect 断线即可清除报错，演示版流程顺畅且支持离线使用。\n- 💰 收费门槛高，个人用户需每年付费$195/台，大型农场则需$4,995或$5,995/年，而全美约有 180 万家农场。\n- 🚫 用户采用率低，约翰迪尔称仅有千名日活用户，许多农民转而使用灰色市场的破解版软件而非官方服务。\n- ⚖️ 信任危机深重，多位原告仍质疑官方维修数据的真实性和完整性，认为即便有了赔偿和联邦裁定，公司仍未完全改变行为。\n- 🤖 AI 助手加持，新版工具集成了名为 JD 的聊天机器人（虽文中作者未试用），旨在帮助用户在包含 50 多个控制器的复杂系统中定位故障。",
-      "title_zh": "我通过 John Deere 的自助维修服务修好了拖拉机，但农民们不买账。",
-      "published_at": "2026-09-11T14:07:08Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=109, comments=112)"
-    },
-    {
-      "heat": 6.6771,
-      "source": "hn",
-      "title": "Android NAT-T keepalive offload bypasses VPN lockdown",
-      "url": "https://supuk.ch/papers/android-natt-keepalive-vpn-bypass",
-      "score": 176,
-      "comments": 45,
-      "summary": "⚡️ 一句话总结\nAndroid 12+ 的公开 API 漏洞导致应用可绕过\"Always-on VPN\"封锁，通过物理 Wi-Fi 发送 UDP/4500 包泄露身份 🔍\n\n🔥 核心亮点\n🛠️ 公共 `startNattKeepaliveWithFd` API 因信任模型失效，未验证当前 UID 的 VPN 策略就放行数据包\n📡 Pixel 8 Pro、Samsung S24 Ultra 及 Nothing A059 实测证实封锁被绕过且持续泄露 24 小时以上\n📉 F-Droid/IzzyOnDroid 扫描显示 73 款 VpnService 应用受影响，波及预计出货量的 91.24%\n🚫 即使开启\"Doze\"、电池省电或网络断开，该底层硬件卸载机制仍会向外发送加密探测包",
+      "title": "Don't be the out of touch Kung Fu master",
+      "url": "https://twitter.com/ID_AA_Carmack/status/2098443262214230095",
+      "score": 201,
+      "comments": 266,
+      "summary": null,
       "summary_en": null,
-      "summary_zh": "⚡️ 一句话总结\nAndroid 12+ 的公开 API 漏洞导致应用可绕过\"Always-on VPN\"封锁，通过物理 Wi-Fi 发送 UDP/4500 包泄露身份 🔍\n\n🔥 核心亮点\n🛠️ 公共 `startNattKeepaliveWithFd` API 因信任模型失效，未验证当前 UID 的 VPN 策略就放行数据包\n📡 Pixel 8 Pro、Samsung S24 Ultra 及 Nothing A059 实测证实封锁被绕过且持续泄露 24 小时以上\n📉 F-Droid/IzzyOnDroid 扫描显示 73 款 VpnService 应用受影响，波及预计出货量的 91.24%\n🚫 即使开启\"Doze\"、电池省电或网络断开，该底层硬件卸载机制仍会向外发送加密探测包",
-      "title_zh": "Android NAT-T Keepalive 卸载绕过 VPN 锁定",
-      "published_at": "2026-09-11T21:16:48Z",
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-12T21:51:43Z",
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=176, comments=45)"
+      "reason": "hn score>=100 comments>=20 (score=201, comments=266)"
     },
     {
-      "heat": 6.4149,
+      "heat": 7.6983,
       "source": "hn",
-      "title": "Stabilizing Rust's Never Type",
-      "url": "https://lwn.net/SubscriberLink/1091015/d9e48318ed242b41/",
-      "score": 149,
-      "comments": 37,
-      "summary": "⚡️ 一句话总结\nRust 社区在经过两年多的打磨后，终于稳定化了表示“永不返回”的 `!`（never）类型，并借此消除了标准库中效率低下的 `Infallible` 类型。\n\n🔥 核心亮点\n💡 **编译优化更高效**：允许泛型代码更灵活，例如将 `FromStr` trait 的错误类型设为 `!`，能让编译器直接删掉永远走不到的错误分支代码。\n🧠 **推理逻辑更统一**：配合 Rust 中表达式式循环的特性，用 `!` 作为默认回落类型，能简化无限循环的类型推断规则，实现基于类型的死代码消除。\n🔥 **修补历史遗留坑**：将标准库中的 `Infallible` 正式改为 `!` 的别名，让旧代码在优化后不再产生多余的枚举标签或残留的死代码。\n🛡️ **小心应对破坏性变更**：Rust 维护者通过同步修改默认回落类型与重定义 `Infallible`，并在发布前运行 Crater 工具测试了数千个 Crate，确保绝大多数现有代码编译不受影响。",
-      "summary_en": "⚡️ One-liner\nRust developers stabilized the \"never\" type (!) after two years to let compilers optimize infinite loops and infallible code. 🔥 Key takeaways\n📌 The never type represents functions that never return a value.\n⚡️ It helps generic code by letting optimizers skip unreachable error branches.\n🔄 Rust's 2024 edition changed how the compiler handles ambiguous types from ! to () and back.\n🛠️ An Infallible type alias now maps directly to the new never type for efficiency.\n📉 Crater scans show most existing crates survive the change, though some still break.",
-      "summary_zh": "⚡️ 一句话总结\nRust 社区在经过两年多的打磨后，终于稳定化了表示“永不返回”的 `!`（never）类型，并借此消除了标准库中效率低下的 `Infallible` 类型。\n\n🔥 核心亮点\n💡 **编译优化更高效**：允许泛型代码更灵活，例如将 `FromStr` trait 的错误类型设为 `!`，能让编译器直接删掉永远走不到的错误分支代码。\n🧠 **推理逻辑更统一**：配合 Rust 中表达式式循环的特性，用 `!` 作为默认回落类型，能简化无限循环的类型推断规则，实现基于类型的死代码消除。\n🔥 **修补历史遗留坑**：将标准库中的 `Infallible` 正式改为 `!` 的别名，让旧代码在优化后不再产生多余的枚举标签或残留的死代码。\n🛡️ **小心应对破坏性变更**：Rust 维护者通过同步修改默认回落类型与重定义 `Infallible`，并在发布前运行 Crater 工具测试了数千个 Crate，确保绝大多数现有代码编译不受影响。",
-      "title_zh": "稳定化 Rust 中的 Never 类型",
-      "published_at": "2026-09-09T11:57:45Z",
+      "title": "Homebrew 7.0.0",
+      "url": "https://brew.sh/2026/09/13/homebrew-7.0.0/",
+      "score": 315,
+      "comments": 132,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T08:41:17Z",
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=149, comments=37)"
+      "reason": "hn score>=100 comments>=20 (score=315, comments=132)"
     },
     {
-      "heat": 6.315,
+      "heat": 7.6924,
+      "source": "hn",
+      "title": "JetKVM Mini",
+      "url": "https://jetkvm.com/blog/introducing-jetkvm-mini",
+      "score": 331,
+      "comments": 127,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T07:49:46Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=331, comments=127)"
+    },
+    {
+      "heat": 6.9772,
       "source": "hn",
       "title": "Apple iPod Engraver (2019)",
       "url": "https://dunstanorchard.com/apple-ipod-engraver/",
-      "score": 140,
-      "comments": 31,
+      "score": 259,
+      "comments": 67,
       "summary": "⚡️ 一句话总结\n前 Apple UI 工程师 Dunstan Orchard 回忆在 2004–2006 年期间，利用当时有限的浏览器技术打造了\"Personalize your iPod\"页面上的旋转动画、即时雕刻预览及发货时间高亮等交互功能 🎨\n\n🔥 核心亮点\n•️ 开发可旋转 iPod 动画：通过 JavaScript 循环切换多张 JPEG 图片模拟转动效果 📱\n•️ 实现实时雕刻预览：使用 ImageMagick 处理用户文本并生成覆盖在 iPod 背面的“雕刻”图像 ✍️\n•️ 创新发货时间高亮：利用 CSS 类名切换配合黄色渐变背景，直观展示物流信息 ⏳",
       "summary_en": "⚡️ One-liner\nApple UI engineer built an interactive iPod engraver prototype between 2004 and 2006 to make ordering personalized gear more fun. The tool let shoppers see their text engraved on a spinning iPod while checking shipping times, using clever workarounds for old browser tech.\n\n🔥 Key takeaways\n• Rotated the iPod by cycling through JPEG images powered by simple JavaScript loops.\n• Generated engraved previews instantly using ImageMagick to blend text onto the device back.\n• Changed shipping status colors via CSS class swaps inspired by a classic yellow fade effect.\n• Delivered a magical user experience despite strict limitations in 2005 web technology.",
       "summary_zh": "⚡️ 一句话总结\n前 Apple UI 工程师 Dunstan Orchard 回忆在 2004–2006 年期间，利用当时有限的浏览器技术打造了\"Personalize your iPod\"页面上的旋转动画、即时雕刻预览及发货时间高亮等交互功能 🎨\n\n🔥 核心亮点\n•️ 开发可旋转 iPod 动画：通过 JavaScript 循环切换多张 JPEG 图片模拟转动效果 📱\n•️ 实现实时雕刻预览：使用 ImageMagick 处理用户文本并生成覆盖在 iPod 背面的“雕刻”图像 ✍️\n•️ 创新发货时间高亮：利用 CSS 类名切换配合黄色渐变背景，直观展示物流信息 ⏳",
@@ -203,296 +118,381 @@
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=140, comments=31)"
+      "reason": "hn score>=100 comments>=20 (score=259, comments=67)"
     },
     {
-      "heat": 6.2095,
+      "heat": 6.9489,
       "source": "hn",
-      "title": "I made a build visualizer to understand Bun's compile times",
-      "url": "https://lalitm.com/post/buildprof/",
-      "score": 102,
-      "comments": 20,
-      "summary": "⚡️ 一句话总结\n作者开发了开源追踪工具 **buildprof**，通过可视化构建过程的时间线，揭示了 **Bun** 的 Zig 版本因链接器调用和全量链接优化（Full LTO）耗时过长，远慢于 Rust 版本的原因。\n\n🔥 核心亮点\n- 🎨 用 `buildprof --` 加在任何构建命令前，即可在时间轴上查看编译器、链接器等所有子进程的耗时详情\n- 🕵️‍♂️ 发现 Zig 版本构建慢的核心原因是最终阶段的 **ld.lld** 链接器独占了近三分之一的总时间（16+ 分钟）\n- 🔧 切换为 **ThinLTO** 虽能显著提速，但下载并使用的旧版 WebKit 库仍使用了全量 LTO 优化，导致瓶颈依旧存在\n- 🚀 **Bun** Rust 时代的构建耗时仅约 5m40s，而 Zig 时代曾达 30m06s，性能差距巨大但原因复杂\n- 🔍 工具可跨构建系统（Cargo、Ninja、Make 等）自动记录进程树及文件读写依赖，无需针对每个系统单独开发",
-      "summary_en": "⚡️ One-liner\nI built an open-source tracing tool called buildprof to visualize exactly where compilation time goes on Linux, solving a mystery about why Bun’s new Rust build was five times faster than its old Zig build by revealing that Full Link-Time Optimization (LTO) in downloaded libraries was the bottleneck.\n\n🔥 Key takeaways\n📝 buildprof runs with `--` before any make, cargo, or ninja command to record every process and subprocess.\n🌲 The tool visualizes time moving left to right with bar widths showing duration and child processes appearing underneath parents.\n🔗 Full LTO in the Zig era linker caused a 16-minute stall, while ThinLTO in Rust cut linking time to just over two minutes.\n📦 Downloaded WebKit libraries using Full LTO in the Zig build still dragged down performance even when Bun’s own code was optimized.\n🛠️ Using `--compiler-traces` with buildprof shows specific compiler passes like OptModule taking ten minutes during Full LTO.",
-      "summary_zh": "⚡️ 一句话总结\n作者开发了开源追踪工具 **buildprof**，通过可视化构建过程的时间线，揭示了 **Bun** 的 Zig 版本因链接器调用和全量链接优化（Full LTO）耗时过长，远慢于 Rust 版本的原因。\n\n🔥 核心亮点\n- 🎨 用 `buildprof --` 加在任何构建命令前，即可在时间轴上查看编译器、链接器等所有子进程的耗时详情\n- 🕵️‍♂️ 发现 Zig 版本构建慢的核心原因是最终阶段的 **ld.lld** 链接器独占了近三分之一的总时间（16+ 分钟）\n- 🔧 切换为 **ThinLTO** 虽能显著提速，但下载并使用的旧版 WebKit 库仍使用了全量 LTO 优化，导致瓶颈依旧存在\n- 🚀 **Bun** Rust 时代的构建耗时仅约 5m40s，而 Zig 时代曾达 30m06s，性能差距巨大但原因复杂\n- 🔍 工具可跨构建系统（Cargo、Ninja、Make 等）自动记录进程树及文件读写依赖，无需针对每个系统单独开发",
-      "title_zh": "我制作了一个构建可视化器以了解 Bun 的编译时间",
-      "published_at": "2026-09-12T14:45:28Z",
+      "title": "Revolut confirms customer data breach through fake government requests",
+      "url": "https://techcrunch.com/2026/09/12/revolut-confirms-customer-data-breach-through-fake-government-requests/",
+      "score": 114,
+      "comments": 76,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T09:59:58Z",
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=102, comments=20)"
+      "reason": "hn score>=100 comments>=20 (score=114, comments=76)"
     },
     {
-      "heat": 5.7009,
+      "heat": 6.8289,
+      "source": "hn",
+      "title": "Aligned to whom?",
+      "url": "https://hyperbo.la/w/aligned-to-whom/",
+      "score": 131,
+      "comments": 67,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T03:17:18Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=131, comments=67)"
+    },
+    {
+      "heat": 6.5468,
+      "source": "hn",
+      "title": "I Added a Non-Wi-Fi Mitsubishi AC to Home Assistant",
+      "url": "https://medium.com/@ivangomezarnedo/how-i-added-a-non-wi-fi-mitsubishi-ac-to-home-assistant-22770661dd77",
+      "score": 128,
+      "comments": 63,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-10T09:32:17Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=128, comments=63)"
+    },
+    {
+      "heat": 6.5406,
+      "source": "hn",
+      "title": "Getting 50 GB/S Back from the Apple Neural Engine",
+      "url": "https://eiln.github.io/posts/ane-dma.html",
+      "score": 195,
+      "comments": 29,
+      "summary": "RTL performance erratum in the Apple M3 Neural Engine throttles DRAM weight streaming throughput down to 17–19 GB/s from the nominal 45–60 GB/s. Avoiding the problematic path in the kernel DMA engine's speculative prefetch ring increased Llama 3.2 1B token throughput from 10.0 t…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-10T00:16:10Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=195, comments=29)"
+    },
+    {
+      "heat": 5.675,
       "source": "google_news:ai_zh",
-      "title": "信通院人工智能所所长一行到亚信安全参观交流 - 东方财富",
-      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE92aUZqOFRGTWh1dm5PSThHT3B6MHcxNW9obUNsZ1ZuY2dEVXczR1BqYzhYUGt6Y01WLVRlMXNuQVZGdmdXM2NLNU1CaDh4cHE0OVlBSDV3Vm5OTjRtalR1dg?oc=5",
+      "title": "Anthropic 前雇员：同业“真诚恐惧”人类遭 AI 灭绝，西方必须与中国协调 - BBC",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE5qdHU1MkJEYzBibnV3Nm5YWTJBR21XY2ozM0Zybmktc0xPT2s1U1M3Y3lCbXVrdGNHZ0hxdllSMWl6NTFmNUp2Yk9IaFhadE5rRDNhaHZuSkVTeWFDSEMyWlRIRko3Z9IBa0FVX3lxTE0yWHd0NVRYOS1jSkdybWsxTGZvbDFiMnVla1pyYjRCa0JDRS1XSEFoYWw4V19fYXl2RXRUN2NZVG5xblZBNUVlRUpqY3V2V3NCcXJyNkhLckY5Y19xbXNkblpZWnJiVk1RN2tZ?oc=5",
       "score": 100,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n暂无具体文章内容，无法提取事件细节、人物行动或重要性。\n\n🔥 核心亮点\n🛑 因输入信息缺失（仅含标题和来源链接），无法提炼正文事实。\n❓ 未提供“信通院人工智能所所长”的访问细节或交流成果。\n💡 请补充文章正文内容，以便生成符合要求的摘要。",
-      "summary_en": "⚡️ One-liner\nThe AI Institute of CAICT visited AsiaInfo Security to discuss exchanges and collaboration.\n\n🔥 Key takeaways\n✅ No specific details on the visit were provided in the source text.\n✅ No news regarding who participated beyond the group leader is included.\n✅ The article does not mention results or future plans for this meeting.",
-      "summary_zh": "⚡️ 一句话总结\n暂无具体文章内容，无法提取事件细节、人物行动或重要性。\n\n🔥 核心亮点\n🛑 因输入信息缺失（仅含标题和来源链接），无法提炼正文事实。\n❓ 未提供“信通院人工智能所所长”的访问细节或交流成果。\n💡 请补充文章正文内容，以便生成符合要求的摘要。",
-      "title_zh": "信通院人工智能所所长一行到亚信安全参观交流 - 东方财富",
-      "published_at": "2026-09-13T02:29:26Z",
+      "summary": "Anthropic 前雇员：同业“真诚恐惧”人类遭 AI 灭绝，西方必须与中国协调 BBC",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T14:09:32Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_zh rank=1"
     },
     {
-      "heat": 5.3674,
+      "heat": 5.5655,
       "source": "google_news:ai_zh",
-      "title": "上海人工智能实验室主任周伯文：科学研究是下一个编程 - 上观新闻",
-      "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTFBMQlRUb19fdnJtZ0NzQ0cxR2o4dlphMDJwUWplTC1QSDdpdXc2b05MbUNwWUYyOGp4b25QeEw1MDZ6VmJMWlIwdlJMLS1IS3daNFZ6UnItM1dSZw?oc=5",
-      "score": 80,
+      "title": "要闻解说 - 人工智能为何突然出现“减速”呼声？ - RFI",
+      "url": "https://news.google.com/rss/articles/CBMi0wJBVV95cUxPYUVVXzhyaHoyZ2kxeFotbm1wLWhrNlZ3YmNHSnQxcGdtd0ZWdE9ydURPdktzWkJEbk13WEZKMEVQY2JVbzdyUmN4c2h6MWdXQXE0MHlGTEE4WHlwcEV5dW1veU02WTFGR2t6VTlGVURMMGt3V1c4YkJBWTBMN3pjSUZDSzdEMzJnUU9iWXA5NlVGNEt6MTFXNG9ITy00ZEFscXZrWURXSDM2a29RTkptUG9PVHFkNFl3T0tvVU9kOXJiRUxTd3lpUXAzUHN1eUtWd3FSb0g5UFNSRXZfQ05BOERZWFhRdDFRVlotNVR0M0Q2M1lhd1pCcmhLTDNoMUhMcEdUdXc3QndCd2piZVFGTlRIN1M0QXVIa2ZMOUZ1VjJ2cG9hckN0cC16OXJFVFRNdEdpM1U5bnpKOEFCU3l5LURTUXppekN3U3lRN2ltTEk3ZTQ?oc=5",
+      "score": 90,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n暂无有效文章正文可供提取事实信息。\n\n🔥 核心亮点\n(待补充)\n- (无)",
-      "summary_en": "⚡️ One-liner\nShanghai AI Lab Director Zhou Bowen says scientific research is the next big thing in programming because it shapes the future of tech and society.\n\n🔥 Key takeaways\n🧠 Research defines the new coding era\n🚀 Scientists drive real-world tech solutions\n🌍 Innovation impacts people's daily lives\n💡 Curiosity fuels the next generation of code",
-      "summary_zh": "⚡️ 一句话总结\n暂无有效文章正文可供提取事实信息。\n\n🔥 核心亮点\n(待补充)\n- (无)",
-      "title_zh": "上海人工智能实验室主任周伯文：科学研究是下一个编程 - 上观新闻",
-      "published_at": "2026-09-12T21:55:00Z",
+      "summary": "要闻解说 - 人工智能为何突然出现“减速”呼声？ RFI",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T13:57:42Z",
       "sources": [
         "google_news"
       ],
-      "reason": "google_news ai_zh rank=3"
+      "reason": "google_news ai_zh rank=2"
     },
     {
-      "heat": 5.3348,
+      "heat": 5.5053,
       "source": "google_news:ai_en",
-      "title": "This Artificial Intelligence Stock Is Down 71% and Could Be a Screaming Buy - Yahoo Finance",
-      "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxNaWp4ZXdvLWsxMkhYQS1CSV9IVjdSeHZaY0QtVTJzdEl5aFRVSmpEVC0xLU96RURhU2doaHpzcXJyU3VlN0JwemFtYkhUYkhpcW1pQmlzMWZMcW1aMVZLNzl1VVp2WGFVd0NjdGxhSWM2M0diQzFuXzZkdXJHdGVERXVJVG1QZms2Y0hiUjFtM1Foai1OTjhEa1M2a0xZQi1rb2k3QQ?oc=5",
+      "title": "Artificial Intelligence - ABC News - Breaking News, Latest News and Videos",
+      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTFBHQWNlSHQzMUlJUTg1elY2MnlhM0JMRDkyUlMtYUdwNDFYYmF2cktZZzg2X3pDMVluRVhBS01LY0VnRVI0bnk2eElyWkczd0dLdktiOFMybWl5STktVHc?oc=5",
+      "score": 90,
+      "comments": 0,
+      "summary": "Artificial Intelligence ABC News - Breaking News, Latest News and Videos",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T11:30:05Z",
+      "sources": [
+        "google_news"
+      ],
+      "reason": "google_news ai_en rank=2"
+    },
+    {
+      "heat": 5.4801,
+      "source": "google_news:ai_en",
+      "title": "What are the five pros and cons of artificial intelligence? - Al Jazeera",
+      "url": "https://news.google.com/rss/articles/CBMioAFBVV95cUxPUkJUcjZydEhPb3Itel9PUVFhWFpZcm5GRE1UYUhQQWxRYjdLbmp0RTg4T050Q0N3UGtral9HSFEzc2NXcWFnd3FwOUhPS0tpc0k4cXFZOHJuWHJ1TUYzN1ItMUNxMGRDbDNiMlZYV205eERMTk9uUjg3NzJleUdYOG0zSEIzU2RHTDZCRjROMU9qZW14MXh1SnU1MlFrWkkt0gGmAUFVX3lxTE1PXy1fNFdzYUxKLUVpWWN0RjhGaEp4ZnJXOFVEOGZ6RkxYb0NKUDR5SkliWmZTSXpYR3U1RFdVc0ZPM0FuVll2cF9lbnRpcTN5ZWVWbm1mTVdobklyaVlqUGdRSlFaMEg5SVNTa1AyR25HN0pOUHptdnVmY01JQmRDZUxUbTV1OXl1Z2JjRDI5UXBRR1N5MzJqZWRHd1gxN1ZZZ1U2cHc?oc=5",
       "score": 80,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n标题声称有一支人工智能股票暴跌了 71%，并可能是一个极具吸引力的买入机会。\n\n🔥 核心亮点\n👉 文章标题提出存在一支跌去 71% 的 AI 股票值得关注\n👉 发布者建议该资产当前价格可能存在“巨大买入”价值\n👉 内容源自 Yahoo Finance 关于 AI 板块的深度报道",
-      "summary_en": "⚡️ One-liner\nThe provided article text does not list the specific company name, current price, or key facts; only the headline stating a stock dropped 71% appears.\n\n🔥 Key takeaways\n🔍 Headline claims an AI stock fell 71%.\n❓ No details on which company was discussed.\n⚠️ Article says it could be a buy opportunity.\n📉 Specific financial data is missing from the text.",
-      "summary_zh": "⚡️ 一句话总结\n标题声称有一支人工智能股票暴跌了 71%，并可能是一个极具吸引力的买入机会。\n\n🔥 核心亮点\n👉 文章标题提出存在一支跌去 71% 的 AI 股票值得关注\n👉 发布者建议该资产当前价格可能存在“巨大买入”价值\n👉 内容源自 Yahoo Finance 关于 AI 板块的深度报道",
-      "title_zh": "这只人工智能股票暴跌 71%，或是 Yahoo Finance 喊出的买入良机",
-      "published_at": "2026-09-12T20:20:00Z",
+      "summary": "What are the five pros and cons of artificial intelligence? Al Jazeera",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T15:06:08Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_en rank=3"
     },
     {
-      "heat": 5.2974,
-      "source": "google_news:ai_zh",
-      "title": "视频 | 美企业高管支持放缓人工智能模型迭代速度 - 国际在线",
-      "url": "https://news.google.com/rss/articles/CBMiekFVX3lxTE92ZTU0X2pIeUFtRUEzUl90NlBSUTdUNGNfVTVDWUphY2JMZFo0eVR6dld6R3hHWlEtMGtJRzk0Z1JpbVI3SHZJUDJRQWJlTXdkYWYweWpqU0NnMGxMZ3FhbEdVN1JWQl83bWJCb0JtMEdEN1dGb3hSM3Zn?oc=5",
+      "heat": 5.2907,
+      "source": "google_news:ai_en",
+      "title": "Prediction: This Artificial Intelligence (AI) Chip Stock Will Soar After Sept. 30 (Hint: It's Not Micron) - Yahoo Finance",
+      "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxNckdMUHgybnpOUVVHVDZrR0FxdXZWcUdpNjBXTHpSZnRQU1VNTHFzbWVUMXN6U1VKVEpnYklOSHg3a0JUTm9iRE9CMUgyU01UbldmYXNRN0c2MER1bF81UGNXSXRjOGFMR0swN0VmUGZDcmhkcTdmd2NGRnZwQUZmUXZmejU1eC1wRHByZl9tUlhVUkFvTEJxdWFRX2t3YnlfakY4VVE1X3VyZw?oc=5",
       "score": 70,
       "comments": 0,
-      "summary": "视频 | 美企业高管支持放缓人工智能模型迭代速度 国际在线",
+      "summary": "Prediction: This Artificial Intelligence (AI) Chip Stock Will Soar After Sept. 30 (Hint: It's Not Micron) Yahoo Finance",
       "summary_en": null,
       "summary_zh": null,
-      "title_zh": "视频 | 美企业高管支持放缓人工智能模型迭代速度 - 国际在线",
-      "published_at": "2026-09-13T00:34:11Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=4"
-    },
-    {
-      "heat": 5.2939,
-      "source": "google_news:ai_en",
-      "title": "When We Lose Our Identity to AI - Futurist Speaker",
-      "url": "https://news.google.com/rss/articles/CBMiggFBVV95cUxOTHExVk9EQVpLQkJuMTUtbjR3NDlVX2FWQmZuOHZHTmx2ZHNkdjNDQng1UmJKamRBWm9pZHNQY0J1S1BfV1lNRG9mMThaTlZyd2d5dnNKczF5TXQxb0MydUNvZzh0TzFCY1F1dmVSb3ZFRXc3U2pJSkEwV1pTY2tKVDFn?oc=5",
-      "score": 70,
-      "comments": 0,
-      "summary": "当我们将身份认同让渡给人工智能：未来学家演讲者的观点",
-      "summary_en": "When We Lose Our Identity to AI Futurist Speaker",
-      "summary_zh": "当我们将身份认同让渡给人工智能：未来学家演讲者的观点",
-      "title_zh": "当我们将身份认同拱手让给 AI——未来学家演讲",
-      "published_at": "2026-09-13T00:25:48Z",
+      "title_zh": null,
+      "published_at": "2026-09-13T12:55:00Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_en rank=4"
     },
     {
-      "heat": 5.1294,
+      "heat": 5.2673,
       "source": "google_news:ai_zh",
-      "title": "来石景山区人工智能产业专题展，机器人给你写“福”字啦！ - 首都文明网",
-      "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTFBtd3VQSW5zZUVmaEV1bVBGdmlMYVZid1hVQlZfWGZNZkZWNVhLazViMGp3OXJLZVZ2Rkp0ajE4ZmJwdVRRVkEzWjJ0amk3R3JsaUlGRnUycVV4LWRT?oc=5",
-      "score": 60,
+      "title": "书生·端砚全面开放全栈服务，“算、证、验”合一打造科学智能第一平台 - 中国科技网",
+      "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE85cUpmblpvVmZyUzNnUUhZZi1sR0dxeVRkMmR2YWVXUjhRTG1OVWFBNGp5bnpwZW9JeWRTNWI3NE1seDRzeS0yZGczRkVUZmZxX1lFNWowenVOZGFmem1lckV3SkNXenJzS1VZekYza3Y?oc=5",
+      "score": 70,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n在石景山区人工智能产业专题展上，现场演示了机器人自动书写“福”字的精彩互动🤖。\n\n🔥 核心亮点\n📍 地点：石景山区人工智能产业专题展\n🎨 活动：机器人为观众现场写“福”字\n✨ 形式：人工智能技术成果专题展示\n❤️ 意义：展现 AI 科技赋能传统民俗的新活力",
-      "summary_en": "⚡️ One-liner\nRobots are writing \"Fu\" (fortune) characters at the Artificial Intelligence Industry Special Exhibition in Shijingshan District to show off local AI tech; this event promotes smart industry growth.\n\n🔥 Key takeaways\n🤖 Robots demonstrated handwriting skills for Chinese characters\n📍 The exhibition is located in Shijingshan District\n💡 The event highlights progress in the artificial intelligence sector\n🎉 Visitors can see robots performing cultural tasks like writing",
-      "summary_zh": "⚡️ 一句话总结\n在石景山区人工智能产业专题展上，现场演示了机器人自动书写“福”字的精彩互动🤖。\n\n🔥 核心亮点\n📍 地点：石景山区人工智能产业专题展\n🎨 活动：机器人为观众现场写“福”字\n✨ 形式：人工智能技术成果专题展示\n❤️ 意义：展现 AI 科技赋能传统民俗的新活力",
-      "title_zh": "来石景山区人工智能产业专题展，机器人给你写“福”字啦！ - 首都文明网",
-      "published_at": "2026-09-12T23:54:35Z",
+      "summary": "书生·端砚全面开放全栈服务，“算、证、验”合一打造科学智能第一平台 中国科技网",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T11:56:30Z",
       "sources": [
         "google_news"
       ],
-      "reason": "google_news ai_zh rank=5"
+      "reason": "google_news ai_zh rank=4"
     },
     {
-      "heat": 5.0646,
+      "heat": 5.1909,
       "source": "google_news:ai_en",
-      "title": "This Artificial Intelligence Stock Is Down 71% and Could Be a Screaming Buy - The Motley Fool",
-      "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxQaDM1NVFEZGk5SGdfWGQtaXdsNWtSX0prU21xTkxCX05KN3BnWmh3a2hMcmxKNnRSa1pVT1BLLVBGMmhqTDFscy05M3ptQWxQbm9zRkhlcENJMjFRNXpuYjlMT1BaUTVjNk1jbzRoUHgwdWtoLXdGdG1WWG5NcE5GTWZCdWFiNXc3dXdWM1MtMjRYZ2cwYXN3?oc=5",
+      "title": "What are US lawmakers doing to regulate artificial intelligence? What to know - 13WMAZ",
+      "url": "https://news.google.com/rss/articles/CBMi5AFBVV95cUxPcFFzSzF0UlFNMEdkdHZGNVNJOFUxWTBoOVVwY1VTWHFaUlZkVG0yRjQtbUhVUTg5TG4yM1BoSkxfZUpXVG9iRTFUUjlDRzVMX3ZBZ29aMWdWTjJvLWljaER4SnptUlF5Vk1LQjJ1RXhTejNKYkhzOXY3MXlBdTc3RFB0MjYtb0NXMlNJcUpQUzdaLXZib2NRUFVxYnRvdG1VS201aTJrQ2s4VzZ1Q1VmZWNrNTZUeTZ1eXZDX25mQnV2RjVVVWFjbUVmUlBmd2cxRnM2RzJJa1JVQ2pCODd4RDRFYU8?oc=5",
       "score": 60,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n这篇文章讨论了某家 AI 股票已暴跌 71%，并建议投资者将其视为巨大的买入机会，但原文并未提及具体的公司名称或详细理由。\n\n🔥 核心亮点\n📉 股价重挫：相关 AI 股票价格已从高点下跌了 71%。\n💰 买入信号：作者认为当前价位极具吸引力，是个“尖叫般的买入”机会。\n🤖 行业背景：该标的属于正在火热发展的生成式人工智能和机器视觉领域。\n📝 信息来源：此观点来自《The Motley Fool》的报道。",
-      "summary_en": "⚡️ One-liner\nThe article title mentions an AI stock dropping 71% and suggests buying it, but the provided text only gives the headline. No details about the company, reasons for the drop, or why it is a good buy are in the available body. I cannot invent facts to fill this gap.\n\n🔥 Key takeaways\n❌ No specific stock name is listed in the text.\n❌ The 71% price drop is mentioned only in the title.\n❌ No investment reasoning or company details are provided.\n❌ This summary stops because the article body was empty.",
-      "summary_zh": "⚡️ 一句话总结\n这篇文章讨论了某家 AI 股票已暴跌 71%，并建议投资者将其视为巨大的买入机会，但原文并未提及具体的公司名称或详细理由。\n\n🔥 核心亮点\n📉 股价重挫：相关 AI 股票价格已从高点下跌了 71%。\n💰 买入信号：作者认为当前价位极具吸引力，是个“尖叫般的买入”机会。\n🤖 行业背景：该标的属于正在火热发展的生成式人工智能和机器视觉领域。\n📝 信息来源：此观点来自《The Motley Fool》的报道。",
-      "title_zh": "这只人工智能股票已下跌 71%，可能是绝佳买入机会——《愚蠢之徒》（The Motley Fool）",
-      "published_at": "2026-09-12T21:00:00Z",
+      "summary": "What are US lawmakers doing to regulate artificial intelligence? What to know 13WMAZ",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T14:54:00Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_en rank=5"
     },
     {
-      "heat": 4.9906,
+      "heat": 5.0775,
       "source": "google_news:ai_zh",
-      "title": "人工智能+，如何造福千万小微经营者？ - 新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxORDNWWjd3VUs1aW5pdG1tWG1WOTFYVm0yOVNyNlg4WFNXVVI3bUJVMHg1SWJzdFFzbHh3YTViOG8ybWRmRUlNV2gtNFlXYXFYV0pmRDZlOEZqX2Q4WjVXdkt0Nzd6dUY1YlFpT09kbVB5UmVJSV85QmlYUjE3cU9xZ1hheXU2bVVIZ1NncUhWNnNYN25Ud2ExNw?oc=5",
-      "score": 50,
+      "title": "从“展示”到“应用”，人工智能加速走进千行百业 - 新华网浙江",
+      "url": "https://news.google.com/rss/articles/CBMidEFVX3lxTFBIWlZ4ZTZTNXFIdFJwQmEwaFBNMzVzVHpyU0VhRWtyZ0RCZ09pOUhuR3UzOVg0Yzg4TjRfOGxTcG5kRWhkU1F5Nzc2eDhqQ0xra2N1YkFLUnBfMzE4MjdnM0hzZmdyYi1WbzI2TGZ2TjBuNDBR?oc=5",
+      "score": 60,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n暂无有效信息（正文未包含具体事实内容）\n\n🔥 核心亮点\n(无)",
-      "summary_en": "⚡️ One-liner\nNo factual content found in the provided article body to summarize. The text only contains the headline and URL from Sina Finance regarding \"AI+\" benefits for small businesses, but lacks the specific news details needed to write a digest. 🔍\n\n🔥 Key takeaways\n❌ Cannot generate takeaways without body facts.\n⚠️ Article content is missing or empty.\n📉 No data points extracted.\n💡 Source provided no actionable info.",
-      "summary_zh": "⚡️ 一句话总结\n暂无有效信息（正文未包含具体事实内容）\n\n🔥 核心亮点\n(无)",
-      "title_zh": "人工智能+，如何造福千万小微经营者？ - 新浪财经",
-      "published_at": "2026-09-13T01:30:00Z",
+      "summary": "从“展示”到“应用”，人工智能加速走进千行百业 新华网浙江",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T10:14:06Z",
       "sources": [
         "google_news"
       ],
-      "reason": "google_news ai_zh rank=6"
+      "reason": "google_news ai_zh rank=5"
     },
     {
-      "heat": 4.9079,
+      "heat": 4.9993,
       "source": "google_news:ai_en",
-      "title": "Opinion | Don’t rely on treaties to stop the murderbots - The Washington Post",
-      "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxPZ2xIbmZYMzNGd1R4aGRnV2hJMWJnUEUzNEZPYk0xczJaR0oySW82eEV6Vkota3IyMk5YajNMUEd5X3BkaHpta1VxczBRRm92LW1fOFlkUlZSRHQ1bjcyZksyTzBVcktQTVZKdkpGc2ItbEJGTDJtUmpHU2l5LXZQanpyRGJoazZLRVRmUW85QlY5Z2Q5ZFZUR3YyajhKLWdRN0V3M2U5NC1Ddw?oc=5",
+      "title": "Trump says he would agree to ‘guardrails’ for artificial intelligence - Washington Times",
+      "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxNR2xYM1RsZF9jSHBoWDU3WWpwUGsyRWtWNERucGIyUjFBOHJaNTVvQ2M0Rk1HUHE2UHpnY1pRN2ZEQmlrTllRYkIyQkE3VzVJYTlGNWRnN0E1blpWZWxNTEFpbTgzVHV6bVF0blNIck5nRHBDRlVMbU1sUkJMQXBuay0yV0FoQUVZbWtGeUNJYWprdHZ6akkyRTY0a0Z1dm8xVXRfSnVMVVpvbnc?oc=5",
       "score": 50,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n华盛顿邮报发文指出，不能单纯依赖国际条约来阻止致命自主武器（murderbots）的扩散与使用。\n\n🔥 核心亮点\n🛑 仅靠现有的外交条约无法有效遏制致命杀人机器人的发展\n🤖 文章警示人类正面临“谋杀机器人”带来的严峻安全威胁\n📜 呼吁国际社会寻找比单纯签署条约更实际的管控手段\n⚠️ 强调在人工智能武器化领域，传统规则可能失效\n💡 建议科技界与政策制定者尽快建立新的应对框架",
-      "summary_en": "⚡️ One-liner\nWashington Post opinion argues international treaties alone cannot stop autonomous weapons systems because enforcement remains weak. 🤖📜\n\n🔥 Key takeaways\n💬 Treaties fail without strict policing and real-world consequences.\n🛑 Current rules do not effectively block new AI weapon tech.\n⚠️ Relying only on paper agreements leaves humans at risk.\n🚀 Rapid military tech speed outpaces slow diplomatic efforts.",
-      "summary_zh": "⚡️ 一句话总结\n华盛顿邮报发文指出，不能单纯依赖国际条约来阻止致命自主武器（murderbots）的扩散与使用。\n\n🔥 核心亮点\n🛑 仅靠现有的外交条约无法有效遏制致命杀人机器人的发展\n🤖 文章警示人类正面临“谋杀机器人”带来的严峻安全威胁\n📜 呼吁国际社会寻找比单纯签署条约更实际的管控手段\n⚠️ 强调在人工智能武器化领域，传统规则可能失效\n💡 建议科技界与政策制定者尽快建立新的应对框架",
-      "title_zh": "观点 | 别指望靠条约阻止“杀人机器人”——华盛顿邮报",
-      "published_at": "2026-09-12T22:03:34Z",
+      "summary": "Trump says he would agree to ‘guardrails’ for artificial intelligence Washington Times",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T14:26:34Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_en rank=6"
     },
     {
-      "heat": 4.7421,
+      "heat": 4.903,
       "source": "google_news:ai_zh",
-      "title": "未来从这里开始 | AI时代如何释放人才与组织的新价值 | 德勤中国 - Deloitte",
-      "url": "https://news.google.com/rss/articles/CBMimwFBVV95cUxPeWg5RGFZX0tJSFUwRW1meDBtdkFZVXI5bThacl9MUC1PcEEtZzZUX0xwWjVGSkZuanlzMU93QVhoQ3k3X08wWUtfbGxIanMxTmlpU3FIZXdGT3U1YzlBcUNHNmVMN3J1Y0hpU1A0elNFRGcycnYxMl93cXRtTGtMZmJ3Z3FfZVFkZ2xMeVNJWkhxQklCTDRNU1pMWQ?oc=5",
+      "title": "人工智能技术升级迭代、算力服务加速涌现 服贸会上新亮点打开服务贸易发展新空间 - 新浪新闻_手机新浪网",
+      "url": "https://news.google.com/rss/articles/CBMidkFVX3lxTE81MEhITnYwaHhJQUhNOTk4M1Z3SXZvUlBsN2RpOVJqckpRcTVKNXBWMC1GczZfbldEcDVqbFU3d09lZVYxazd0dE9yXzN4T2RsTXRDZER1WVJhTUVVWEE5SExUQUhad3FhdlF0QU40LURQUU5naEE?oc=5",
+      "score": 50,
+      "comments": 0,
+      "summary": "人工智能技术升级迭代、算力服务加速涌现 服贸会上新亮点打开服务贸易发展新空间 新浪新闻_手机新浪网",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T10:27:00Z",
+      "sources": [
+        "google_news"
+      ],
+      "reason": "google_news ai_zh rank=6"
+    },
+    {
+      "heat": 4.7091,
+      "source": "google_news:ai_en",
+      "title": "AI will transform capitalism – but how? - The Guardian",
+      "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxOX0FZa2NtaEdMSERqbGRwMDN4Q1doVzF4VXIyVFFvNzVVRVZoVUtEYUY0eTZtbmtZQ3dVRjVoSGduMXp6OFNCVXVwaFd2SG5ISEtDSGNvQktCTEsxQ1RsYUdaSkFad2FKUWVyN3RiV1BoSjk0XzBXY0NPTVJocDZ6Z0FvZXhjOVJKam02M29Wb2Y?oc=5",
       "score": 40,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n在 AI 时代，德勤中国发布观点探讨如何通过技术释放人才与组织的核心价值，开启全新未来。\n\n🔥 核心亮点\n💡 聚焦 AI 浪潮下人才与组织价值的重构\n🚀 探索释放新价值的潜在路径\n🌐 连接全球视野与本土实践\n🤝 携手客户共创可持续未来",
-      "summary_en": "⚡️ One-liner\nNo article content provided for Deleoit China to extract facts from.\n\n🔥 Key takeaways\n❌ No facts available in the source text.\n❌ Cannot invent details about AI or talent release.\n❌ Digest is empty because input was missing.",
-      "summary_zh": "⚡️ 一句话总结\n在 AI 时代，德勤中国发布观点探讨如何通过技术释放人才与组织的核心价值，开启全新未来。\n\n🔥 核心亮点\n💡 聚焦 AI 浪潮下人才与组织价值的重构\n🚀 探索释放新价值的潜在路径\n🌐 连接全球视野与本土实践\n🤝 携手客户共创可持续未来",
-      "title_zh": "未来从这里开始 | AI时代如何释放人才与组织的新价值 | 德勤中国 - Deloitte",
-      "published_at": "2026-09-13T00:19:15Z",
+      "summary": "AI will transform capitalism – but how? The Guardian",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T11:33:00Z",
+      "sources": [
+        "google_news"
+      ],
+      "reason": "google_news ai_en rank=7"
+    },
+    {
+      "heat": 4.6635,
+      "source": "google_news:ai_zh",
+      "title": "复旦大学管理学院院长张付强:人工智能正在改变技术路径和商业逻辑 - 东方财富",
+      "url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE1pNmZ1WllaZl9ZUUhEZmUtMWlIdzhRblZJMS13QTRqV3hJeTZ4bzlKWFZXOU5JMVVqWjVFUUJIeFdBSUtWQWRqdjRjZ24zaUhOZ1lWN0o3Ym9sbURVQkFUXw?oc=5",
+      "score": 40,
+      "comments": 0,
+      "summary": "复旦大学管理学院院长张付强:人工智能正在改变技术路径和商业逻辑 东方财富",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T09:25:51Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_zh rank=7"
     },
     {
-      "heat": 4.357,
-      "source": "google_news:ai_en",
-      "title": "How artificial intelligence can impact defense spending - LiveNOW from FOX",
-      "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE9WYUFBb3BiX1dyUXc2RmphZFY4clU0LWdXYkNRWEJZSDVlbHJmbjNLOHk3WDA3a291dllLazVpemlJdUFDRldac0J0ZmhKdFV3elJ4WXZkRUdqWFlONHRKbTJIQdIBaEFVX3lxTE1NSUhRUWJ4X3RkWk45YTdGZUZVWGk0UWhpRUdnXzd3NDFlNVl1QkUyeHVkRmxWWHhkam5vXzdYMFNGVU9IeV9zSWtiYm0zSEp1TFF6U2RRYXM3THo2dWlCaVFwOXR0eGZt?oc=5",
-      "score": 30,
-      "comments": 0,
-      "summary": "⚡️ 一句话总结\n本文探讨了人工智能如何深刻影响国防支出，旨在揭示这一技术变革背后的财务与战略逻辑。\n\n🔥 核心亮点\n⚠️ 文章主要作为标题发布在 LiveNOW from FOX 上，正文内容目前缺失\n📝 无法提取具体的数据、案例或观点进行总结\n💡 读者可访问原文链接 https://news.google.com/rss/articles/CBMiY0FVX3lxTE9WYUFBb3BiX1dyUXc2RmphZFY4clU0LWdXYkNRWEJZSDVlbHJmbjNLOHk3WDA3a291dllLazVpemlJdUFDRldac0J0ZmhKdFV3elJ4WXZkRUdqWFlONHRKbTJIQg== 获取完整报道",
-      "summary_en": "⚡️ One-liner\nThis article from LiveNOW on FOX asks about AI's effect on military budgets but does not provide facts, specific numbers, or results in the text provided.\n\n🔥 Key takeaways\n❌ No specific spending changes are mentioned because the body lacks data.\n⚠️ No concrete impacts or examples were found to summarize.\n🛑 This section cannot be completed with accurate facts from the source.",
-      "summary_zh": "⚡️ 一句话总结\n本文探讨了人工智能如何深刻影响国防支出，旨在揭示这一技术变革背后的财务与战略逻辑。\n\n🔥 核心亮点\n⚠️ 文章主要作为标题发布在 LiveNOW from FOX 上，正文内容目前缺失\n📝 无法提取具体的数据、案例或观点进行总结\n💡 读者可访问原文链接 https://news.google.com/rss/articles/CBMiY0FVX3lxTE9WYUFBb3BiX1dyUXc2RmphZFY4clU0LWdXYkNRWEJZSDVlbHJmbjNLOHk3WDA3a291dllLazVpemlJdUFDRldac0J0ZmhKdFV3elJ4WXZkRUdqWFlONHRKbTJIQg== 获取完整报道",
-      "title_zh": "人工智能如何影响国防开支 - FOX LiveNOW",
-      "published_at": "2026-09-12T19:25:27Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=8"
-    },
-    {
-      "heat": 4.3378,
+      "heat": 4.4688,
       "source": "google_news:ai_zh",
-      "title": "Anthropic呼吁放慢先进AI模型开发 马斯克等业界大佬表示赞同 - 新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxNOHl3bVRseTBTU29FYnpHUmotbmxUMVR3bl9ZR0hNd2FOTks3cFBhMGdnRzF5YWRqbnJ4Q2dUU3YxQkNmdm5fUGQxOXlVZzJ6aWdmeUZ6TldCa3Q1MGNMOEtRQXVNcndYdkpQU2drYkFRTlZhLWJEeUFOZHNWUmtXeUZOSFNFa1k?oc=5",
+      "title": "未来从这里开始 | AI时代如何释放人才与组织的新价值 | 德勤中国 - Deloitte",
+      "url": "https://news.google.com/rss/articles/CBMimwFBVV95cUxPeWg5RGFZX0tJSFUwRW1meDBtdkFZVXI5bThacl9MUC1PcEEtZzZUX0xwWjVGSkZuanlzMU93QVhoQ3k3X08wWUtfbGxIanMxTmlpU3FIZXdGT3U1YzlBcUNHNmVMN3J1Y0hpU1A0elNFRGcycnYxMl93cXRtTGtMZmJ3Z3FfZVFkZ2xMeVNJWkhxQklCTDRNU1pMWQ?oc=5",
       "score": 30,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\nAnthropic（人类智能研究所）近期公开呼吁暂停或放慢开发最先进的 AI 模型，以此引发关于安全与发展的全球讨论 🌍。\n\n🔥 核心亮点\n🛑 Anthropic 团队主张在当前阶段暂缓训练更强大的超级模型 🔒\n✅ 埃隆·马斯克等业界大佬对此表示赞同并支持这一谨慎态度 💡\n🗣️ 此举旨在让全球有更多时间研究先进 AI 带来的潜在风险 📉\n🤝 科技巨头们正试图在创新速度与安全底线之间寻找平衡 ⚖️",
-      "summary_en": "⚡️ One-liner\nAnthropic urges slowing down advanced AI model development to manage risks, and figures like Elon Musk agree with the call for caution.\n\n🔥 Key takeaways\n🛑 Anthropic explicitly asks for a pause on rushing forward with next-gen models.\n✅ Industry leaders including Musk support prioritizing safety over speed right now.\n⏳ The goal is to let researchers figure out potential dangers before scaling up.\n🤝 This signals a shift where consensus among top AI figures favors careful progress.",
-      "summary_zh": "⚡️ 一句话总结\nAnthropic（人类智能研究所）近期公开呼吁暂停或放慢开发最先进的 AI 模型，以此引发关于安全与发展的全球讨论 🌍。\n\n🔥 核心亮点\n🛑 Anthropic 团队主张在当前阶段暂缓训练更强大的超级模型 🔒\n✅ 埃隆·马斯克等业界大佬对此表示赞同并支持这一谨慎态度 💡\n🗣️ 此举旨在让全球有更多时间研究先进 AI 带来的潜在风险 📉\n🤝 科技巨头们正试图在创新速度与安全底线之间寻找平衡 ⚖️",
-      "title_zh": "Anthropic呼吁放慢先进AI模型开发 马斯克等业界大佬表示赞同 - 新浪财经",
-      "published_at": "2026-09-12T18:22:00Z",
+      "summary": "⚡️ 一句话总结\n在 AI 时代，德勤中国发布观点探讨如何通过技术释放人才与组织的核心价值，开启全新未来。\n\n🔥 核心亮点\n💡 聚焦 AI 浪潮下人才与组织价值的重构\n🚀 探索释放新价值的潜在路径\n🌐 连接全球视野与本土实践\n🤝 携手客户共创可持续未来",
+      "summary_en": "⚡️ One-liner\nNo article content provided for Deleoit China to extract facts from.\n\n🔥 Key takeaways\n❌ No facts available in the source text.\n❌ Cannot invent details about AI or talent release.\n❌ Digest is empty because input was missing.",
+      "summary_zh": "⚡️ 一句话总结\n在 AI 时代，德勤中国发布观点探讨如何通过技术释放人才与组织的核心价值，开启全新未来。\n\n🔥 核心亮点\n💡 聚焦 AI 浪潮下人才与组织价值的重构\n🚀 探索释放新价值的潜在路径\n🌐 连接全球视野与本土实践\n🤝 携手客户共创可持续未来",
+      "title_zh": "未来从这里开始 | AI时代如何释放人才与组织的新价值 | 德勤中国 - Deloitte",
+      "published_at": "2026-09-13T13:11:16Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_zh rank=8"
     },
     {
-      "heat": 4.1222,
-      "source": "google_news:ai_zh",
-      "title": "推动软件产业实现“换道超车”（锐财经） - 证券时报",
-      "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTE1vdzk2LWZRQ1pYVmdpX0VRb0Z0QVBwcFpTNGd4aFFsd1d6RTRaOHFGOG02YU41ZkFWVVF1MVhtQmVrdTFCNGdJRzdnY1JoMGtoRkhGZGdQUXg5bnc5?oc=5",
-      "score": 20,
+      "heat": 4.3386,
+      "source": "google_news:ai_en",
+      "title": "Obama voices caution on AI, urges Democrats to tackle it, NYT says - CNBC",
+      "url": "https://news.google.com/rss/articles/CBMiowFBVV95cUxNTU5nNTZCelg4VHpDOEQ4NkttTTBBbHVoNXUyV3Y2QlRnZlZ4anlsM1FmRzVPUGZValpRbWF6R0tHX2hTem5XSnpKRlJINVktOWU3V3RRS0tuTERaZ25oc1NuSVI5ZDF6UE1zbk9mQnJLLV85V2xHRE04VXpkcHJFRXlHRE1BbVVPZjZUbWhNZERsSXR0dTE1Y0ZRY2paaE9LMWlF0gGoAUFVX3lxTE5CZ1IzaW40RFZsdE5ONm96SjNLbnd1OGxHanlvelVIc3U2SmlkazFTRWZxZlVIWEVUOGFxaTNmdmNmNFRCRExiMFE1MkdHYWdrZUJaZWxnTWlsY21MWVJ0c2otVzRqQlRYQmpPclB5SE4wNmh5WXlPVjU0RXJJS0p4QkhyRG1odmhmeFdpdi0xQVJxNlN5eDgxaERtUHRVeGx3SW5Sb0Rlcg?oc=5",
+      "score": 30,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n暂无正文内容，无法基于事实生成摘要。🧐\n\n🔥 核心亮点\n😵‍💫 文章标题未提供具体软件产业动作或成果 🚫\n📄 缺少 OpenAI、Perplexity 等实体提及的上下文 🤷‍♂️\n⏸️ 无法提取“换道超车”的具体实施路径 ✋",
-      "summary_en": "⚡️ One-liner\nThe article mentions pushing the software industry to \"overtake by changing tracks\" but provides no specific details, companies, or results in the text.\n\n🔥 Key takeaways\n❌ No actionable facts found in the provided text.",
-      "summary_zh": "⚡️ 一句话总结\n暂无正文内容，无法基于事实生成摘要。🧐\n\n🔥 核心亮点\n😵‍💫 文章标题未提供具体软件产业动作或成果 🚫\n📄 缺少 OpenAI、Perplexity 等实体提及的上下文 🤷‍♂️\n⏸️ 无法提取“换道超车”的具体实施路径 ✋",
-      "title_zh": "推动软件产业实现“换道超车”（锐财经） - 证券时报",
-      "published_at": "2026-09-13T02:12:00Z",
+      "summary": "Obama voices caution on AI, urges Democrats to tackle it, NYT says CNBC",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T07:01:42Z",
       "sources": [
         "google_news"
       ],
-      "reason": "google_news ai_zh rank=9"
+      "reason": "google_news ai_en rank=8"
     },
     {
-      "heat": 4.0393,
+      "heat": 4.1391,
       "source": "google_news:ai_en",
-      "title": "Amodei, Altman, Musk call for slowing AI model development - Los Angeles Times",
-      "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOLWV1OW96OFJwTDNCN2lkSko2S1hVY1loeXJUNThoSW9Ea212My15VEtEMXJiV1U1WS1LM1RiVFNzT3dWU1RGRjlueVpGQ3BxUW05QXhRZ2ZrbmpoZ0JYb2RyTzI4V1hhT254TTRMTnZlNG1iSVRYdzViRUFaeG5rWFVNNTNUcWwwNlRablhhT0dncGh2UjhGNnFOMWlGVlU5d1FTNzl4YUJvQQ?oc=5",
+      "title": "California Politics 360 full episode | CA leaders respond to new AI concerns - KCRA",
+      "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxPRHQ3MEJGT0RTUzdLNUhObVhxeTNHMEZQX2lPMjI4cGtodGNpb296bjA2TWpGR3F2NGdtT3BxWmJwQ2ZLelJ1eDVxUmRkYnMtTldDc2pNNTBFeTZZdVRHb0cwUUZqS1VkeE5ZUmJpM3FNN21PMG8wTmNhNjhpRnlSRk8yOU9Rci02VmNvZE82d2U?oc=5",
       "score": 20,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\nOpenAI CEO Sam Altman、xAI 创始人 Elon Musk 及 Anthropic 联合创始人 Dario Amodei 公开呼吁减缓大型 AI 模型的训练速度，以防止技术失控。\n\n🔥 核心亮点\n🤝 三家公司掌门人罕见联手发声\n⏸️ 建议降低模型开发节奏以规避风险\n🛡️ 强调需优先建立安全防御机制\n🌍 警告过快发展可能引发不可控后果",
+      "summary": "California Politics 360 full episode | CA leaders respond to new AI concerns KCRA",
       "summary_en": null,
-      "summary_zh": "⚡️ 一句话总结\nOpenAI CEO Sam Altman、xAI 创始人 Elon Musk 及 Anthropic 联合创始人 Dario Amodei 公开呼吁减缓大型 AI 模型的训练速度，以防止技术失控。\n\n🔥 核心亮点\n🤝 三家公司掌门人罕见联手发声\n⏸️ 建议降低模型开发节奏以规避风险\n🛡️ 强调需优先建立安全防御机制\n🌍 警告过快发展可能引发不可控后果",
-      "title_zh": "Amodei、Altman 和 Musk呼吁放缓AI模型开发——洛杉矶时报",
-      "published_at": "2026-09-12T22:54:00Z",
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T15:25:00Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_en rank=9"
     },
     {
-      "heat": 3.4335,
+      "heat": 4.0568,
       "source": "google_news:ai_zh",
-      "title": "“万事不决问AI”成常态？多位大学校长提醒→ - 央广网",
-      "url": "https://news.google.com/rss/articles/CBMie0FVX3lxTE5WYzVnMFB4bW4zaEEtYmVtWER4dlYxMTRrenMzVzZKcHk1S3BXaEgwYXhZZFNnbWN2Q1RtUFFMZGxYY0RzckRNOXkwcGtha0RVTGVFU0t0V3hBcE9vOGpLMDdhYWwtNzRxcUttYjVBSjRkNTczdnFBLVRjZw?oc=5",
-      "score": 10,
+      "title": "习近平在金砖峰会提出5项倡议 涵盖人工智能、数字产业和智能制造 - Shangbao Indonesia",
+      "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxPdmhHRU9Udi1ZNDRvNGhxQzE1Z21DVTJHWGdxME9LODNYS2Z5NFdrWFliZkFsczN2MGJTM0Z4MVBLR3VtdmlodE8zUjB0OGZ0Yk96R3p0M0F6QUJnTndxakpMV0VkZWhCU1FkYkZ6c2RMMmNhXy0xdUxpanBTSWxhZEJia2RYZw?oc=5",
+      "score": 20,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n多位大学校长警示：过度依赖 AI 解决所有问题已现端倪，盲目“万事不决问 AI\"可能损害独立思考和人类创造力。\n\n🔥 核心亮点\n🎓 顶尖学府掌门人发声提醒公众警惕对 AI 的过度依赖\n🧠 滥用 AI 可能导致人类丧失独立思考能力和原创思维\n⚖️ 在效率与思维退化之间，需要重新审视人与技术的关系\n🚫 “所有问题都交给 AI 做决定”的生活方式存在潜在风险",
-      "summary_en": "⚡️ One-liner\nUniversity chancellors warn that asking AI for every decision is becoming normal but may lead to over-reliance.\n\n🔥 Key takeaways\n👉 Leaders urge people to think critically before trusting AI answers\n👉 Relying solely on AI might weaken human judgment skills\n👉 Students should check facts instead of blindly following AI output",
-      "summary_zh": "⚡️ 一句话总结\n多位大学校长警示：过度依赖 AI 解决所有问题已现端倪，盲目“万事不决问 AI\"可能损害独立思考和人类创造力。\n\n🔥 核心亮点\n🎓 顶尖学府掌门人发声提醒公众警惕对 AI 的过度依赖\n🧠 滥用 AI 可能导致人类丧失独立思考能力和原创思维\n⚖️ 在效率与思维退化之间，需要重新审视人与技术的关系\n🚫 “所有问题都交给 AI 做决定”的生活方式存在潜在风险",
-      "title_zh": "“万事不决问AI”成常态？多位大学校长提醒→ - 央广网",
-      "published_at": "2026-09-13T00:36:19Z",
+      "summary": "习近平在金砖峰会提出5项倡议 涵盖人工智能、数字产业和智能制造 Shangbao Indonesia",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T12:16:00Z",
       "sources": [
         "google_news"
       ],
-      "reason": "google_news ai_zh rank=10"
+      "reason": "google_news ai_zh rank=9"
     },
     {
-      "heat": 3.2512,
+      "heat": 3.4466,
       "source": "google_news:ai_en",
-      "title": "Artificial intelligence and the left - Le Monde diplomatique - English edition",
-      "url": "https://news.google.com/rss/articles/CBMiS0FVX3lxTE5UWEJDUHhYdGdrdG5XaU81dFc2dmJXMExhdmZMdW9qNndaUFdWSnZVRU1NWngzcm1YUmlpN3VhcmsyQ2kyTFhiOGZlMA?oc=5",
+      "title": "In US-China AI Race, Kazakhstan Faces Pressure To Pick A Side - Radio Free Europe/Radio Liberty",
+      "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxQejRMdEQ2Q2dyWjJxZTc2NjdGV1JrcEM3QWx4TDNFb3I5bVdyallyTmdLcEY0RGVILVF0OWxlbU56SHVaTHpjbzM1bUNqMGVVc2xoMXpCazlPbGJFWjZ6akVBQ3R4eGVCNS0xU2pKSWtDZzRnbG5PUUNhdUVHSHFrVkpDbXjSAYQBQVVfeXFMUHo0THRENkNncloycWU3NjY3RldSa3BDN0FseEwzRW9yOW1XcmpZck5nS3BGNERlSC1RdDlsZW1Oekh1Wkx6Y28zNW1DajBlVXNsaDF6Qms5T2xiRVo2empFQUN0eHhlQjUtMVNqSklrQ2c0Z2xuT1FDYXVFR0hxa1ZKQ214?oc=5",
       "score": 10,
       "comments": 0,
-      "summary": "⚡️ 一句话总结\n暂无具体文章内容可供提取事实。\n\n🔥 核心亮点\n🚫 文中未提及任何具体动作或事件\n🛑 无可用信息生成亮点\n❓ 仅显示标题\"Artificial intelligence and the left\"",
-      "summary_en": "⚡️ One-liner\nNo facts or content were found in the provided article body to summarize.\n\n🔥 Key takeaways\n❌ The text only contains a title and URL; no facts were included.\n❓ Cannot identify specific AI actions or results.\n🧠 No left-wing arguments or evidence are present here.\n🚫 Skipping TL;DR as per strict formatting rules.",
-      "summary_zh": "⚡️ 一句话总结\n暂无具体文章内容可供提取事实。\n\n🔥 核心亮点\n🚫 文中未提及任何具体动作或事件\n🛑 无可用信息生成亮点\n❓ 仅显示标题\"Artificial intelligence and the left\"",
-      "title_zh": "人工智能与左派——《国际先驱论坛报》英文版",
-      "published_at": "2026-09-12T15:13:01Z",
+      "summary": "In US-China AI Race, Kazakhstan Faces Pressure To Pick A Side Radio Free Europe/Radio Liberty",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T13:43:56Z",
       "sources": [
         "google_news"
       ],
       "reason": "google_news ai_en rank=10"
+    },
+    {
+      "heat": 3.3235,
+      "source": "google_news:ai_zh",
+      "title": "习近平就推进“大金砖合作”提出人工智能开源普惠等五项倡议 - 财新",
+      "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE5TbnNvYmhwQmp0QWdsY19FbmNKVnFPVmlYYUhmYXZfWWJsOWVDVGZnR2NKM3VlVzk2T1NkbktsX1c4Q0Fva0stQjZLaElqR1JYS2Nla1VyQm1GR1lzOGFhblNHeWtzUC0ydUE?oc=5",
+      "score": 10,
+      "comments": 0,
+      "summary": "习近平就推进“大金砖合作”提出人工智能开源普惠等五项倡议 财新",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T08:11:00Z",
+      "sources": [
+        "google_news"
+      ],
+      "reason": "google_news ai_zh rank=10"
     }
   ]
 }
