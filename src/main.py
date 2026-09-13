@@ -66,10 +66,10 @@ def main(argv: list[str] | None = None) -> int:
         f"{mode} digest={config.paths.digest_path}"
     )
     if should_translate(args):
-        translate_model = args.translate_model or args.llm
-        zh_path = translate_digest_file(config, model=translate_model)
-        tr_provider = resolve_provider(translate_model, config)
-        tr_model = resolve_llm_model(translate_model, config, provider=tr_provider)
+        translate_flag = args.translate_model or args.llm
+        tr_provider = resolve_provider(translate_flag, config)
+        tr_model = resolve_llm_model(translate_flag, config, provider=tr_provider)
+        zh_path = translate_digest_file(config, model=tr_model)
         print(
             f"[ai_hot] translated → {zh_path} "
             f"(provider={tr_provider}, model={tr_model})"
