@@ -45,6 +45,13 @@ jobs:
           import sys
           from pathlib import Path
 
+          import yaml
+
+          cfg = yaml.safe_load(Path("config.yaml").read_text(encoding="utf-8"))
+          if not (cfg.get("site") or {}).get("hot_page_enabled", False):
+              print("hot page verify skipped: site.hot_page_enabled is false")
+              raise SystemExit(0)
+
           data = json.loads(Path("content/hot_topics/latest.json").read_text(encoding="utf-8"))
           zh = Path("public/zh/hot.html").read_text(encoding="utf-8")
           items = data.get("items") or []

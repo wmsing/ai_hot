@@ -235,6 +235,8 @@ class SiteConfig(BaseModel):
     contact_email: str = ""
     # sitemap / canonical / hreflang 用的站点根（无尾斜杠）
     base_url: str = "https://ai-hot.tonysingwm.workers.dev"
+    # 公开「今日热搜」页（与 deploy 同步易漂移，默认关闭）
+    hot_page_enabled: bool = False
 
 
 class LeaderboardConfig(BaseModel):

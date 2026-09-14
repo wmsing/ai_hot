@@ -120,6 +120,7 @@ class PageLinks:
     privacy: str
     lang_other: str
     brand_home: str
+    show_hot: bool = False
 
 
 def build_site(
@@ -211,12 +212,13 @@ def build_site(
     sitemap_urls.extend(
         [_abs_url(origin, "/arena.html"), _abs_url(origin, "/zh/arena.html")]
     )
-    hot_snap = hot_topics if hot_topics is not None else HotTopicSnapshot()
-    _write(output_dir / "hot.html", _render_hot_page("en", cfg, hot_snap))
-    _write(output_dir / "zh" / "hot.html", _render_hot_page("zh", cfg, hot_snap))
-    sitemap_urls.extend(
-        [_abs_url(origin, "/hot.html"), _abs_url(origin, "/zh/hot.html")]
-    )
+    if cfg.hot_page_enabled:
+        hot_snap = hot_topics if hot_topics is not None else HotTopicSnapshot()
+        _write(output_dir / "hot.html", _render_hot_page("en", cfg, hot_snap))
+        _write(output_dir / "zh" / "hot.html", _render_hot_page("zh", cfg, hot_snap))
+        sitemap_urls.extend(
+            [_abs_url(origin, "/hot.html"), _abs_url(origin, "/zh/hot.html")]
+        )
     _write(output_dir / "disclosure.html", _render_disclosure("en", cfg))
     _write(output_dir / "zh" / "disclosure.html", _render_disclosure("zh", cfg))
     _write(output_dir / "about.html", _render_about("en", cfg))
@@ -300,7 +302,9 @@ def build_site(
                 day=day_files.day,
                 lang="en",
                 has_other_lang=has_zh,
-                links=_links_digest_archive("en", day_s, has_zh),
+                links=_links_digest_archive(
+                    "en", day_s, has_zh, show_hot=cfg.hot_page_enabled
+                ),
                 site=cfg,
                 older_day=older_day,
                 newer_day=newer_day,
@@ -317,7 +321,9 @@ def build_site(
                 day=day_files.day,
                 lang="zh",
                 has_other_lang=has_en,
-                links=_links_digest_archive("zh", day_s, has_en),
+                links=_links_digest_archive(
+                    "zh", day_s, has_en, show_hot=cfg.hot_page_enabled
+                ),
                 site=cfg,
                 older_day=older_day,
                 newer_day=newer_day,
@@ -343,6 +349,7 @@ def _make_links(
     disclosure: str,
     lang_other: str,
     brand_home: str,
+    show_hot: bool = False,
 ) -> PageLinks:
     return PageLinks(
         css=css,
@@ -355,10 +362,17 @@ def _make_links(
         privacy=disclosure.replace("disclosure.html", "privacy.html"),
         lang_other=lang_other,
         brand_home=brand_home,
+        show_hot=show_hot,
     )
 
 
-def _links_digest_home(lang: str, day_s: str, has_other: bool) -> PageLinks:
+def _links_digest_home(
+    lang: str,
+    day_s: str,
+    has_other: bool,
+    *,
+    show_hot: bool = False,
+) -> PageLinks:
     _ = day_s
     if lang == "en":
         other = "zh/index.html" if has_other else ""
@@ -369,6 +383,7 @@ def _links_digest_home(lang: str, day_s: str, has_other: bool) -> PageLinks:
             disclosure="disclosure.html",
             lang_other=other,
             brand_home="index.html",
+            show_hot=show_hot,
         )
     other = "../index.html" if has_other else ""
     return _make_links(
@@ -378,10 +393,17 @@ def _links_digest_home(lang: str, day_s: str, has_other: bool) -> PageLinks:
         disclosure="disclosure.html",
         lang_other=other,
         brand_home="index.html",
+        show_hot=show_hot,
     )
 
 
-def _links_digest_archive(lang: str, day_s: str, has_other: bool) -> PageLinks:
+def _links_digest_archive(
+    lang: str,
+    day_s: str,
+    has_other: bool,
+    *,
+    show_hot: bool = False,
+) -> PageLinks:
     if lang == "en":
         other = f"../../zh/archive/{day_s}/index.html" if has_other else ""
         return _make_links(
@@ -391,6 +413,7 @@ def _links_digest_archive(lang: str, day_s: str, has_other: bool) -> PageLinks:
             disclosure="../../disclosure.html",
             lang_other=other,
             brand_home="../../index.html",
+            show_hot=show_hot,
         )
     other = f"../../../archive/{day_s}/index.html" if has_other else ""
     return _make_links(
@@ -400,10 +423,11 @@ def _links_digest_archive(lang: str, day_s: str, has_other: bool) -> PageLinks:
         disclosure="../../disclosure.html",
         lang_other=other,
         brand_home="../../index.html",
+        show_hot=show_hot,
     )
 
 
-def _links_root(lang: str, *, lang_other: str) -> PageLinks:
+def _links_root(lang: str, *, lang_other: str, show_hot: bool = False) -> PageLinks:
     if lang == "en":
         return _make_links(
             css="styles.css",
@@ -412,6 +436,7 @@ def _links_root(lang: str, *, lang_other: str) -> PageLinks:
             disclosure="disclosure.html",
             lang_other=lang_other,
             brand_home="index.html",
+            show_hot=show_hot,
         )
     return _make_links(
         css="../styles.css",
@@ -420,6 +445,7 @@ def _links_root(lang: str, *, lang_other: str) -> PageLinks:
         disclosure="disclosure.html",
         lang_other=lang_other,
         brand_home="index.html",
+        show_hot=show_hot,
     )
 
 
@@ -484,13 +510,16 @@ def _main_nav(lang: str, links: PageLinks) -> str:
         home_l, hot_l, arena_l = "首页", "今日热搜", "AI 模型榜"
         about_l, privacy_l = "关于", "隐私"
         nav_label = "主导航"
-    parts = [
-        f'<a href="{escape(links.home)}">{home_l}</a>',
-        f'<a href="{escape(links.hot)}">{hot_l}</a>',
-        f'<a href="{escape(links.arena)}">{arena_l}</a>',
-        f'<a href="{escape(links.about)}">{about_l}</a>',
-        f'<a href="{escape(links.privacy)}">{privacy_l}</a>',
-    ]
+    parts = [f'<a href="{escape(links.home)}">{home_l}</a>']
+    if links.show_hot:
+        parts.append(f'<a href="{escape(links.hot)}">{hot_l}</a>')
+    parts.extend(
+        [
+            f'<a href="{escape(links.arena)}">{arena_l}</a>',
+            f'<a href="{escape(links.about)}">{about_l}</a>',
+            f'<a href="{escape(links.privacy)}">{privacy_l}</a>',
+        ]
+    )
     return (
         f'<nav class="site-nav" aria-label="{nav_label}">'
         f'<div class="nav-primary">{"".join(parts)}</div>'
@@ -1771,7 +1800,9 @@ def _render_home_timeline(
     | None = None,
     has_bgm: bool = False,
 ) -> str:
-    links = _links_digest_home(lang, "", has_other_lang)
+    links = _links_digest_home(
+        lang, "", has_other_lang, show_hot=site.hot_page_enabled
+    )
     script_src = _feed_script_href(links.css)
     available: dict[str, set[tuple[str, int]]] | set[tuple[str, int]] = (
         audio_available or {}
@@ -1983,7 +2014,9 @@ def _render_arena_page(
     boards: list[ArenaLeaderboard],
 ) -> str:
     if lang == "en":
-        links = _links_root("en", lang_other="zh/arena.html")
+        links = _links_root(
+            "en", lang_other="zh/arena.html", show_hot=site.hot_page_enabled
+        )
         heading = "AI Models"
         intro = (
             "Arena AI model & agent rankings (community mirror), refreshed on each "
@@ -1993,7 +2026,9 @@ def _render_arena_page(
         )
         empty = "AI model ranking data is unavailable right now."
     else:
-        links = _links_root("zh", lang_other="../arena.html")
+        links = _links_root(
+            "zh", lang_other="../arena.html", show_hot=site.hot_page_enabled
+        )
         heading = "AI 模型榜"
         intro = (
             "Arena AI 模型与 Agent 排行（社区镜像），站点每次构建时刷新。"
@@ -2163,7 +2198,7 @@ def _render_hot_item(item: HotTopicSnapshotItem, lang: str, *, index: int) -> st
 
 def _render_hot_page(lang: str, site: SiteConfig, snapshot: HotTopicSnapshot) -> str:
     if lang == "en":
-        links = _links_root("en", lang_other="zh/hot.html")
+        links = _links_root("en", lang_other="zh/hot.html", show_hot=True)
         heading = "Trending Today"
         intro = (
             "Cross-source AI hot topics ranked by engagement, recency, and source "
@@ -2173,7 +2208,7 @@ def _render_hot_page(lang: str, site: SiteConfig, snapshot: HotTopicSnapshot) ->
         empty = "No trending topics available right now. Run the hot topics probe."
         updated = "Updated"
     else:
-        links = _links_root("zh", lang_other="../hot.html")
+        links = _links_root("zh", lang_other="../hot.html", show_hot=True)
         heading = "今日热搜"
         intro = (
             "跨源 AI 热搜榜：按互动、时效与来源权重综合排序。"
@@ -2408,6 +2443,7 @@ def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> 
             disclosure="../disclosure.html",
             lang_other="../zh/archive/index.html",
             brand_home="../index.html",
+            show_hot=site.hot_page_enabled,
         )
         heading, empty = "Archive", "No digests yet."
     else:
@@ -2418,6 +2454,7 @@ def _render_archive_index(days: list[DayFiles], lang: str, site: SiteConfig) -> 
             disclosure="../disclosure.html",
             lang_other="../../archive/index.html",
             brand_home="../index.html",
+            show_hot=site.hot_page_enabled,
         )
         heading, empty = "归档", "暂无摘要。"
 
@@ -2490,7 +2527,9 @@ def _static_page_shell(
 
 def _render_disclosure(lang: str, site: SiteConfig) -> str:
     if lang == "en":
-        links = _links_root("en", lang_other="zh/disclosure.html")
+        links = _links_root(
+            "en", lang_other="zh/disclosure.html", show_hot=site.hot_page_enabled
+        )
         heading = "Disclosure"
         if site.affiliate_enabled:
             body_text = (
@@ -2508,7 +2547,9 @@ def _render_disclosure(lang: str, site: SiteConfig) -> str:
                 "will be disclosed here and in the footer.</p>"
             )
     else:
-        links = _links_root("zh", lang_other="../disclosure.html")
+        links = _links_root(
+            "zh", lang_other="../disclosure.html", show_hot=site.hot_page_enabled
+        )
         heading = "披露说明"
         if site.affiliate_enabled:
             body_text = (
@@ -2538,7 +2579,9 @@ def _render_about(lang: str, site: SiteConfig) -> str:
     owner = _owner_blurb(lang, site)
     contact = _contact_blurb(lang, site)
     if lang == "en":
-        links = _links_root("en", lang_other="zh/about.html")
+        links = _links_root(
+            "en", lang_other="zh/about.html", show_hot=site.hot_page_enabled
+        )
         heading = "About"
         body_text = (
             f"<p><strong>{escape(SITE_NAME_EN)}</strong> is {owner} that "
@@ -2556,7 +2599,9 @@ def _render_about(lang: str, site: SiteConfig) -> str:
             f"<p>Contact: {contact}.</p>"
         )
     else:
-        links = _links_root("zh", lang_other="../about.html")
+        links = _links_root(
+            "zh", lang_other="../about.html", show_hot=site.hot_page_enabled
+        )
         heading = "关于"
         body_text = (
             f"<p><strong>{escape(SITE_NAME_EN)}</strong>（{escape(SITE_TAGLINE_ZH)}）"
@@ -2583,7 +2628,9 @@ def _render_about(lang: str, site: SiteConfig) -> str:
 def _render_privacy(lang: str, site: SiteConfig) -> str:
     contact = _contact_blurb(lang, site)
     if lang == "en":
-        links = _links_root("en", lang_other="zh/privacy.html")
+        links = _links_root(
+            "en", lang_other="zh/privacy.html", show_hot=site.hot_page_enabled
+        )
         heading = "Privacy"
         body_text = (
             "<p>This is a static site. We do not run accounts, comments, or "
@@ -2603,7 +2650,9 @@ def _render_privacy(lang: str, site: SiteConfig) -> str:
             f"<p>Questions: {contact}.</p>"
         )
     else:
-        links = _links_root("zh", lang_other="../privacy.html")
+        links = _links_root(
+            "zh", lang_other="../privacy.html", show_hot=site.hot_page_enabled
+        )
         heading = "隐私"
         body_text = (
             "<p>本站为静态站点，不提供账号、评论或页面侧服务端统计。</p>"
@@ -2633,10 +2682,14 @@ def _render_empty_home(
     site: SiteConfig,
 ) -> str:
     if lang == "en":
-        links = _links_root("en", lang_other="zh/index.html")
+        links = _links_root(
+            "en", lang_other="zh/index.html", show_hot=site.hot_page_enabled
+        )
         msg = "No digests published yet. Run publish then build."
     else:
-        links = _links_root("zh", lang_other="../index.html")
+        links = _links_root(
+            "zh", lang_other="../index.html", show_hot=site.hot_page_enabled
+        )
         msg = "尚无已发布摘要。请先 publish 再 build。"
     origin = _origin(site)
     en_path, zh_path = "/", "/zh/"
@@ -2664,10 +2717,14 @@ def _render_missing_home(
 ) -> str:
     day_s = day.isoformat()
     if lang == "en":
-        links = _links_root("en", lang_other="zh/index.html")
+        links = _links_root(
+            "en", lang_other="zh/index.html", show_hot=site.hot_page_enabled
+        )
         msg = f"English digest for {day_s} is missing."
     else:
-        links = _links_root("zh", lang_other="../index.html")
+        links = _links_root(
+            "zh", lang_other="../index.html", show_hot=site.hot_page_enabled
+        )
         msg = f"{day_s} 的中文摘要缺失。"
     origin = _origin(site)
     en_path, zh_path = "/", "/zh/"

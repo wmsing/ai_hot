@@ -65,7 +65,7 @@ Selected: 1
             arena_cache_dir=str(arena),
             site_output_dir=str(public),
         ),
-        site=SiteConfig(base_url="https://example.com"),
+        site=SiteConfig(base_url="https://example.com", hot_page_enabled=True),
     )
     out = build_site_from_content(cfg)
     assert out == public
@@ -130,7 +130,7 @@ Selected: 1
             arena_cache_dir=str(arena),
             site_output_dir=str(public),
         ),
-        site=SiteConfig(base_url="https://example.com"),
+        site=SiteConfig(base_url="https://example.com", hot_page_enabled=True),
     )
     monkeypatch.setattr("src.site_build.load_app_config", lambda: cfg)
 

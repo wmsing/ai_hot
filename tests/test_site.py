@@ -260,8 +260,8 @@ def test_build_site_outputs(tmp_path: Path) -> None:
     assert 'rel="sponsored' not in home
     assert "partner.example" not in home
     assert 'href="about.html"' in home
-    assert 'href="hot.html"' in home
-    assert ">Trending<" in home
+    assert 'href="hot.html"' not in home
+    assert ">Trending<" not in home
     assert 'href="arena.html"' in home
     assert ">AI Models<" in home
     assert 'href="privacy.html"' in home
@@ -362,7 +362,7 @@ def test_build_site_outputs(tmp_path: Path) -> None:
         ">归档<"
         not in zh_home.split('class="nav-primary">', 1)[1].split("</div>", 1)[0]
     )
-    assert 'href="hot.html">今日热搜</a>' in zh_home
+    assert 'href="hot.html"' not in zh_home
     assert 'href="archive/index.html">归档</a>' in zh_home
 
     archive_day = (out / "zh" / "archive" / "2026-09-10" / "index.html").read_text(
@@ -533,8 +533,8 @@ def test_build_site_seo(tmp_path: Path) -> None:
     assert f"<loc>{base}/zh/archive/2026-09-10/</loc>" in sitemap
     assert f"<loc>{base}/about.html</loc>" in sitemap
     assert f"<loc>{base}/arena.html</loc>" in sitemap
-    assert f"<loc>{base}/hot.html</loc>" in sitemap
-    assert f"<loc>{base}/zh/hot.html</loc>" in sitemap
+    assert f"<loc>{base}/hot.html</loc>" not in sitemap
+    assert f"<loc>{base}/zh/hot.html</loc>" not in sitemap
 
     home = (out / "index.html").read_text(encoding="utf-8")
     assert 'rel="canonical" href="https://example.test/"' in home
@@ -599,7 +599,7 @@ def test_build_site_hot_page(tmp_path: Path) -> None:
     build_site(
         content_dir=content,
         output_dir=out,
-        site=SiteConfig(base_url="https://example.test"),
+        site=SiteConfig(base_url="https://example.test", hot_page_enabled=True),
         hot_topics=snapshot,
     )
     hot_en = (out / "hot.html").read_text(encoding="utf-8")
@@ -639,7 +639,7 @@ def test_build_site_hot_page_zh_skips_english_summary_fallback(tmp_path: Path) -
     build_site(
         content_dir=content,
         output_dir=out,
-        site=SiteConfig(base_url="https://example.test"),
+        site=SiteConfig(base_url="https://example.test", hot_page_enabled=True),
         hot_topics=snapshot,
     )
     hot_zh = (out / "zh" / "hot.html").read_text(encoding="utf-8")
@@ -670,7 +670,7 @@ def test_build_site_hot_page_cross_source_badges(tmp_path: Path) -> None:
     build_site(
         content_dir=content,
         output_dir=out,
-        site=SiteConfig(base_url="https://example.test"),
+        site=SiteConfig(base_url="https://example.test", hot_page_enabled=True),
         hot_topics=snapshot,
     )
     hot_en = (out / "hot.html").read_text(encoding="utf-8")
