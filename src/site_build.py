@@ -34,9 +34,14 @@ _YT_WATCH_RE = re.compile(
     r"(?:youtube\.com/watch\?(?:[^#]*&)?v=|youtu\.be/)([A-Za-z0-9_-]{11})",
     re.IGNORECASE,
 )
-_ADHD_SECTION_MARKERS = ("🔥 核心亮点", "🔥 Key takeaways")
+_ADHD_SECTION_MARKERS = (
+    "🔥 核心亮点",
+    "🔥 Key takeaways",
+    "亮点",
+    "Highlights",
+)
 _ADHD_SECTION_BREAK_RE = re.compile(
-    r"([^\n])\n?(🔥 (?:核心亮点|Key takeaways))"
+    r"([^\n])\n?((?:🔥 (?:核心亮点|Key takeaways))|亮点|Highlights)"
 )
 
 

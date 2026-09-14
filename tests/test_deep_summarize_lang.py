@@ -44,7 +44,7 @@ def test_summarize_adhd_pair_zh_only() -> None:
 
     def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
         calls.append(system)
-        if "核心亮点" in system:
+        if "一句话" in system and "亮点" in system:
             return "⚡️ 一句话总结\n中文摘要。\n\n🔥 核心亮点\n✅ ok\n"
         raise AssertionError("EN prompt should not run for lang=zh")
 

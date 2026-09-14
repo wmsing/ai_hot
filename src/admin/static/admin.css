@@ -98,6 +98,17 @@ main {
   backdrop-filter: blur(6px);
 }
 
+.tab.hidden {
+  display: none;
+}
+
+.toolbar-hint {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
 .panel-busy-overlay.hidden {
   display: none;
 }
@@ -147,12 +158,7 @@ body.panel-busy-open {
   overflow: hidden;
 }
 
-.panel.is-busy {
-  pointer-events: none;
-  user-select: none;
-}
-
-.panel.is-busy .panel-busy-overlay {
+.panel.is-busy .panel-busy-overlay:not(.hidden) {
   pointer-events: auto;
 }
 
@@ -338,6 +344,31 @@ tr:hover td {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+.digest-adhd-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 5.5rem;
+}
+
+.digest-adhd-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.btn-compact {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+th.col-adhd,
+td.col-adhd {
+  min-width: 6.5rem;
 }
 
 .job-status {

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.models import DigestItem, HotItem
+from src.normalize import normalize_url, titles_similar
 from src.ollama_client import is_junk_summary
 from src.site_parse import parse_digest_markdown
 from src.timeutil import format_published, parse_published
@@ -50,14 +51,21 @@ def same_utc_day(generated_at: datetime, now: datetime) -> bool:
     return a == b
 
 
+def digest_item_matches(existing: HotItem, incoming: HotItem) -> bool:
+    """是否视为同一条（规范化 URL 相同或标题相似）。"""
+    left_url = normalize_url(existing.url)
+    right_url = normalize_url(incoming.url)
+    if left_url and right_url and left_url == right_url:
+        return True
+    return titles_similar(existing.title, incoming.title)
+
+
 def merge_by_url(existing: list[HotItem], new: list[HotItem]) -> list[HotItem]:
-    """保序合并：已有在前，新 URL 追加；重复 URL 跳过。"""
-    seen = {item.url for item in existing}
+    """保序合并：已有在前；URL 相同或标题相似则保留旧条、跳过新条。"""
     out = list(existing)
     for item in new:
-        if item.url in seen:
+        if any(digest_item_matches(prev, item) for prev in out):
             continue
-        seen.add(item.url)
         out.append(item)
     return out
 

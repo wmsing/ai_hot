@@ -25,7 +25,7 @@ from src.models import (
     LlmRuntime,
 )
 from src.ollama_client import llm_chat
-from src.textutil import contains_cjk, speak_plain
+from src.textutil import contains_cjk, speak_plain, strip_emoji
 
 AdhdLang = Literal["zh", "en", "both"]
 FetchBodyFn = Callable[..., str | None]
@@ -48,28 +48,65 @@ _ADHD_SYSTEM = """你是面向 ADHD 读者的中文科技资讯精写助手。
 根据用户给出的【文章正文】写摘要，硬性规则：
 1. 只根据正文事实，禁止编造正文没有的信息
 2. 专有名词可保留英文（OpenAI、Perplexity、Astra 等）
-3. 口语、短句、可有 emoji；结构必须如下（可换具体 emoji，但两级标题文字保留）：
+3. 口语、简洁、极短句；结构必须如下（两级标题文字保留）：
 
-⚡️ 一句话总结
-（一段话，点明谁做了什么、为何重要）
+一句话
+（单独一段，仅 1–2 句；不要在本段写「亮点」或 bullet）
 
-🔥 核心亮点
-（3–5 条，每条一行，以 emoji 开头，讲清动作/结果；不要写 TL;DR 或英文括号说明）
+亮点
+（另起一段；3 条，每条独立一行、短句即可）
 
-4. 只输出上述摘要正文，不要前言后语，不要 Markdown 代码块围栏"""
+4. 全文禁止 emoji 与表情符号（含亮点各行）
+5. 禁止 TL;DR、英文括号说明、编号列表、子 bullet
+6. 只输出上述摘要正文，不要前言后语，不要 Markdown 代码块围栏"""
+
+_ZH_ADHD_ONE_HEADING = "一句话"
+_ZH_ADHD_HIGHLIGHTS_HEADING = "亮点"
+_EN_ADHD_ONE_HEADING = "One line"
+_EN_ADHD_HIGHLIGHTS_HEADING = "Highlights"
+
+# 仅文本标题；旧稿若带 🔥/⚡️ 由 _normalize_adhd_heading_line 剥掉后再匹配。
+_ZH_ADHD_ONE_MARKERS = ("一句话总结", "一句话")
+_ZH_ADHD_HIGHLIGHTS_MARKERS = ("核心亮点", "亮点")
+_EN_ADHD_ONE_MARKERS = ("One-liner", "One line")
+_EN_ADHD_HIGHLIGHTS_MARKERS = ("Key takeaways", "Highlights")
+
+
+def adhd_one_markers(lang: Literal["zh", "en"]) -> tuple[str, ...]:
+    return _ZH_ADHD_ONE_MARKERS if lang == "zh" else _EN_ADHD_ONE_MARKERS
+
+
+def adhd_highlights_markers(lang: Literal["zh", "en"]) -> tuple[str, ...]:
+    return _ZH_ADHD_HIGHLIGHTS_MARKERS if lang == "zh" else _EN_ADHD_HIGHLIGHTS_MARKERS
+
+
+def adhd_canonical_headings(lang: Literal["zh", "en"]) -> tuple[str, str]:
+    if lang == "zh":
+        return _ZH_ADHD_ONE_HEADING, _ZH_ADHD_HIGHLIGHTS_HEADING
+    return _EN_ADHD_ONE_HEADING, _EN_ADHD_HIGHLIGHTS_HEADING
+
+
+def is_adhd_summary(text: str, *, lang: Literal["zh", "en"]) -> bool:
+    cleaned = text.strip()
+    if not cleaned:
+        return False
+    return any(m in cleaned for m in adhd_one_markers(lang)) and any(
+        m in cleaned for m in adhd_highlights_markers(lang)
+    )
 
 
 def extract_adhd_one_liner(text: str, *, lang: str = "zh") -> str:
-    """从 ADHD 摘要里取一句话总结正文。"""
-    marker = "一句话总结" if lang == "zh" else "One-liner"
-    stop_markers = ("核心亮点", "Key takeaways")
+    """从 ADHD 摘要里取一句话正文。"""
+    lang_key: Literal["zh", "en"] = "zh" if lang == "zh" else "en"
+    stop_markers = adhd_highlights_markers(lang_key)
     normalized = text.replace("\r\n", "\n").strip()
     if not normalized:
         return ""
     lines = normalized.split("\n")
     for idx, raw in enumerate(lines):
         line = raw.strip()
-        if marker not in line:
+        marker = next((m for m in adhd_one_markers(lang_key) if m in line), None)
+        if marker is None:
             continue
         inline = line.split(marker, 1)[-1].strip("：: \t")
         if inline:
@@ -180,17 +217,18 @@ def _hot_topic_needs_title_zh(item: HotTopicSnapshotItem) -> bool:
 _EN_ADHD_SYSTEM = """You write ADHD-friendly English tech digests from the article body.
 Hard rules:
 1. Only use facts from the body; never invent
-2. Short spoken sentences; emoji OK; keep this exact two-level structure
-   (emoji on headings may vary, but the English labels must stay):
+2. Keep proper nouns; plain, concise, very short sentences
+3. Use exactly this two-level structure (heading labels must stay):
 
-⚡️ One-liner
-(one short paragraph: who did what and why it matters)
+One line
+(its own paragraph; 1–2 sentences only; do not put Highlights or bullets here)
 
-🔥 Key takeaways
-(3–5 lines, each starts with an emoji; action/result only;
- do not write TL;DR or parenthetical English glosses)
+Highlights
+(separate paragraph; 3 lines, each on its own line; short phrases are fine)
 
-3. Output only the digest body; no preface, no Markdown fences"""
+4. No emoji or emoticons anywhere (including highlight lines)
+5. No TL;DR, parenthetical glosses, numbered lists, or sub-bullets
+6. Output only the digest body; no preface, no Markdown code fences"""
 
 
 def _normalize_adhd_summary(text: str) -> str:
@@ -201,6 +239,186 @@ def _normalize_adhd_summary(text: str) -> str:
     cleaned = cleaned.replace("Key takeaways(TL;DR)", "Key takeaways")
     cleaned = cleaned.replace("(TL;DR)", "")
     return cleaned.strip()
+
+
+def _split_marker_line(line: str, marker: str) -> str:
+    """标题行上 inline 的正文（若有）。"""
+    if marker not in line:
+        return ""
+    return line.split(marker, 1)[-1].strip("：: \t")
+
+
+def _line_has_one_marker(line: str, *, lang: Literal["zh", "en"]) -> str | None:
+    return next((m for m in adhd_one_markers(lang) if m in line), None)
+
+
+def _normalize_adhd_heading_line(line: str) -> str:
+    text = line.strip()
+    for prefix in ("🔥 ", "🔥", "⚡️ ", "⚡️"):
+        if text.startswith(prefix):
+            text = text[len(prefix) :].lstrip()
+    return text
+
+
+def _is_highlights_header(line: str, *, lang: Literal["zh", "en"]) -> bool:
+    """仅整行是亮点标题时成立（行内提及不算）。"""
+    normalized = _normalize_adhd_heading_line(line)
+    _, highlights_heading = adhd_canonical_headings(lang)
+    if normalized == highlights_heading:
+        return True
+    return normalized in adhd_highlights_markers(lang)
+
+
+def _strip_leading_bolt(text: str) -> str:
+    return _normalize_adhd_heading_line(text)
+
+
+def _clean_adhd_body_line(text: str) -> str:
+    """正文行：去 emoji、去常见列表前缀与加粗标记。"""
+    cleaned = strip_emoji(text.strip()).replace("**", "")
+    return cleaned.lstrip("-•* ").strip()
+
+
+_ADHD_MAX_HIGHLIGHT_LINES = 3
+
+
+def _digest_item_fallback_body(
+    en_item: HotItem,
+    zh_item: HotItem | None,
+    *,
+    max_chars: int = 8000,
+) -> str | None:
+    """抓页失败时给 LLM 的备用正文（已有摘要 / 口播）。"""
+    parts: list[str] = []
+    for candidate in (
+        zh_item.summary if zh_item else "",
+        en_item.summary,
+        zh_item.speak_summary if zh_item else "",
+        en_item.speak_summary or "",
+    ):
+        text = (candidate or "").strip()
+        if len(text) < 24:
+            continue
+        if is_adhd_summary(text, lang="zh") or is_adhd_summary(text, lang="en"):
+            parts.append(speak_plain(text))
+        else:
+            parts.append(text)
+    if not parts:
+        return None
+    body = "\n\n".join(parts)
+    return body[:max_chars] if len(body) > max_chars else body
+
+
+def _retidy_existing_adhd_pair(
+    en_item: HotItem,
+    zh_item: HotItem | None,
+) -> tuple[str | None, str | None] | None:
+    """不调用 LLM：把已有 ADHD 摘要整理为新格式并去 emoji。"""
+    zh_raw = (zh_item.summary if zh_item else "").strip()
+    en_raw = (en_item.summary or "").strip()
+    zh_out = (
+        tidy_adhd_summary(zh_raw, lang="zh")
+        if zh_raw and is_adhd_summary(zh_raw, lang="zh")
+        else None
+    )
+    en_out = (
+        tidy_adhd_summary(en_raw, lang="en")
+        if en_raw and is_adhd_summary(en_raw, lang="en")
+        else None
+    )
+    if not zh_out and not en_out:
+        return None
+    changed_zh = bool(zh_out and zh_raw and zh_out != zh_raw)
+    changed_en = bool(en_out and en_raw and en_out != en_raw)
+    if not changed_zh and not changed_en:
+        return None
+    return en_out or en_raw or None, zh_out or zh_raw or None
+
+
+def _split_line_on_highlights(
+    line: str, *, lang: Literal["zh", "en"]
+) -> tuple[str, list[str]]:
+    """行内出现亮点标题时拆开，返回 (一句正文片段, 已拆出的 bullet 行)。"""
+    for marker in sorted(adhd_highlights_markers(lang), key=len, reverse=True):
+        if marker not in line:
+            continue
+        before, after = line.split(marker, 1)
+        spill = after.strip()
+        bullets: list[str] = []
+        if spill:
+            bullets.append(_clean_adhd_body_line(spill))
+        return _clean_adhd_body_line(before), bullets
+    return _clean_adhd_body_line(line), []
+
+
+def tidy_adhd_summary(text: str, *, lang: Literal["zh", "en"]) -> str:
+    """整理 ADHD 结构：分段、统一标题；不截断正文。"""
+    cleaned = _normalize_adhd_summary(text)
+    if not cleaned:
+        return cleaned
+    one_heading, highlights_heading = adhd_canonical_headings(lang)
+    if not is_adhd_summary(cleaned, lang=lang):
+        return cleaned
+
+    lines = cleaned.replace("\r\n", "\n").split("\n")
+    one_parts: list[str] = []
+    bullets: list[str] = []
+    phase = "seek_one"
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        one_marker = _line_has_one_marker(line, lang=lang)
+        if phase == "seek_one":
+            if one_marker and _is_highlights_header(line, lang=lang):
+                phase = "bullets"
+                continue
+            if one_marker:
+                inline = _split_marker_line(line, one_marker)
+                if inline:
+                    one_parts.append(_strip_leading_bolt(inline))
+                phase = "one_body"
+                continue
+            if _is_highlights_header(line, lang=lang):
+                phase = "bullets"
+                continue
+            one_parts.append(_strip_leading_bolt(line))
+            continue
+        if phase == "one_body":
+            if _is_highlights_header(line, lang=lang):
+                phase = "bullets"
+                continue
+            chunk, spill = _split_line_on_highlights(line, lang=lang)
+            if chunk:
+                one_parts.append(_strip_leading_bolt(chunk))
+            if spill:
+                bullets.extend(spill)
+                phase = "bullets"
+            continue
+        if _is_highlights_header(line, lang=lang):
+            continue
+        bullets.append(_clean_adhd_body_line(line))
+
+    one_liner = _clean_adhd_body_line(_strip_leading_bolt(" ".join(one_parts).strip()))
+    for marker in adhd_highlights_markers(lang):
+        if marker in one_liner:
+            before, after = one_liner.split(marker, 1)
+            one_liner = before.strip()
+            spill_text = after.strip()
+            if spill_text:
+                bullets.insert(0, spill_text)
+            break
+
+    if not one_liner and not bullets:
+        return cleaned
+
+    cleaned_bullets = [
+        line for line in (_clean_adhd_body_line(b) for b in bullets) if line
+    ][: _ADHD_MAX_HIGHLIGHT_LINES]
+    parts = [one_heading, one_liner]
+    if cleaned_bullets:
+        parts.extend(["", highlights_heading, *cleaned_bullets])
+    return "\n".join(parts).strip()
 
 
 def _normalize_url(url: str) -> str:
@@ -292,23 +510,25 @@ def summarize_adhd_pair(
         user_payload = (
             f"Title: {title}\nURL: {url}\nSource: {source}\n\n【文章正文】\n{body}\n"
         )
-        zh_summary = _normalize_adhd_summary(
-            chat_fn(system=_ADHD_SYSTEM, user=user_payload, llm=llm).strip()
+        zh_summary = tidy_adhd_summary(
+            chat_fn(system=_ADHD_SYSTEM, user=user_payload, llm=llm).strip(),
+            lang="zh",
         )
-        if not zh_summary or "一句话总结" not in zh_summary:
+        if not zh_summary or not is_adhd_summary(zh_summary, lang="zh"):
             logger.warning("summarize_adhd weak ZH output url=%s", url[:120])
             if lang in {"zh", "both"}:
                 return None
 
     if lang in {"en", "both"}:
-        en_summary = _normalize_adhd_summary(
+        en_summary = tidy_adhd_summary(
             chat_fn(
                 system=_EN_ADHD_SYSTEM,
                 user=(f"Title: {title}\nURL: {url}\n\nArticle body:\n{body}\n"),
                 llm=llm,
-            ).strip()
+            ).strip(),
+            lang="en",
         )
-        if not en_summary or "One-liner" not in en_summary:
+        if not en_summary or not is_adhd_summary(en_summary, lang="en"):
             logger.warning("summarize_adhd weak EN output url=%s", url[:120])
             if lang == "en":
                 return None
@@ -325,16 +545,14 @@ def summarize_adhd_pair(
 
 def _hot_topic_has_adhd_zh(item: HotTopicSnapshotItem) -> bool:
     zh = (item.summary_zh or "").strip()
-    if "一句话总结" in zh:
-        return True
-    return bool(zh and contains_cjk(zh) and "核心亮点" in zh)
+    return is_adhd_summary(zh, lang="zh") or bool(
+        zh and contains_cjk(zh) and "核心亮点" in zh
+    )
 
 
 def _hot_topic_has_adhd_en(item: HotTopicSnapshotItem) -> bool:
     en = (item.summary_en or "").strip()
-    if "One-liner" in en:
-        return True
-    return bool(en and "Key takeaways" in en)
+    return is_adhd_summary(en, lang="en")
 
 
 def _hot_topic_needs_adhd(
@@ -356,7 +574,7 @@ def _hot_topic_has_adhd_summary(item: HotTopicSnapshotItem) -> bool:
     """已有完整 ADHD 或 probe 摘要直译则跳过。"""
     zh = (item.summary_zh or "").strip()
     en = (item.summary_en or "").strip()
-    if "一句话总结" in zh and "One-liner" in en:
+    if is_adhd_summary(zh, lang="zh") and is_adhd_summary(en, lang="en"):
         return True
     return bool(zh and en and contains_cjk(zh))
 
@@ -417,10 +635,11 @@ def deep_summarize_digest(
     fetch_body: FetchBodyFn | None = None,
     chat: ChatFn | None = None,
     should_stop: ShouldStopFn | None = None,
-) -> tuple[Path, Path, int]:
+) -> tuple[Path, Path, int, str | None]:
     """对指定 URL 抓全文并写回 en/zh digest（逐条落盘）。
 
-    返回 (en_path, zh_path, changed)。
+    返回 (en_path, zh_path, changed, write_mode)。
+    write_mode 为 llm / retidy（仅整理已有 ADHD，未调 LLM）。
     """
     url_list = [_normalize_url(u) for u in urls if u.strip()]
     if not url_list:
@@ -466,6 +685,7 @@ def deep_summarize_digest(
     owns_client = client is None
     http = client or build_client(config.http)
     changed = 0
+    last_mode: str | None = None
     stopped = False
 
     try:
@@ -475,11 +695,14 @@ def deep_summarize_digest(
                 break
             item = en_by_url[key]
             url = item.url.strip()
+            prev_zh = zh_by_url.get(key)
+            fallback_body = _digest_item_fallback_body(item, prev_zh, max_chars=max_chars)
             logger.info(
                 "deep_summarize fetch url=%s model=%s",
                 url[:120],
                 llm.model,
             )
+            write_mode = "llm"
             pair = summarize_adhd_pair(
                 title=item.title,
                 url=url,
@@ -489,16 +712,19 @@ def deep_summarize_digest(
                 max_chars=max_chars,
                 fetch_body=fetch_fn,
                 chat=chat_fn,
+                fallback_body=fallback_body,
             )
             if pair is None:
-                continue
+                pair = _retidy_existing_adhd_pair(item, prev_zh)
+                if pair is None:
+                    continue
+                write_mode = "retidy"
             en_summary, zh_summary = pair
             if not en_summary:
                 en_summary = (item.summary or "").strip()
             if not zh_summary:
                 continue
 
-            prev_zh = zh_by_url.get(key)
             if prev_zh and prev_zh.title.strip():
                 zh_title = prev_zh.title
             else:
@@ -529,10 +755,12 @@ def deep_summarize_digest(
             )
             en_by_url[key] = en_item
             changed += 1
+            last_mode = write_mode
             logger.info(
-                "deep_summarize wrote item url=%s changed=%s",
+                "deep_summarize wrote item url=%s changed=%s mode=%s",
                 url[:120],
                 changed,
+                write_mode,
             )
     finally:
         if owns_client:
@@ -542,7 +770,7 @@ def deep_summarize_digest(
         logger.info("deep_summarize digest stopped early changed=%s", changed)
     if not changed:
         logger.info("deep_summarize: nothing written")
-        return en_path, zh_path, 0
+        return en_path, zh_path, 0, None
 
     logger.info(
         "deep_summarize wrote en=%s zh=%s changed=%s",
@@ -550,7 +778,7 @@ def deep_summarize_digest(
         zh_path,
         changed,
     )
-    return en_path, zh_path, changed
+    return en_path, zh_path, changed, last_mode
 
 
 def translate_hot_topic_titles(
@@ -828,7 +1056,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: provide --url and/or --hot-topics", file=sys.stderr)
         return 2
     config = load_app_config()
-    en_path, zh_path, n = deep_summarize_digest(
+    en_path, zh_path, n, _mode = deep_summarize_digest(
         config,
         urls=args.url,
         llm_flag=args.llm,

@@ -4,13 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI Hot Admin</title>
-    <link rel="stylesheet" href="/static/admin.css" />
+    <link rel="stylesheet" href="/static/admin.css?v=20260915-retidy" />
   </head>
   <body>
     <header class="topbar">
       <div>
         <h1>AI Hot Admin</h1>
-        <p class="meta" id="meta-line">本地管理 · 热搜 + Digest</p>
+        <p class="meta" id="meta-line">本地管理 · Digest 归档</p>
       </div>
       <div class="topbar-actions">
         <button id="btn-pull" class="btn" title="从 HN/RSS 等拉取新数据，归档到 content/（覆盖当日 digest）">拉取数据</button>
@@ -21,12 +21,13 @@
     </header>
 
     <nav class="tabs">
-      <button class="tab active" data-tab="hot">今日热搜</button>
-      <button class="tab" data-tab="digest">Digest 归档</button>
+      <button class="tab hidden" data-tab="hot" id="tab-hot">今日热搜</button>
+      <button class="tab active" data-tab="digest">按发布日</button>
+      <button class="tab" data-tab="recent">近5日一览</button>
     </nav>
 
     <main>
-      <section id="panel-hot" class="panel active">
+      <section id="panel-hot" class="panel">
         <div
           id="hot-busy-overlay"
           class="panel-busy-overlay hidden"
@@ -69,7 +70,7 @@
         </div>
       </section>
 
-      <section id="panel-digest" class="panel">
+      <section id="panel-digest" class="panel active">
         <div
           id="digest-busy-overlay"
           class="panel-busy-overlay hidden"
@@ -122,11 +123,71 @@
                 <th>summary (zh)</th>
                 <th>url</th>
                 <th>mp3</th>
-                <th>ADHD</th>
+                <th class="col-adhd">ADHD</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody id="digest-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="panel-recent" class="panel">
+        <div
+          id="recent-busy-overlay"
+          class="panel-busy-overlay hidden"
+          role="status"
+          aria-live="polite"
+          aria-hidden="true"
+        >
+          <div class="panel-busy-card">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="recent-busy-label">Digest LLM 任务进行中…</p>
+          </div>
+        </div>
+        <div
+          id="recent-speak-busy-overlay"
+          class="panel-busy-overlay hidden"
+          role="status"
+          aria-live="polite"
+          aria-hidden="true"
+        >
+          <div class="panel-busy-card">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="recent-speak-busy-label">口播 mp3 生成中…</p>
+          </div>
+        </div>
+        <p class="toolbar-hint" id="recent-range-hint">首页最近 5 个发布日的全部条目；改完 → 重建站点 → 发布推送。</p>
+        <div class="toolbar">
+          <button id="btn-recent-translate-all" class="btn">翻译全部标题</button>
+          <button id="btn-recent-translate-summaries" class="btn">翻译全部摘要</button>
+          <button id="btn-recent-adhd-selected" class="btn" disabled>重做ADHD选中</button>
+          <button id="btn-recent-speak-stale" class="btn">生成过期 mp3</button>
+          <button id="btn-recent-speak-selected" class="btn" disabled>生成选中 mp3</button>
+          <button id="btn-recent-refresh" class="btn ghost">刷新</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-check">
+                  <input type="checkbox" id="recent-select-all" aria-label="全选近5日" />
+                </th>
+                <th>发布日</th>
+                <th>归档</th>
+                <th>#</th>
+                <th>feed</th>
+                <th>title (en)</th>
+                <th>title (zh)</th>
+                <th>summary (en)</th>
+                <th>summary (zh)</th>
+                <th>url</th>
+                <th>mp3</th>
+                <th class="col-adhd">ADHD</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="recent-tbody"></tbody>
           </table>
         </div>
       </section>
@@ -143,6 +204,6 @@
       </form>
     </dialog>
 
-    <script src="/static/admin.js"></script>
+    <script src="/static/admin.js?v=20260915-retidy"></script>
   </body>
 </html>

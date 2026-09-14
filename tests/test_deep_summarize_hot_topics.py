@@ -78,9 +78,9 @@ def test_summarize_adhd_pair_uses_fallback_body() -> None:
 
     def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
         calls.append(system)
-        if "核心亮点" in system:
+        if "一句话" in system and "亮点" in system:
             return "⚡️ 一句话总结\nReddit 帖总结。\n\n🔥 核心亮点\n✅ ok\n"
-        return "⚡️ One-liner\nReddit post summary.\n\n🔥 Key takeaways\n✅ ok\n"
+        return "One line\nReddit post summary.\n\nHighlights\n✅ ok\n"
 
     pair = mod.summarize_adhd_pair(
         title="Reddit post",
@@ -93,7 +93,7 @@ def test_summarize_adhd_pair_uses_fallback_body() -> None:
         fallback_body="Reddit selftext about the model release.",
     )
     assert pair is not None
-    assert "一句话总结" in pair[1]
+    assert "一句话" in pair[1]
     assert len(calls) == 2
 
 
@@ -144,8 +144,9 @@ def test_deep_summarize_hot_topics_updates_snapshot(
             return "热榜 AI 故事"
         if "技术资讯翻译" in system:
             return "关于新模型刷榜的中文简介。"
-        if "核心亮点" in system:
+        if "一句话" in system and "亮点" in system:
             return "⚡️ 一句话总结\n新模型刷榜。\n\n🔥 核心亮点\n🚀 分数更高\n"
+        assert "One line" in system and "Highlights" in system
         return (
             "⚡️ One-liner\nA new model tops the chart.\n\n"
             "🔥 Key takeaways\n🚀 Higher score\n"
@@ -164,9 +165,9 @@ def test_deep_summarize_hot_topics_updates_snapshot(
     loaded = load_hot_topics_snapshot(snap_path)
     assert loaded is not None
     assert loaded.items[0].summary_zh is not None
-    assert "一句话总结" in loaded.items[0].summary_zh
+    assert "一句话" in (loaded.items[0].summary_zh or "")
     assert loaded.items[0].summary_en is not None
-    assert "One-liner" in loaded.items[0].summary_en
+    assert "One line" in (loaded.items[0].summary_en or "")
     assert loaded.items[0].title_zh == "热榜 AI 故事"
     assert loaded.items[0].title_zh != "新模型刷榜。"
 
@@ -275,8 +276,9 @@ def test_deep_summarize_hot_topics_skips_already_done(
     def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
         if "标题翻译" in system:
             return "已完成" if user == "Done" else "新条目标题"
-        if "核心亮点" in system:
+        if "一句话" in system and "亮点" in system:
             return "⚡️ 一句话总结\n新条目。\n\n🔥 核心亮点\n🆕 new\n"
+        assert "One line" in system and "Highlights" in system
         return "⚡️ One-liner\nNew item.\n\n🔥 Key takeaways\n🆕 new\n"
 
     _, n = mod.deep_summarize_hot_topics(
@@ -338,7 +340,7 @@ def test_save_hot_topics_snapshot_preserves_summaries(tmp_path: Path) -> None:
     assert merged.items[0].title == "New title"
     assert merged.items[0].heat == 8.5
     assert merged.items[0].summary_en is not None
-    assert "One-liner" in merged.items[0].summary_en
+    assert "One-liner" in (merged.items[0].summary_en or "")
     assert merged.items[0].summary_zh is not None
-    assert "一句话总结" in merged.items[0].summary_zh
+    assert "一句话总结" in (merged.items[0].summary_zh or "")
     assert merged.items[0].title_zh == "保留。"

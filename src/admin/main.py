@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     from src.admin.app import create_app
 
     app = create_app()
-    print(f"[ai_hot] admin → http://{args.host}:{args.port}/")
+    print(f"[ai_hot] admin → http://{args.host}:{args.port}/digest/")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
 

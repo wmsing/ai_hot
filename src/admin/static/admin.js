@@ -1,7 +1,11 @@
+const RECENT_DAYS_LIMIT = 5;
+
 const state = {
-  tab: "hot",
+  tab: "digest",
+  hotPageEnabled: false,
   hotItems: [],
   digestDay: "",
+  recentPublishedDays: [],
   digestItems: [],
   editContext: null,
   hotTopicsLlmBusy: false,
@@ -34,12 +38,22 @@ async function api(path, options = {}) {
 
 function hasHotAdhdZh(item) {
   const zh = (item.summary_zh || "").trim();
-  return zh.includes("一句话总结") || zh.includes("🔥 核心亮点");
+  return (
+    zh.includes("一句话") ||
+    zh.includes("一句话总结") ||
+    zh.includes("亮点") ||
+    zh.includes("核心亮点")
+  );
 }
 
 function hasHotAdhdEn(item) {
   const en = (item.summary_en || "").trim();
-  return en.includes("One-liner") || en.includes("🔥 Key takeaways");
+  return (
+    en.includes("One line") ||
+    en.includes("One-liner") ||
+    en.includes("Highlights") ||
+    en.includes("Key takeaways")
+  );
 }
 
 function hasHotAdhd(item) {
@@ -113,15 +127,27 @@ function setJobStatus(text) {
 
 function setPanelBusy(panelId, overlayId, labelId, busy, label) {
   const panel = document.getElementById(panelId);
-  const overlay = document.getElementById(overlayId);
-  const labelEl = document.getElementById(labelId);
-  if (!panel || !overlay) return;
+  const overlay = overlayId ? document.getElementById(overlayId) : null;
+  const labelEl = labelId ? document.getElementById(labelId) : null;
+  if (!panel) return;
   panel.classList.toggle("is-busy", busy);
-  overlay.classList.toggle("hidden", !busy);
-  overlay.setAttribute("aria-hidden", busy ? "false" : "true");
+  if (overlay) {
+    overlay.classList.toggle("hidden", !busy);
+    overlay.setAttribute("aria-hidden", busy ? "false" : "true");
+  }
   const hotOpen = !document.getElementById("hot-busy-overlay")?.classList.contains("hidden");
   const digestOpen = !document.getElementById("digest-busy-overlay")?.classList.contains("hidden");
-  document.body.classList.toggle("panel-busy-open", hotOpen || digestOpen);
+  const recentOpen = !document.getElementById("recent-busy-overlay")?.classList.contains("hidden");
+  const digestSpeakOpen = !document
+    .getElementById("digest-speak-busy-overlay")
+    ?.classList.contains("hidden");
+  const recentSpeakOpen = !document
+    .getElementById("recent-speak-busy-overlay")
+    ?.classList.contains("hidden");
+  document.body.classList.toggle(
+    "panel-busy-open",
+    hotOpen || digestOpen || recentOpen || digestSpeakOpen || recentSpeakOpen,
+  );
   if (labelEl && label) labelEl.textContent = label;
   panel.querySelectorAll("button, select, input, textarea, a").forEach((el) => {
     if (busy) {
@@ -156,12 +182,14 @@ function setHotTopicsLlmBusy(busy, label = "热搜 LLM 任务进行中…") {
 function setDigestLlmBusy(busy, label = "Digest LLM 任务进行中…") {
   state.digestLlmBusy = busy;
   setPanelBusy("panel-digest", "digest-busy-overlay", "digest-busy-label", busy, label);
+  setPanelBusy("panel-recent", "recent-busy-overlay", "recent-busy-label", busy, label);
   updateDigestSelectionUi();
 }
 
 function setDigestSpeakBusy(busy, label = "口播 mp3 生成中…") {
   state.digestSpeakBusy = busy;
   setPanelBusy("panel-digest", "digest-speak-busy-overlay", "digest-speak-busy-label", busy, label);
+  setPanelBusy("panel-recent", "recent-speak-busy-overlay", "recent-speak-busy-label", busy, label);
   updateDigestSelectionUi();
 }
 
@@ -226,9 +254,25 @@ async function pollJob(jobId, label, maxLoops = 120) {
   throw new Error(`${label} 超时`);
 }
 
+function applyHotPageVisibility(enabled) {
+  state.hotPageEnabled = Boolean(enabled);
+  const tab = document.getElementById("tab-hot");
+  const panel = document.getElementById("panel-hot");
+  if (tab) tab.classList.toggle("hidden", !state.hotPageEnabled);
+  if (panel && !state.hotPageEnabled && state.tab === "hot") {
+    switchTab("digest", { sync: true, replace: true });
+  }
+}
+
 async function loadMeta() {
   const meta = await api("/api/meta");
-  $("#meta-line").textContent = `热搜: ${meta.hot_topics_path} · Digest: ${meta.content_digests_dir}`;
+  const digestPath = meta.content_digests_dir;
+  if (meta.hot_page_enabled) {
+    $("#meta-line").textContent = `热搜: ${meta.hot_topics_path} · Digest: ${digestPath}`;
+  } else {
+    $("#meta-line").textContent = `Digest: ${digestPath}`;
+  }
+  applyHotPageVisibility(meta.hot_page_enabled);
   setHotTopicsLlmBusy(Boolean(meta.hot_topics_llm_busy));
 }
 
@@ -240,16 +284,38 @@ function pruneHotSelection() {
 }
 
 function digestRowKey(item) {
-  const archiveDay = item.archive_day || state.digestDay;
-  return `${archiveDay}:${item.index}`;
+  const archiveDay = item.archive_day;
+  if (!archiveDay) {
+    throw new Error("条目缺少 archive_day，无法定位归档文件");
+  }
+  return `${archiveDay}|${item.index}`;
 }
 
 function parseDigestRowKey(key) {
-  const splitAt = key.lastIndexOf(":");
-  return {
-    archiveDay: key.slice(0, splitAt),
-    index: Number(key.slice(splitAt + 1)),
-  };
+  const pipeAt = key.lastIndexOf("|");
+  if (pipeAt > 0) {
+    return {
+      archiveDay: key.slice(0, pipeAt),
+      index: Number(key.slice(pipeAt + 1)),
+    };
+  }
+  const colonAt = key.lastIndexOf(":");
+  if (colonAt > 0 && /^\d{4}-\d{2}-\d{2}:\d+$/.test(key)) {
+    return {
+      archiveDay: key.slice(0, colonAt),
+      index: Number(key.slice(colonAt + 1)),
+    };
+  }
+  throw new Error(`无法解析条目键: ${key}`);
+}
+
+function digestRowFromButton(btn) {
+  const archiveDay = btn.getAttribute("data-archive-day") || btn.dataset.archiveDay || "";
+  const index = Number(btn.getAttribute("data-item-index") || btn.dataset.itemIndex);
+  if (!archiveDay || !Number.isFinite(index)) {
+    throw new Error("无法定位条目（缺少归档日或序号）");
+  }
+  return { archiveDay, index };
 }
 
 function findDigestItem(key) {
@@ -268,7 +334,8 @@ function selectedDigestItems() {
 function groupDigestItemsByArchive(items) {
   const groups = new Map();
   items.forEach((item) => {
-    const archiveDay = item.archive_day || state.digestDay;
+    const archiveDay = item.archive_day;
+    if (!archiveDay) return;
     if (!groups.has(archiveDay)) groups.set(archiveDay, []);
     groups.get(archiveDay).push(item.index);
   });
@@ -322,10 +389,31 @@ function updateDigestSelectionUi() {
   }
   const staleBtn = $("#btn-digest-speak-stale");
   if (staleBtn) staleBtn.disabled = busy;
+  const recentAdhd = $("#btn-recent-adhd-selected");
+  if (recentAdhd) {
+    recentAdhd.disabled = n === 0 || busy;
+    recentAdhd.textContent = n ? `重做ADHD选中 (${n})` : "重做ADHD选中";
+  }
+  const recentSpeak = $("#btn-recent-speak-selected");
+  if (recentSpeak) {
+    recentSpeak.disabled = n === 0 || busy;
+    recentSpeak.textContent = n ? `生成选中 mp3 (${n})` : "生成选中 mp3";
+  }
+  const recentStale = $("#btn-recent-speak-stale");
+  if (recentStale) recentStale.disabled = busy;
+  const recentTranslateTitles = $("#btn-recent-translate-all");
+  if (recentTranslateTitles) recentTranslateTitles.disabled = busy;
+  const recentTranslateSummaries = $("#btn-recent-translate-summaries");
+  if (recentTranslateSummaries) recentTranslateSummaries.disabled = busy;
   const selectAll = $("#digest-select-all");
-  if (selectAll && state.digestItems.length) {
+  if (selectAll && state.tab === "digest" && state.digestItems.length) {
     selectAll.checked = n > 0 && n === state.digestItems.length;
     selectAll.indeterminate = n > 0 && n < state.digestItems.length;
+  }
+  const recentSelectAll = $("#recent-select-all");
+  if (recentSelectAll && state.tab === "recent" && state.digestItems.length) {
+    recentSelectAll.checked = n > 0 && n === state.digestItems.length;
+    recentSelectAll.indeterminate = n > 0 && n < state.digestItems.length;
   }
 }
 
@@ -357,7 +445,9 @@ function renderHotTopics() {
         <button class="btn" data-hot-edit='${esc(item.url)}'>编辑</button>
         ${needsTitleZh(item) ? `<button class="btn" data-hot-translate='${esc(item.url)}'>译</button>` : ""}
         ${needsHotAdhdZh(item) ? `<button class="btn" data-hot-adhd-zh='${esc(item.url)}'>摘要</button>` : ""}
+        ${hasHotAdhdZh(item) ? `<button class="btn" data-hot-adhd-redo-zh='${esc(item.url)}' title="按最新 prompt 重新生成中文 ADHD">重做摘要</button>` : ""}
         ${needsHotAdhdEn(item) ? `<button class="btn" data-hot-adhd-en='${esc(item.url)}'>EN</button>` : ""}
+        ${hasHotAdhdEn(item) ? `<button class="btn" data-hot-adhd-redo-en='${esc(item.url)}' title="Regenerate EN ADHD with latest prompt">重做 EN</button>` : ""}
         ${hasHotAdhd(item) ? `<button class="btn" data-hot-copy-digest='${esc(item.url)}' title="复制到 Digest 归档">→Digest</button>` : ""}
         <button class="btn danger" data-hot-del='${esc(item.url)}'>删</button>
       </td>
@@ -376,6 +466,12 @@ function renderHotTopics() {
   });
   tbody.querySelectorAll("[data-hot-adhd-en]").forEach((btn) => {
     btn.addEventListener("click", () => runHotAdhd(btn.dataset.hotAdhdEn, "en"));
+  });
+  tbody.querySelectorAll("[data-hot-adhd-redo-zh]").forEach((btn) => {
+    btn.addEventListener("click", () => runHotAdhd(btn.dataset.hotAdhdRedoZh, "zh", true));
+  });
+  tbody.querySelectorAll("[data-hot-adhd-redo-en]").forEach((btn) => {
+    btn.addEventListener("click", () => runHotAdhd(btn.dataset.hotAdhdRedoEn, "en", true));
   });
   tbody.querySelectorAll("[data-hot-copy-digest]").forEach((btn) => {
     btn.addEventListener("click", () => copyHotToDigest(btn.dataset.hotCopyDigest));
@@ -413,6 +509,83 @@ async function loadDigest() {
   updateDigestSelectionUi();
 }
 
+async function reloadDigestView() {
+  if (state.tab === "recent") {
+    await loadRecent();
+  } else {
+    await loadDigest();
+  }
+}
+
+async function loadRecent() {
+  const data = await api(`/api/digest-recent?limit=${RECENT_DAYS_LIMIT}`);
+  state.digestItems = data.items || [];
+  state.recentPublishedDays = data.published_days || [];
+  const hint = $("#recent-range-hint");
+  if (hint) {
+    const days = state.recentPublishedDays.join("、") || "—";
+    hint.textContent = `首页最近 ${data.limit} 个发布日（${days}）的全部条目；改完 → 重建站点 → 发布推送。`;
+  }
+  pruneDigestSelection();
+  renderRecent();
+  updateDigestSelectionUi();
+}
+
+function digestAdhdCell(item) {
+  const archiveDay = esc(item.archive_day || "");
+  const index = item.index;
+  const rowAttrs = `data-archive-day="${archiveDay}" data-item-index="${index}"`;
+  const adhdLabel = item.has_adhd ? "重做ADHD" : "ADHD";
+  const adhdTitle = item.has_adhd
+    ? "按最新 prompt 重新抓页并生成中/英 ADHD"
+    : "生成 ADHD 摘要";
+  const hotBadge =
+    item.hot_topic_match && !item.has_adhd
+      ? ' <span class="badge stale" title="热搜已有 ADHD">热搜✓</span>'
+      : "";
+  return `<div class="digest-adhd-cell">
+      <div class="digest-adhd-badges">
+        <span class="badge ${item.has_adhd ? "ok" : "no"}">${item.has_adhd ? "yes" : "no"}</span>${hotBadge}
+      </div>
+      <button type="button" class="btn btn-compact" data-digest-adhd ${rowAttrs} title="${esc(adhdTitle)}">${adhdLabel}</button>
+    </div>`;
+}
+
+function digestActionCells(item) {
+  const archiveDay = esc(item.archive_day || "");
+  const index = item.index;
+  const key = esc(digestRowKey(item));
+  const rowAttrs = `data-archive-day="${archiveDay}" data-item-index="${index}"`;
+  return `
+        <button class="btn" data-digest-edit ${rowAttrs} data-digest-key="${key}">编辑</button>
+        ${item.can_copy_hot_adhd ? `<button class="btn" data-digest-copy-hot-adhd ${rowAttrs} data-digest-key="${key}" title="从今日热搜复制 ADHD">复制ADHD</button>` : ""}
+        <button class="btn danger" data-digest-del ${rowAttrs}>删</button>`;
+}
+
+function bindDigestTableRows(tbody, rowCheckClass) {
+  tbody.querySelectorAll("[data-digest-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => openDigestEdit(btn));
+  });
+  tbody.querySelectorAll("[data-digest-copy-hot-adhd]").forEach((btn) => {
+    btn.addEventListener("click", () => copyDigestHotAdhd(btn));
+  });
+  tbody.querySelectorAll("[data-digest-adhd]").forEach((btn) => {
+    btn.addEventListener("click", () => runDigestAdhd(btn));
+  });
+  tbody.querySelectorAll("[data-digest-del]").forEach((btn) => {
+    btn.addEventListener("click", () => deleteDigest(btn));
+  });
+  tbody.querySelectorAll(rowCheckClass).forEach((box) => {
+    box.addEventListener("change", () => {
+      const key = box.dataset.digestCheck;
+      if (box.checked) state.digestSelectedKeys.add(key);
+      else state.digestSelectedKeys.delete(key);
+      updateDigestSelectionUi();
+    });
+  });
+  updateDigestSelectionUi();
+}
+
 function renderDigest() {
   const tbody = $("#digest-tbody");
   tbody.innerHTML = state.digestItems
@@ -432,38 +605,43 @@ function renderDigest() {
       <td>${summaryCell(item.summary_zh)}</td>
       <td class="cell-url">${esc(item.url)}</td>
       <td>${audioCell(item.audio_en, item.audio_zh)}</td>
-      <td><span class="badge ${item.has_adhd ? "ok" : "no"}">${item.has_adhd ? "yes" : "no"}</span>${item.hot_topic_match && !item.has_adhd ? ' <span class="badge stale" title="热搜已有 ADHD">热搜✓</span>' : ""}</td>
-      <td class="row-actions">
-        <button class="btn" data-digest-edit="${esc(digestRowKey(item))}">编辑</button>
-        ${item.can_copy_hot_adhd ? `<button class="btn" data-digest-copy-hot-adhd="${esc(digestRowKey(item))}" title="从今日热搜复制 ADHD">复制ADHD</button>` : ""}
-        <button class="btn" data-digest-adhd="${esc(digestRowKey(item))}">ADHD</button>
-        <button class="btn danger" data-digest-del="${esc(digestRowKey(item))}">删</button>
-      </td>
+      <td class="col-adhd">${digestAdhdCell(item)}</td>
+      <td class="row-actions">${digestActionCells(item)}</td>
     </tr>`
     )
     .join("");
 
-  tbody.querySelectorAll("[data-digest-edit]").forEach((btn) => {
-    btn.addEventListener("click", () => openDigestEdit(btn.dataset.digestEdit));
-  });
-  tbody.querySelectorAll("[data-digest-copy-hot-adhd]").forEach((btn) => {
-    btn.addEventListener("click", () => copyDigestHotAdhd(btn.dataset.digestCopyHotAdhd));
-  });
-  tbody.querySelectorAll("[data-digest-adhd]").forEach((btn) => {
-    btn.addEventListener("click", () => runDigestAdhd(btn.dataset.digestAdhd));
-  });
-  tbody.querySelectorAll("[data-digest-del]").forEach((btn) => {
-    btn.addEventListener("click", () => deleteDigest(btn.dataset.digestDel));
-  });
-  tbody.querySelectorAll(".digest-row-check").forEach((box) => {
-    box.addEventListener("change", () => {
-      const key = box.dataset.digestCheck;
-      if (box.checked) state.digestSelectedKeys.add(key);
-      else state.digestSelectedKeys.delete(key);
-      updateDigestSelectionUi();
-    });
-  });
-  updateDigestSelectionUi();
+  bindDigestTableRows(tbody, ".digest-row-check");
+}
+
+function renderRecent() {
+  const tbody = $("#recent-tbody");
+  tbody.innerHTML = state.digestItems
+    .map(
+      (item) => `
+    <tr>
+      <td class="col-check">
+        <input type="checkbox" class="recent-row-check" data-digest-check="${esc(digestRowKey(item))}" ${
+          state.digestSelectedKeys.has(digestRowKey(item)) ? "checked" : ""
+        } aria-label="选择条目 #${item.index}" />
+      </td>
+      <td>${esc(item.published_day || "—")}</td>
+      <td>${esc(item.archive_day || "—")}</td>
+      <td>${item.index}</td>
+      <td class="cell-feed">${esc(item.source || "—")}</td>
+      <td class="cell-title">${esc(item.title_en)}</td>
+      <td class="cell-title">${esc(item.title_zh)}</td>
+      <td>${summaryCell(item.summary_en)}</td>
+      <td>${summaryCell(item.summary_zh)}</td>
+      <td class="cell-url">${esc(item.url)}</td>
+      <td>${audioCell(item.audio_en, item.audio_zh)}</td>
+      <td class="col-adhd">${digestAdhdCell(item)}</td>
+      <td class="row-actions">${digestActionCells(item)}</td>
+    </tr>`
+    )
+    .join("");
+
+  bindDigestTableRows(tbody, ".recent-row-check");
 }
 
 function openDialog(title, fields, onSave) {
@@ -579,7 +757,7 @@ async function copyHotToDigest(url) {
     const action = result.created ? "新增" : "更新";
     setJobStatus(`${action} Digest ${result.day} #${result.index}`);
     if (state.tab === "digest" && state.digestDay === result.day) {
-      await loadDigest();
+      await reloadDigestView();
     }
   } catch (err) {
     setJobStatus(err.message || String(err));
@@ -603,33 +781,59 @@ async function cancelActiveHotJob() {
   }
 }
 
+async function translateDigestAcrossArchives(endpoint, items, label) {
+  const groups = groupDigestItemsByArchive(items);
+  if (!groups.size) return 0;
+  let changed = 0;
+  for (const [archiveDay, indices] of groups) {
+    const job = await api(`/api/digests/${archiveDay}/${endpoint}`, {
+      method: "POST",
+      body: JSON.stringify({ indices }),
+    });
+    const result = await pollJob(job.id, `${label} (${archiveDay})`, 600);
+    changed += result?.result?.changed ?? 0;
+    if (result.status === "cancelled") break;
+  }
+  return changed;
+}
+
 async function runDigestTranslateTitles(indices = null) {
   if (state.digestLlmBusy) {
     setJobStatus("Digest LLM 任务进行中，请稍后再试");
     return;
   }
-  if (!state.digestDay) {
-    setJobStatus("请先选择日期");
-    return;
-  }
-  const pending = indices
-    || state.digestItems.filter(needsDigestTitleZh).map((item) => item.index);
-  if (!pending.length) {
+  const pendingItems = indices
+    ? state.digestItems.filter((item) => indices.includes(item.index))
+    : state.digestItems.filter(needsDigestTitleZh);
+  if (!pendingItems.length) {
     setJobStatus("无需翻译的标题");
     return;
   }
-  setDigestLlmBusy(true, `翻译标题 (${pending.length})…`);
+  setDigestLlmBusy(true, `翻译标题 (${pendingItems.length})…`);
   try {
-    const job = await api(`/api/digest-timeline/${state.digestDay}/translate-titles`, {
-      method: "POST",
-      body: JSON.stringify({ indices: indices || null }),
-    });
-    const result = await pollJob(job.id, `翻译标题 (${pending.length})`, 300);
-    const changed = result?.result?.changed ?? 0;
-    if (result.status !== "cancelled") {
-      setJobStatus(`翻译完成：${changed} 条`);
+    let changed = 0;
+    if (state.tab === "recent") {
+      changed = await translateDigestAcrossArchives(
+        "translate-titles",
+        pendingItems,
+        "翻译标题",
+      );
+    } else {
+      if (!state.digestDay) {
+        setJobStatus("请先选择日期");
+        return;
+      }
+      const job = await api(`/api/digest-timeline/${state.digestDay}/translate-titles`, {
+        method: "POST",
+        body: JSON.stringify({
+          indices: indices || pendingItems.map((item) => item.index),
+        }),
+      });
+      const result = await pollJob(job.id, `翻译标题 (${pendingItems.length})`, 600);
+      changed = result?.result?.changed ?? 0;
     }
-    await loadDigest();
+    setJobStatus(`翻译完成：${changed} 条`);
+    await reloadDigestView();
   } catch (err) {
     setJobStatus(err.message || String(err));
   } finally {
@@ -642,28 +846,41 @@ async function runDigestTranslateSummaries(indices = null) {
     setJobStatus("Digest LLM 任务进行中，请稍后再试");
     return;
   }
-  if (!state.digestDay) {
-    setJobStatus("请先选择日期");
-    return;
-  }
-  const pending = indices
-    || state.digestItems.filter(needsDigestSummaryZh).map((item) => item.index);
-  if (!pending.length) {
+  const pendingItems = indices
+    ? state.digestItems.filter((item) => indices.includes(item.index))
+    : state.digestItems.filter(needsDigestSummaryZh);
+  if (!pendingItems.length) {
     setJobStatus("无需翻译的摘要");
     return;
   }
-  setDigestLlmBusy(true, `翻译摘要 (${pending.length})…`);
+  setDigestLlmBusy(true, `翻译摘要 (${pendingItems.length})…`);
   try {
-    const job = await api(`/api/digest-timeline/${state.digestDay}/translate-summaries`, {
-      method: "POST",
-      body: JSON.stringify({ indices: indices || null }),
-    });
-    const result = await pollJob(job.id, `翻译摘要 (${pending.length})`, 300);
-    const changed = result?.result?.changed ?? 0;
-    if (result.status !== "cancelled") {
-      setJobStatus(`摘要翻译完成：${changed} 条`);
+    let changed = 0;
+    if (state.tab === "recent") {
+      changed = await translateDigestAcrossArchives(
+        "translate-summaries",
+        pendingItems,
+        "翻译摘要",
+      );
+    } else {
+      if (!state.digestDay) {
+        setJobStatus("请先选择日期");
+        return;
+      }
+      const job = await api(
+        `/api/digest-timeline/${state.digestDay}/translate-summaries`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            indices: indices || pendingItems.map((item) => item.index),
+          }),
+        },
+      );
+      const result = await pollJob(job.id, `翻译摘要 (${pendingItems.length})`, 600);
+      changed = result?.result?.changed ?? 0;
     }
-    await loadDigest();
+    setJobStatus(`摘要翻译完成：${changed} 条`);
+    await reloadDigestView();
   } catch (err) {
     setJobStatus(err.message || String(err));
   } finally {
@@ -699,17 +916,18 @@ async function runHotTranslateTitles(urls = null) {
   }
 }
 
-async function runHotAdhd(url, lang) {
+async function runHotAdhd(url, lang, force = false) {
   if (state.hotTopicsLlmBusy) {
     setJobStatus("热搜 LLM 任务进行中，请稍后再试");
     return;
   }
-  const label = lang === "zh" ? "热搜 ADHD 摘要" : "热搜 ADHD Summary";
+  const base = lang === "zh" ? "热搜 ADHD 摘要" : "热搜 ADHD Summary";
+  const label = force ? `${base}（重做）` : base;
   setHotTopicsLlmBusy(true, `${label} 生成中…`);
   try {
     const job = await api("/api/hot-topics/items/adhd", {
       method: "POST",
-      body: JSON.stringify({ url, force: false, lang }),
+      body: JSON.stringify({ url, force, lang }),
     });
     state.activeHotJobId = job.id;
     await pollJob(job.id, label, 180);
@@ -785,11 +1003,16 @@ async function runHotAdhdAll(lang) {
   }
 }
 
-function openDigestEdit(key) {
-  if (state.digestLlmBusy) return;
-  const item = findDigestItem(key);
+function openDigestEdit(btnOrKey) {
+  if (state.digestLlmBusy || state.digestSpeakBusy) return;
+  const { archiveDay, index } =
+    typeof btnOrKey === "object" && btnOrKey?.getAttribute
+      ? digestRowFromButton(btnOrKey)
+      : parseDigestRowKey(btnOrKey);
+  const item = state.digestItems.find(
+    (it) => (it.archive_day || "") === archiveDay && it.index === index,
+  );
   if (!item) return;
-  const { archiveDay, index } = parseDigestRowKey(key);
   openDialog(
     `编辑 Digest #${index}`,
     [
@@ -807,7 +1030,7 @@ function openDigestEdit(key) {
         method: "PUT",
         body: JSON.stringify(data),
       });
-      await loadDigest();
+      await reloadDigestView();
     }
   );
 }
@@ -830,21 +1053,26 @@ function openDigestAdd() {
         method: "POST",
         body: JSON.stringify(data),
       });
-      await loadDigest();
+      await reloadDigestView();
     }
   );
 }
 
-async function deleteDigest(key) {
-  if (state.digestLlmBusy) return;
-  const { archiveDay, index } = parseDigestRowKey(key);
+async function deleteDigest(btnOrKey) {
+  if (state.digestLlmBusy || state.digestSpeakBusy) return;
+  const { archiveDay, index } =
+    typeof btnOrKey === "object" && btnOrKey?.getAttribute
+      ? digestRowFromButton(btnOrKey)
+      : parseDigestRowKey(btnOrKey);
   if (!confirm(`删除 #${index} ?`)) return;
   await api(`/api/digests/${archiveDay}/items/${index}`, { method: "DELETE" });
-  await loadDigest();
+  await reloadDigestView();
 }
 
 async function confirmDigestAudioWarning(actionLabel) {
-  if (state.tab !== "digest" || !state.digestDay) return true;
+  if (state.tab !== "digest" && state.tab !== "recent") return true;
+  if (state.tab === "digest" && !state.digestDay) return true;
+  if (!state.digestItems.length) return true;
   const groups = groupDigestItemsByArchive(state.digestItems);
   let stale = 0;
   let missing = 0;
@@ -865,7 +1093,7 @@ async function runDigestSpeakStale() {
     setJobStatus("Digest 任务进行中，请稍后再试");
     return;
   }
-  if (!state.digestDay) return;
+  if (state.tab === "digest" && !state.digestDay) return;
   const groups = groupDigestItemsByArchive(state.digestItems);
   if (!groups.size) return;
   setDigestSpeakBusy(true, "生成过期 mp3…");
@@ -880,7 +1108,7 @@ async function runDigestSpeakStale() {
       generated += result?.result?.generated ?? 0;
     }
     setJobStatus(`生成过期 mp3 完成：${generated} 条`);
-    await loadDigest();
+    await reloadDigestView();
   } catch (err) {
     setJobStatus(err.message || String(err));
   } finally {
@@ -911,7 +1139,7 @@ async function runDigestSpeakSelected() {
       generated += result?.result?.generated ?? 0;
     }
     setJobStatus(`${label} 完成：${generated} 条`);
-    await loadDigest();
+    await reloadDigestView();
   } catch (err) {
     setJobStatus(err.message || String(err));
   } finally {
@@ -919,16 +1147,19 @@ async function runDigestSpeakSelected() {
   }
 }
 
-async function copyDigestHotAdhd(key) {
+async function copyDigestHotAdhd(btnOrKey) {
   if (state.digestLlmBusy || state.digestSpeakBusy) return;
-  const { archiveDay, index } = parseDigestRowKey(key);
+  const { archiveDay, index } =
+    typeof btnOrKey === "object" && btnOrKey?.getAttribute
+      ? digestRowFromButton(btnOrKey)
+      : parseDigestRowKey(btnOrKey);
   try {
     const result = await api(
       `/api/digests/${archiveDay}/items/${index}/copy-hot-adhd`,
       { method: "POST" },
     );
     setJobStatus(`已从热搜复制 ADHD → #${result.index}`);
-    await loadDigest();
+    await reloadDigestView();
   } catch (err) {
     setJobStatus(err.message || String(err));
   }
@@ -957,7 +1188,7 @@ async function runDigestAdhdSelected() {
       changed += result?.result?.changed ?? 0;
     }
     setJobStatus(`${label} 完成：${changed} 条`);
-    await loadDigest();
+    await reloadDigestView();
   } catch (err) {
     setJobStatus(err.message || String(err));
   } finally {
@@ -965,20 +1196,39 @@ async function runDigestAdhdSelected() {
   }
 }
 
-async function runDigestAdhd(key) {
-  if (state.digestLlmBusy) {
-    setJobStatus("Digest LLM 任务进行中，请稍后再试");
+async function runDigestAdhd(btnOrKey) {
+  if (state.digestLlmBusy || state.digestSpeakBusy) {
+    setJobStatus("Digest 任务进行中，请稍后再试");
     return;
   }
-  const { archiveDay, index } = parseDigestRowKey(key);
-  setDigestLlmBusy(true, `Digest #${index} ADHD 生成中…`);
+  let archiveDay;
+  let index;
+  try {
+    if (typeof btnOrKey === "object" && btnOrKey?.getAttribute) {
+      ({ archiveDay, index } = digestRowFromButton(btnOrKey));
+    } else {
+      ({ archiveDay, index } = parseDigestRowKey(btnOrKey));
+    }
+  } catch (err) {
+    setJobStatus(err.message || String(err));
+    return;
+  }
+  const label = `Digest #${index} (${archiveDay}) ADHD`;
+  setDigestLlmBusy(true, `${label} 生成中…`);
   try {
     const job = await api(`/api/digests/${archiveDay}/items/${index}/adhd`, {
       method: "POST",
       body: JSON.stringify({ force: true }),
     });
-    await pollJob(job.id, "Digest ADHD", 180);
-    await loadDigest();
+    const result = await pollJob(job.id, label, 300);
+    const changed = result?.result?.changed ?? 0;
+    const mode = result?.result?.mode;
+    if (changed === 0) {
+      setJobStatus(`${label} 未写入（抓页失败、LLM 无结果或 URL 不在该归档 en 稿）`);
+    } else if (mode === "retidy") {
+      setJobStatus(`${label} 已本地整理（去 emoji/改格式；LLM 未成功）`);
+    }
+    await reloadDigestView();
   } catch (err) {
     setJobStatus(err.message || String(err));
   } finally {
@@ -1006,6 +1256,8 @@ async function runPull() {
     if (state.tab === "digest") {
       await loadDigestDays();
       await loadDigest();
+    } else if (state.tab === "recent") {
+      await loadRecent();
     }
   } catch (err) {
     setJobStatus(err.message || String(err));
@@ -1061,14 +1313,26 @@ function parseRoute() {
   if (parts[0] === "digest") {
     return { tab: "digest", day: parts[1] || "" };
   }
-  return { tab: "hot", day: "" };
+  if (parts[0] === "recent") {
+    return { tab: "recent", day: "" };
+  }
+  if (parts[0] === "hot" && state.hotPageEnabled) {
+    return { tab: "hot", day: "" };
+  }
+  return { tab: "digest", day: "" };
 }
 
 function routePath(tab, day) {
   if (tab === "digest") {
-    return day ? `/digest/${encodeURIComponent(day)}` : "/digest";
+    return day ? `/digest/${encodeURIComponent(day)}` : "/digest/";
   }
-  return "/";
+  if (tab === "recent") {
+    return "/recent";
+  }
+  if (tab === "hot" && state.hotPageEnabled) {
+    return "/hot";
+  }
+  return "/digest/";
 }
 
 function syncRoute(tab, day = "", { replace = false } = {}) {
@@ -1083,6 +1347,12 @@ function syncRoute(tab, day = "", { replace = false } = {}) {
 }
 
 function switchTab(tab, { sync = true, replace = false } = {}) {
+  if (tab === "hot" && !state.hotPageEnabled) {
+    tab = "digest";
+  }
+  if (tab !== state.tab) {
+    state.digestSelectedKeys.clear();
+  }
   state.tab = tab;
   document.querySelectorAll(".tab").forEach((el) => {
     el.classList.toggle("active", el.dataset.tab === tab);
@@ -1102,6 +1372,7 @@ function applyRoute(route, { sync = false } = {}) {
   const select = $("#digest-day");
   if (select && state.digestDay) select.value = state.digestDay;
   if (route.tab === "digest") return loadDigest();
+  if (route.tab === "recent") return loadRecent();
   return Promise.resolve();
 }
 
@@ -1123,14 +1394,17 @@ $("#btn-cancel").addEventListener("click", () => $("#edit-dialog").close());
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const tab = btn.dataset.tab;
+    if (tab === "hot" && !state.hotPageEnabled) return;
     switchTab(tab);
-    if (tab === "digest") {
-      try {
+    try {
+      if (tab === "digest") {
         if (!state.digestDay) await loadDigestDays();
         await loadDigest();
-      } catch (err) {
-        setJobStatus(err.message || String(err));
+      } else if (tab === "recent") {
+        await loadRecent();
       }
+    } catch (err) {
+      setJobStatus(err.message || String(err));
     }
   });
 });
@@ -1157,6 +1431,20 @@ $("#hot-select-all").addEventListener("change", (e) => {
   renderHotTopics();
 });
 $("#btn-digest-refresh").addEventListener("click", loadDigest);
+$("#btn-recent-refresh").addEventListener("click", loadRecent);
+$("#btn-recent-translate-all").addEventListener("click", () => runDigestTranslateTitles());
+$("#btn-recent-translate-summaries").addEventListener("click", () => runDigestTranslateSummaries());
+$("#btn-recent-adhd-selected").addEventListener("click", () => runDigestAdhdSelected());
+$("#btn-recent-speak-stale").addEventListener("click", () => runDigestSpeakStale());
+$("#btn-recent-speak-selected").addEventListener("click", () => runDigestSpeakSelected());
+$("#recent-select-all").addEventListener("change", (e) => {
+  if (e.target.checked) {
+    state.digestItems.forEach((item) => state.digestSelectedKeys.add(digestRowKey(item)));
+  } else {
+    state.digestSelectedKeys.clear();
+  }
+  renderRecent();
+});
 $("#btn-digest-add").addEventListener("click", openDigestAdd);
 $("#btn-digest-translate-all").addEventListener("click", () => runDigestTranslateTitles());
 $("#btn-digest-translate-summaries").addEventListener("click", () => runDigestTranslateSummaries());
@@ -1183,17 +1471,24 @@ $("#digest-day").addEventListener("change", async (e) => {
 });
 
 async function boot() {
-  const route = parseRoute();
-  state.tab = route.tab;
+  let route = parseRoute();
   if (route.day) state.digestDay = route.day;
   switchTab(route.tab, { sync: false });
   try {
     await loadMeta();
-    await loadHotTopics();
+    route = parseRoute();
+    state.tab = route.tab;
+    if (route.day) state.digestDay = route.day;
+    switchTab(route.tab, { sync: false });
+    if (state.hotPageEnabled) {
+      await loadHotTopics();
+    }
     await loadDigestDays();
     if (state.digestDay) $("#digest-day").value = state.digestDay;
-    if (route.tab === "digest") {
+    if (state.tab === "digest") {
       await loadDigest();
+    } else if (state.tab === "recent") {
+      await loadRecent();
     }
     syncRoute(state.tab, state.digestDay, { replace: true });
   } catch (err) {

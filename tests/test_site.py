@@ -570,6 +570,10 @@ def test_format_summary_html_adds_break_before_adhd_section() -> None:
     )
     already_spaced = "⚡️ One-liner\nGap.\n\n🔥 Key takeaways\n- one"
     assert _format_summary_html(already_spaced) == escape(already_spaced)
+    compact_zh = "一句话\n现更少的人工介入。\n亮点\n- 一条"
+    assert _format_summary_html(compact_zh) == escape(
+        "一句话\n现更少的人工介入。\n\n亮点\n- 一条"
+    )
 
 
 def test_build_site_hot_page(tmp_path: Path) -> None:

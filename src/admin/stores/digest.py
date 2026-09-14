@@ -42,10 +42,14 @@ def has_adhd_summary(text: str) -> bool:
     if not cleaned:
         return False
     markers = (
+        "一句话",
         "一句话总结",
+        "亮点",
+        "核心亮点",
+        "One line",
         "One-liner",
-        "🔥 核心亮点",
-        "🔥 Key takeaways",
+        "Highlights",
+        "Key takeaways",
     )
     return any(marker in cleaned for marker in markers)
 

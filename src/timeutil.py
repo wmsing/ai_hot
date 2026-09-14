@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from time import struct_time
 from typing import Any
 
@@ -11,6 +11,25 @@ _HOUR_UTC_RE = re.compile(
     r"^(\d{4}-\d{2}-\d{2})\s+(\d{2}):00\s+UTC$",
     re.IGNORECASE,
 )
+
+
+def published_utc_date(value: datetime | None) -> date | None:
+    """published_at 的 UTC 日历日；缺时间或无法归一化则 None。"""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+    return value.date()
+
+
+def is_published_on_utc_day(value: datetime | None, *, now: datetime) -> bool:
+    """发布日（UTC 日历日）是否等于 now 的 UTC 日。"""
+    day = published_utc_date(value)
+    if day is None:
+        return False
+    return day == now.astimezone(timezone.utc).date()
 
 
 def format_published(value: datetime | None) -> str:

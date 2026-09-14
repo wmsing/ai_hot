@@ -69,7 +69,7 @@ def test_deep_summarize_updates_only_selected_url(
     def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
         assert llm.model == "qwen3.5:9b"
         assert "Full article body" in user
-        if "核心亮点" in system:
+        if "一句话" in system and "亮点" in system:
             return (
                 "⚡️ 一句话总结\n"
                 "Perplexity 把底层系统交给 Astra 来跑。\n\n"
@@ -77,6 +77,7 @@ def test_deep_summarize_updates_only_selected_url(
                 "🤖 自动干活\n"
                 "🙈 放手不管\n"
             )
+        assert "One line" in system and "Highlights" in system
         return (
             "⚡️ One-liner\n"
             "Perplexity now runs more systems on Astra with less oversight.\n\n"
@@ -85,7 +86,7 @@ def test_deep_summarize_updates_only_selected_url(
             "🙈 Needs less human checking\n"
         )
 
-    en_path, zh_path, n = mod.deep_summarize_digest(
+    en_path, zh_path, n, _mode = mod.deep_summarize_digest(
         cfg,
         urls=[b],
         runtime=runtime,
@@ -99,15 +100,15 @@ def test_deep_summarize_updates_only_selected_url(
     en_text = en.read_text(encoding="utf-8")
     zh_text = zh.read_text(encoding="utf-8")
     assert "old en a" in en_text
-    assert "One-liner" in en_text
-    assert "Key takeaways" in en_text
+    assert "One line" in en_text
+    assert "Highlights" in en_text
     assert "Perplexity now runs more systems on Astra" in en_text
     assert "- speak:" in en_text
     assert "⚡️" not in en_text.split("- speak:", 1)[1].split("\n## ", 1)[0]
     assert "保留中文 A" in zh_text
     assert "旧摘要 A" in zh_text
-    assert "一句话总结" in zh_text
-    assert "核心亮点" in zh_text
+    assert "一句话" in zh_text
+    assert "亮点" in zh_text
     assert "- speak:" in zh_text
     assert "⚡️" not in zh_text.split("- speak:", 1)[1].split("\n## ", 1)[0]
     assert "旧摘要 B" not in zh_text
@@ -143,8 +144,9 @@ def test_deep_summarize_trailing_slash_matches(
         return "Article body text about the story content here. " * 12
 
     def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
-        if "核心亮点" in system:
+        if "一句话" in system and "亮点" in system:
             return "⚡️ 一句话总结\n故事很重要。\n\n🔥 核心亮点 (TL;DR)\n✅ 一条\n"
+        assert "One line" in system and "Highlights" in system
         return (
             "⚡️ One-liner\n"
             "The story matters.\n\n"
@@ -152,7 +154,7 @@ def test_deep_summarize_trailing_slash_matches(
             "✅ One point\n"
         )
 
-    _, _, n = mod.deep_summarize_digest(
+    _, _, n, _mode = mod.deep_summarize_digest(
         cfg,
         urls=[canonical + "/"],
         runtime=LlmRuntime(
@@ -169,10 +171,10 @@ def test_deep_summarize_trailing_slash_matches(
     assert n == 1
     zh_text = zh.read_text(encoding="utf-8")
     en_text = en.read_text(encoding="utf-8")
-    assert "一句话总结" in zh_text
+    assert "一句话" in zh_text
     assert "(TL;DR)" not in zh_text
-    assert "One-liner" in en_text
-    assert "Key takeaways" in en_text
+    assert "One line" in en_text
+    assert "Highlights" in en_text
     assert "(TL;DR)" not in en_text
 
 
@@ -227,15 +229,16 @@ def test_deep_summarize_persists_each_item_before_stop(
         return "Article body with enough text for ADHD summarization. " * 12
 
     def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
-        if "核心亮点" in system:
+        if "一句话" in system and "亮点" in system:
             return "⚡️ 一句话总结\n第一条已写入。\n\n🔥 核心亮点\n✅ 一点\n"
+        assert "One line" in system and "Highlights" in system
         return "⚡️ One-liner\nFirst item saved.\n\n🔥 Key takeaways\n✅ One\n"
 
     def _should_stop() -> bool:
         calls["n"] += 1
         return calls["n"] > 1
 
-    _, _, n = mod.deep_summarize_digest(
+    _, _, n, _mode = mod.deep_summarize_digest(
         cfg,
         urls=[a, b],
         runtime=LlmRuntime(
@@ -253,8 +256,8 @@ def test_deep_summarize_persists_each_item_before_stop(
     assert n == 1
     zh_text = zh.read_text(encoding="utf-8")
     en_text = en.read_text(encoding="utf-8")
-    assert "一句话总结" in zh_text
-    assert "One-liner" in en_text
+    assert "一句话" in zh_text
+    assert "One line" in en_text
     assert "旧摘要 B" in zh_text
     assert "old en b" in en_text
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import httpx
 
@@ -29,8 +30,23 @@ from src.sources.rss import fetch_rss_candidates
 from src.sources.threads import fetch_threads_candidates
 from src.storage import ItemStore
 from src.textutil import truncate
+from src.timeutil import is_published_on_utc_day
 
 logger = logging.getLogger(__name__)
+
+
+def _load_today_digest_baseline(config: AppConfig, now: datetime) -> list[HotItem]:
+    """今日已有 digest：优先 content 归档，再合并同日 out/digest（均保留旧条顺序）。"""
+    today = now.astimezone(timezone.utc).date()
+    baseline: list[HotItem] = []
+    archive_en = Path(config.paths.content_digests_dir) / f"{today.isoformat()}.en.md"
+    if archive_en.is_file():
+        _, archived = load_hot_items(archive_en)
+        baseline = list(archived)
+    prev_at, prev_items = load_hot_items(config.paths.digest_path)
+    if prev_at is not None and same_utc_day(prev_at, now):
+        baseline = merge_by_url(baseline, prev_items)
+    return baseline
 
 
 def _feed_by_source(config: AppConfig, source: str) -> FeedConfig | None:
@@ -80,7 +96,8 @@ def run_once(
 
     llm_model 为 None → 模式 A（RSS/AskHN 原生简介）。
     有值 → 模式 B（对本轮新条目用 LLM 生成简介）。
-    同 UTC 日会与已有 digest.md 按 URL 合并（旧在前、新追加）。
+    只收录 published_at 为当前 UTC 日历日的条目。
+    与今日 content 归档及同日 out/digest 合并：URL/相似标题保留旧条、跳过新条。
     llm_flag 用于解析 provider（如 openrouter）；可与 llm_model 一并传入。
     """
     now = datetime.now(timezone.utc)
@@ -127,6 +144,8 @@ def run_once(
                 feed = _feed_by_source(config, item.source)
                 keywords = feed.keywords if feed else []
                 if not passes_keywords(item, keywords):
+                    continue
+                if not is_published_on_utc_day(item.published_at, now=now):
                     continue
                 hit = matched_keyword(item, keywords)
                 if hit:
@@ -189,13 +208,16 @@ def run_once(
         if dropped:
             logger.info("dropped %s items without usable summary (pre-merge)", dropped)
 
+        selected = [
+            item
+            for item in selected
+            if is_published_on_utc_day(item.published_at, now=now)
+        ]
         for item in selected:
             store.upsert_seen(item, now=now)
 
-        # UTC 当日累计：旧条目保留，本轮新 URL 追加
-        prev_at, prev_items = load_hot_items(config.paths.digest_path)
-        if prev_at is not None and same_utc_day(prev_at, now):
-            selected = merge_by_url(prev_items, selected)
+        baseline = _load_today_digest_baseline(config, now)
+        selected = merge_by_url(baseline, selected)
 
         before = len(selected)
         selected = [

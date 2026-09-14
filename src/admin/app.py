@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.admin.schemas import (
@@ -19,6 +19,7 @@ from src.admin.schemas import (
     DigestDayOut,
     DigestItemCreate,
     DigestItemUpdate,
+    DigestRecentOut,
     DigestSpeakRequest,
     DigestTimelineDayOut,
     HotTopicCreate,
@@ -50,8 +51,10 @@ from src.admin.services.copy_hot_to_digest import (
     match_hot_topic_for_digest,
 )
 from src.admin.services.digest_timeline import (
+    RECENT_PUBLISHED_DAYS_DEFAULT,
     list_published_days,
     rows_for_published_day,
+    rows_for_recent_published_days,
 )
 from src.admin.services.jobs import (
     HotTopicsBusyError,
@@ -109,6 +112,7 @@ def _merged_out(
     day: date,
     hot_topics_by_url: dict[str, HotTopicSnapshotItem] | None = None,
     archive_day: date | None = None,
+    published_day: date | None = None,
 ) -> MergedDigestItemOut:
     config = load_app_config()
     voice_en, rate = speak_voice_rate(config, "en")
@@ -162,6 +166,7 @@ def _merged_out(
         hot_topic_match=hot_match,
         can_copy_hot_adhd=can_copy,
         archive_day=(archive_day or day).isoformat(),
+        published_day=published_day.isoformat() if published_day else None,
         audio_en=_audio_out(audio["en"]),
         audio_zh=_audio_out(audio["zh"]),
     )
@@ -178,6 +183,7 @@ def create_app() -> FastAPI:
             "content_digests_dir": config.paths.content_digests_dir,
             "site_output_dir": config.paths.site_output_dir,
             "hot_topics_llm_busy": hot_topics_llm_busy(),
+            "hot_page_enabled": config.site.hot_page_enabled,
         }
 
     @app.get("/api/hot-topics")
@@ -313,6 +319,27 @@ def create_app() -> FastAPI:
     def digest_timeline_days() -> list[str]:
         return [d.isoformat() for d in list_published_days(_digests_dir())]
 
+    @app.get("/api/digest-recent", response_model=DigestRecentOut)
+    def digest_recent(limit: int = RECENT_PUBLISHED_DAYS_DEFAULT) -> DigestRecentOut:
+        if limit < 1 or limit > 30:
+            raise HTTPException(status_code=400, detail="limit must be 1..30")
+        hot_index = _hot_topics_index()
+        days, rows = rows_for_recent_published_days(_digests_dir(), limit=limit)
+        return DigestRecentOut(
+            limit=limit,
+            published_days=[d.isoformat() for d in days],
+            items=[
+                _merged_out(
+                    row.item,
+                    day=row.archive_day,
+                    archive_day=row.archive_day,
+                    published_day=row.published_day,
+                    hot_topics_by_url=hot_index,
+                )
+                for row in rows
+            ],
+        )
+
     @app.get(
         "/api/digest-timeline/{published_day}",
         response_model=DigestTimelineDayOut,
@@ -328,6 +355,7 @@ def create_app() -> FastAPI:
                     row.item,
                     day=row.archive_day,
                     archive_day=row.archive_day,
+                    published_day=day_value,
                     hot_topics_by_url=hot_index,
                 )
                 for row in rows
@@ -725,9 +753,15 @@ def create_app() -> FastAPI:
         return FileResponse(_STATIC_DIR / "index.html")
 
     @app.get("/")
+    def admin_home() -> RedirectResponse:
+        return RedirectResponse(url="/digest/", status_code=307)
+
     @app.get("/digest")
+    @app.get("/digest/")
     @app.get("/digest/{day}")
-    def index(day: str | None = None) -> FileResponse:
+    @app.get("/hot")
+    @app.get("/recent")
+    def admin_spa(day: str | None = None) -> FileResponse:
         return _admin_index()
 
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")

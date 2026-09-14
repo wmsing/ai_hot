@@ -22,13 +22,14 @@ cp .env.example .env
 ```bash
 pip install -e ".[admin,dev]"
 python -m src.admin
-# → http://127.0.0.1:8787/
+# → http://127.0.0.1:8787/digest/
 ```
 
 | 功能 | 说明 |
 |------|------|
 | 今日热搜 | CRUD `content/hot_topics/latest.json` |
-| Digest 归档 | 按日编辑 `content/digests/YYYY-MM-DD.{en,zh}.md` |
+| 按发布日 | 与首页时间线一致，按「发布日」单日浏览 |
+| 近5日一览 | 最近 5 个发布日合表；翻译标题/摘要、ADHD、mp3 → 重建站点 → 发布推送 |
 | 翻译全部标题 | 批量补 `title_zh`（跳过已有） |
 | **ADHD 摘要** | 只生成中文 ADHD（约 30 次 LLM/轮） |
 | **ADHD Summary** | 只生成英文 ADHD（约 30 次 LLM/轮） |

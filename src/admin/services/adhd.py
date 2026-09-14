@@ -98,7 +98,7 @@ def generate_digest_adhd_batch(
     for url in urls:
         if should_stop and should_stop():
             break
-        en_out, zh_out, n = deep_summarize_digest(
+        en_out, zh_out, n, _mode = deep_summarize_digest(
             config,
             urls=[url],
             input_path=en_path,
@@ -131,7 +131,7 @@ def generate_digest_adhd(
     content_dir = Path(config.paths.content_digests_dir)
     en_path = content_dir / f"{day.isoformat()}.en.md"
     zh_path = content_dir / f"{day.isoformat()}.zh.md"
-    en_out, zh_out, changed = deep_summarize_digest(
+    en_out, zh_out, changed, write_mode = deep_summarize_digest(
         config,
         urls=[url],
         input_path=en_path,
@@ -146,6 +146,7 @@ def generate_digest_adhd(
         "en_path": str(en_out),
         "zh_path": str(zh_out),
         "changed": changed,
+        "mode": write_mode,
         "url": url,
         "day": day.isoformat(),
     }

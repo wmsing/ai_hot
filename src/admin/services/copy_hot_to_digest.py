@@ -30,10 +30,16 @@ def _hot_summaries(item: HotTopicSnapshotItem) -> tuple[str, str]:
     summary_zh = (item.summary_zh or "").strip()
     fallback = (item.summary or "").strip()
     if not summary_en and fallback and digest_store.has_adhd_summary(fallback):
-        if "One-liner" in fallback or "Key takeaways" in fallback:
+        if any(
+            token in fallback
+            for token in ("One line", "One-liner", "Highlights", "Key takeaways")
+        ):
             summary_en = fallback
     if not summary_zh and fallback and digest_store.has_adhd_summary(fallback):
-        if "一句话总结" in fallback or "核心亮点" in fallback:
+        if any(
+            token in fallback
+            for token in ("一句话", "一句话总结", "亮点", "核心亮点")
+        ):
             summary_zh = fallback
     if not summary_zh and not summary_en and fallback:
         if contains_cjk(fallback):

@@ -155,6 +155,7 @@ class MergedDigestItemOut(BaseModel):
     hot_topic_match: bool = False
     can_copy_hot_adhd: bool = False
     archive_day: str | None = None
+    published_day: str | None = None
     audio_en: AudioFileOut = Field(default_factory=AudioFileOut)
     audio_zh: AudioFileOut = Field(default_factory=AudioFileOut)
 
@@ -167,6 +168,12 @@ class DigestDayOut(BaseModel):
 
 class DigestTimelineDayOut(BaseModel):
     published_day: str
+    items: list[MergedDigestItemOut]
+
+
+class DigestRecentOut(BaseModel):
+    limit: int
+    published_days: list[str]
     items: list[MergedDigestItemOut]
 
 

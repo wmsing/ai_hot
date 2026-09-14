@@ -65,7 +65,7 @@ def test_deep_summarize_hot_topics_persists_before_stop(
 
     def _fake_chat(*, system: str, user: str, llm: LlmRuntime) -> str:
         nonlocal adhd_done
-        if "One-liner" in system:
+        if "One line" in system and "Highlights" in system:
             adhd_done += 1
             return "⚡️ One-liner\nSummary.\n\n🔥 Key takeaways\n🚀 ok\n"
         raise AssertionError(f"unexpected prompt: {system[:40]}")
@@ -87,5 +87,5 @@ def test_deep_summarize_hot_topics_persists_before_stop(
     loaded = load_hot_topics_snapshot(snap_path)
     assert loaded is not None
     by_url = {item.url: item for item in loaded.items}
-    assert "One-liner" in (by_url[url_a].summary_en or "")
+    assert "One line" in (by_url[url_a].summary_en or "")
     assert not (by_url[url_b].summary_en or "").strip()

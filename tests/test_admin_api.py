@@ -77,7 +77,11 @@ Selected: 1
 
 
 def test_admin_spa_routes(client: TestClient) -> None:
-    for path in ("/", "/digest", "/digest/2026-09-13"):
+    root = client.get("/", follow_redirects=False)
+    assert root.status_code == 307
+    assert root.headers["location"].rstrip("/") == "/digest"
+
+    for path in ("/digest/", "/digest", "/digest/2026-09-13", "/recent"):
         res = client.get(path)
         assert res.status_code == 200
         assert "AI Hot Admin" in res.text
@@ -88,6 +92,7 @@ def test_meta(client: TestClient) -> None:
     assert res.status_code == 200
     data = res.json()
     assert "hot_topics_path" in data
+    assert "hot_page_enabled" in data
     assert data["hot_topics_llm_busy"] is False
 
 
@@ -131,6 +136,18 @@ def test_digest_timeline_days_and_get(client: TestClient) -> None:
     data = res.json()
     assert data["published_day"] == "2026-09-13"
     assert isinstance(data["items"], list)
+
+
+def test_digest_recent(client: TestClient) -> None:
+    res = client.get("/api/digest-recent?limit=5")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["limit"] == 5
+    assert isinstance(data["published_days"], list)
+    assert isinstance(data["items"], list)
+    if data["items"]:
+        assert "published_day" in data["items"][0]
+        assert "archive_day" in data["items"][0]
 
 
 def test_digest_flags_hot_topic_match(

@@ -1,6 +1,7 @@
 """URL / 标题规范化，供去重使用。"""
 
 import re
+from difflib import SequenceMatcher
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 _TITLE_STRIP_RE = re.compile(r"[^\w\s]+", re.UNICODE)
@@ -40,3 +41,22 @@ def title_key(title: str) -> str:
     lowered = title.strip().lower()
     cleaned = _TITLE_STRIP_RE.sub(" ", lowered)
     return _WS_RE.sub(" ", cleaned).strip()
+
+
+def titles_similar(
+    left: str,
+    right: str,
+    *,
+    ratio_threshold: float = 0.88,
+) -> bool:
+    """标题是否视为同一故事（规范化相等、包含或高相似度）。"""
+    a = title_key(left)
+    b = title_key(right)
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+    if len(shorter) >= 16 and shorter in longer:
+        return True
+    return SequenceMatcher(None, a, b).ratio() >= ratio_threshold

@@ -119,3 +119,24 @@ def rows_for_published_day(
         for row in build_timeline_rows(content_dir)
         if row.published_day == published_day
     ]
+
+
+RECENT_PUBLISHED_DAYS_DEFAULT = 5
+
+
+def rows_for_recent_published_days(
+    content_dir: Path,
+    *,
+    limit: int = RECENT_PUBLISHED_DAYS_DEFAULT,
+) -> tuple[list[date], list[TimelineDigestRow]]:
+    """最近 N 个发布日内的全部时间线条目（与首页展示范围一致）。"""
+    if limit < 1:
+        raise ValueError("limit must be >= 1")
+    days = list_published_days(content_dir)[:limit]
+    day_set = set(days)
+    rows = [
+        row
+        for row in build_timeline_rows(content_dir)
+        if row.published_day in day_set
+    ]
+    return days, rows

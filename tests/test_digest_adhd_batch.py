@@ -51,9 +51,9 @@ def test_generate_digest_adhd_batch_runs_per_url(
         input_zh_path: str | Path | None = None,
         llm_flag: str | None = None,
         should_stop=None,
-    ) -> tuple[Path, Path, int]:
+    ) -> tuple[Path, Path, int, str | None]:
         calls.extend(urls)
-        return Path(input_path or ""), Path(input_zh_path or ""), 1
+        return Path(input_path or ""), Path(input_zh_path or ""), 1, "llm"
 
     def _fake_invalidate(
         config: AppConfig,
@@ -119,9 +119,9 @@ def test_generate_digest_adhd_batch_stops_between_urls(
         input_zh_path: str | Path | None = None,
         llm_flag: str | None = None,
         should_stop=None,
-    ) -> tuple[Path, Path, int]:
+    ) -> tuple[Path, Path, int, str | None]:
         calls.extend(urls)
-        return Path(input_path or ""), Path(input_zh_path or ""), 1
+        return Path(input_path or ""), Path(input_zh_path or ""), 1, "llm"
 
     def _should_stop() -> bool:
         stop_after["n"] += 1
