@@ -1,498 +1,515 @@
 {
-  "generated_at": "2026-09-14T12:38:26.725824Z",
+  "generated_at": "2026-09-14T17:05:06.124459Z",
   "items": [
     {
-      "heat": 8.4445,
-      "source": "hn",
-      "title": "Ask HN: What are you working on? (September 2026)",
-      "url": "https://news.ycombinator.com/item?id=49686380",
-      "score": 212,
-      "comments": 618,
-      "summary": "What are you working on? What have you been curious about lately?",
+      "heat": 8.158,
+      "source": "reddit:LocalLLaMA",
+      "title": "3k$ 128GB VRAM + 256GB RAM DDR4 Server",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfe9zt/3k_128gb_vram_256gb_ram_ddr4_server/",
+      "score": 881,
+      "comments": 248,
+      "summary": "I finished my home inference server. First I tried Lenovo p620 workstation and while it’s a good value overall it pissed me off with a ton of proprietary Lenovo shit to deal with and I return it in the end. Components: 4xV620 - 1400$ 256GB DDR4 RDIMM 2666 - 610$ Huanandzhi D12D…",
       "summary_en": null,
       "summary_zh": null,
       "title_zh": null,
-      "published_at": "2026-09-13T17:31:38Z",
+      "published_at": "2026-09-13T17:42:07Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=881, comments=248)"
+    },
+    {
+      "heat": 8.0737,
+      "source": "hn",
+      "title": "XCancel service is suspended until further notice",
+      "url": "https://xcancel.com/#",
+      "score": 110,
+      "comments": 369,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T09:51:50Z",
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=212, comments=618)"
+      "reason": "hn score>=100 comments>=20 (score=110, comments=369)"
     },
     {
-      "heat": 7.8771,
+      "heat": 8.039,
+      "source": "reddit:LocalLLaMA",
+      "title": "RTX PRO 5500 Blackwell (84GB) released",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfxi36/rtx_pro_5500_blackwell_84gb_released/",
+      "score": 637,
+      "comments": 196,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T08:19:57Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=637, comments=196)"
+    },
+    {
+      "heat": 8.0268,
+      "source": "reddit:LocalLLaMA",
+      "title": "DeepSeek V4.1 Flash beats Astra on AA's new benchmark",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfpwhj/deepseek_v41_flash_beats_astra_on_aas_new/",
+      "score": 810,
+      "comments": 155,
+      "summary": "[https://artificialanalysis.ai/articles/artificial-analysis-intelligence-index-v4-3](https://artificialanalysis.ai/articles/artificial-analysis-intelligence-index-v4-3) AA shipped a new benchmark last week as part of the Intelligence Index v4.3 update — a brand-new private eval…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T01:37:44Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=810, comments=155)"
+    },
+    {
+      "heat": 7.6195,
+      "source": "reddit:LocalLLaMA",
+      "title": "Right to Intelligence. Protect your right to run local AI.",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfqwfh/right_to_intelligence_protect_your_right_to_run/",
+      "score": 546,
+      "comments": 96,
+      "summary": "With all the recent drama surrounding AI safety. It’s obvious that open source could be caught in the crossfire.",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T02:24:07Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=546, comments=96)"
+    },
+    {
+      "heat": 7.5679,
       "source": "hn",
-      "title": "Nike exits the S&P 100 after 18 years and a $200B market-cap wipeout",
-      "url": "https://fortune.com/2026/09/08/nike-stock-plummets-sp500-market-cap-index/",
+      "title": "What a time to be alive",
+      "url": "https://tenderlovemaking.com/2026/09/11/what-a-time-to-be-alive/",
+      "score": 132,
+      "comments": 175,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T12:40:57Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=132, comments=175)"
+    },
+    {
+      "heat": 7.4521,
+      "source": "hn",
+      "title": "How to write an effective software design document",
+      "url": "https://refactoringenglish.com/excerpts/write-an-effective-design-doc/",
+      "score": 228,
+      "comments": 99,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T13:00:46Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=228, comments=99)"
+    },
+    {
+      "heat": 7.4442,
+      "source": "hn",
+      "title": "Apple's Siri AI Can Be Swapped Out for Claude, ChatGPT, Code Shows",
+      "url": "https://www.macrumors.com/2026/09/14/siri-can-be-swapped-out-for-chatgpt-claude/",
+      "score": 200,
+      "comments": 116,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T12:01:32Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=200, comments=116)"
+    },
+    {
+      "heat": 7.4237,
+      "source": "reddit:LocalLLaMA",
+      "title": "Trump downplays the need to check AI development and says he doesn't want to cede edge to China -- \"I think you have a lot of negative forces that are...bringing up things that won’t happen...whoever wins with AI wins\"",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfm3v4/trump_downplays_the_need_to_check_ai_development/",
+      "score": 286,
+      "comments": 173,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T22:43:56Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=286, comments=173)"
+    },
+    {
+      "heat": 7.342,
+      "source": "reddit:OpenAI",
+      "title": "GPT 6 Astra playing Anno 117: Pax Romana from scratch",
+      "url": "https://www.reddit.com/r/OpenAI/comments/1wfhsa3/gpt_6_astra_playing_anno_117_pax_romana_from/",
+      "score": 404,
+      "comments": 97,
+      "summary": "I let GPT 6 Astra play Pax Romana for 6h from scratch, using only screenshots and mouse control via chatGPT desktop app. No plugins, MCP or game instructions. I only asked it to keep the economy healthy and improve its own game skills as it progresses. Ended up with a healthy ci…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T19:51:33Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/OpenAI top (score=404, comments=97)"
+    },
+    {
+      "heat": 7.3075,
+      "source": "reddit:LocalLLaMA",
+      "title": "5090 Stock is Almost Gone",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wft5v9/5090_stock_is_almost_gone/",
+      "score": 251,
+      "comments": 138,
+      "summary": "Prices have been going crazy, but it's about to get worse me thinks.",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T04:15:19Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=251, comments=138)"
+    },
+    {
+      "heat": 6.9612,
+      "source": "reddit:OpenAI",
+      "title": "All they wanna do is get the girl",
+      "url": "https://www.reddit.com/r/OpenAI/comments/1wg313b/all_they_wanna_do_is_get_the_girl/",
+      "score": 259,
+      "comments": 29,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T13:10:51Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/OpenAI top (score=259, comments=29)"
+    },
+    {
+      "heat": 6.8982,
+      "source": "hn",
+      "title": "A 386 PC for Your RP2350",
+      "url": "https://github.com/rh1tech/frank-386",
+      "score": 170,
+      "comments": 49,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T08:25:57Z",
+      "sources": [
+        "hn"
+      ],
+      "reason": "hn score>=100 comments>=20 (score=170, comments=49)"
+    },
+    {
+      "heat": 6.8613,
+      "source": "reddit:artificial",
+      "title": "Trump rejects Silicon Valley’s calls for AI slowdown",
+      "url": "https://www.reddit.com/r/artificial/comments/1wfiypv/trump_rejects_silicon_valleys_calls_for_ai/",
       "score": 209,
-      "comments": 260,
-      "summary": "https://archive.ph/8NmSg",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T02:50:40Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=209, comments=260)"
-    },
-    {
-      "heat": 7.838,
-      "source": "hn",
-      "title": "The case against JPEG XL",
-      "url": "https://giannirosato.com/blog/post/case-against-jxl/",
-      "score": 199,
-      "comments": 261,
+      "comments": 79,
       "summary": null,
       "summary_en": null,
       "summary_zh": null,
       "title_zh": null,
-      "published_at": "2026-09-14T01:02:37Z",
+      "published_at": "2026-09-13T20:35:59Z",
       "sources": [
-        "hn"
+        "reddit"
       ],
-      "reason": "hn score>=100 comments>=20 (score=199, comments=261)"
+      "reason": "reddit r/artificial top (score=209, comments=79)"
     },
     {
-      "heat": 7.8242,
-      "source": "hn",
-      "title": "Mullenweg has returned as CEO after attempted board ouster",
-      "url": "https://techcrunch.com/2026/09/12/automattic-confirms-mullenweg-has-returned-as-ceo-after-attempted-ouster-by-board/",
-      "score": 206,
-      "comments": 275,
-      "summary": null,
+      "heat": 6.8539,
+      "source": "reddit:LocalLLaMA",
+      "title": "The new k2 horizon models seem like an absolute beast",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wg0vqz/the_new_k2_horizon_models_seem_like_an_absolute/",
+      "score": 177,
+      "comments": 59,
+      "summary": "Especially the 7B one seems very interesting, it casually destroys muse glimmer with a way smaller size. And they open source literally everything, every step of the way. Anyone tried that model? It can be a new milestone if 7b and 3.7b ones are actually good, and not just bench…",
       "summary_en": null,
       "summary_zh": null,
       "title_zh": null,
-      "published_at": "2026-09-13T20:19:06Z",
+      "published_at": "2026-09-14T11:33:32Z",
       "sources": [
-        "hn"
+        "reddit"
       ],
-      "reason": "hn score>=100 comments>=20 (score=206, comments=275)"
+      "reason": "reddit r/LocalLLaMA top (score=177, comments=59)"
     },
     {
-      "heat": 7.653,
+      "heat": 6.8411,
       "source": "hn",
-      "title": "Registration without a phone number on Signal will use zero-knowledge proofs",
-      "url": "https://community.signalusers.org/t/registration-without-a-phone-number/2222?page=10",
-      "score": 312,
-      "comments": 157,
-      "summary": null,
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-13T21:47:04Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=312, comments=157)"
-    },
-    {
-      "heat": 7.3167,
-      "source": "hn",
-      "title": "Apple's Dimensional Drawings",
-      "url": "https://developer.apple.com/accessories/dimensional-drawings/",
-      "score": 255,
-      "comments": 89,
-      "summary": null,
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T00:11:21Z",
-      "sources": [
-        "hn"
-      ],
-      "reason": "hn score>=100 comments>=20 (score=255, comments=89)"
-    },
-    {
-      "heat": 6.9467,
-      "source": "hn",
-      "title": "Spaceships (Reverse Asteroid)",
-      "url": "https://spaceships.treybastian.com/",
-      "score": 277,
+      "title": "An atlas of periodic solutions to the three-body problem",
+      "url": "https://www.threebodyorbits.com/",
+      "score": 232,
       "comments": 52,
       "summary": null,
       "summary_en": null,
       "summary_zh": null,
       "title_zh": null,
-      "published_at": "2026-09-10T04:44:32Z",
+      "published_at": "2026-09-12T10:13:24Z",
       "sources": [
         "hn"
       ],
-      "reason": "hn score>=100 comments>=20 (score=277, comments=52)"
+      "reason": "hn score>=100 comments>=20 (score=232, comments=52)"
     },
     {
-      "heat": 6.7545,
-      "source": "hn",
-      "title": "Julia 1.13 highlights",
-      "url": "https://julialang.org/blog/2026/09/julia-1.13-highlights/",
-      "score": 246,
+      "heat": 6.7984,
+      "source": "reddit:artificial",
+      "title": "Trump doubles down on his no AI slowdown stance, also mocks Dario",
+      "url": "https://www.reddit.com/r/artificial/comments/1wg4ziv/trump_doubles_down_on_his_no_ai_slowdown_stance/",
+      "score": 75,
+      "comments": 93,
+      "summary": null,
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T14:28:12Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/artificial top (score=75, comments=93)"
+    },
+    {
+      "heat": 6.6847,
+      "source": "reddit:LocalLLaMA",
+      "title": "UkisAI Swift-Qwen3.8-27B / -58.3% thinking, x1.95 speed while keeping the accuracy of xhigh",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wg7dd5/ukisai_swiftqwen3827b_583_thinking_x195_speed/",
+      "score": 112,
+      "comments": 56,
+      "summary": "Hi everybody, we post-trained **Qwen 3.8 27B** to be more efficient by figuring out which tokens were linked to overthinking and penalizing them without \"attacking\" the reasoning length directly then fixed the accuracy with a bit of secret sauce (hint On-Policy Distillation) and…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T15:57:17Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=112, comments=56)"
+    },
+    {
+      "heat": 6.6263,
+      "source": "reddit:LocalLLaMA",
+      "title": "Xi promotes open source AI zone among BRICS countries",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wg4kpu/xi_promotes_open_source_ai_zone_among_brics/",
+      "score": 151,
+      "comments": 35,
+      "summary": "Xi emphasised the need to step up cooperation. [https://www.hindustantimes.com/india-news/china-will-lead-creation-of-open-source-ai-for-brics-xi-jinping-101789300908632.html](https://www.hindustantimes.com/india-news/china-will-lead-creation-of-open-source-ai-for-brics-xi-jinpi…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T14:12:27Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=151, comments=35)"
+    },
+    {
+      "heat": 6.5472,
+      "source": "reddit:LocalLLaMA",
+      "title": "What are the current best retail GPUs for max VRAM at a reasonable price?",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfy4vo/what_are_the_current_best_retail_gpus_for_max/",
+      "score": 32,
+      "comments": 98,
+      "summary": "I am considering dumping my ChatGPT Plus subscription and go full local, but to do so I would first need to reach a decent result for quality (and reasonable speed). My 4090 fried itself out of nowhere, so I am not stuck with a 3070 until I get something better. I am kind of sus…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T08:59:36Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=32, comments=98)"
+    },
+    {
+      "heat": 6.4819,
+      "source": "reddit:LocalLLaMA",
+      "title": "Decided to build a game, and test the ceiling of Qwen3.8 27b",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfpyvv/decided_to_build_a_game_and_test_the_ceiling_of/",
+      "score": 66,
+      "comments": 86,
+      "summary": "This took roughly 5 hours to create, using 2 different configured harnesses, same model. RTX 3090, overclocked +12% gain (MSI Afterburner), Q4KM - built this for fun, will be throwing it on GitHub, opensource for people to get an idea of a project created to the near ceiling of…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T01:40:52Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=66, comments=86)"
+    },
+    {
+      "heat": 6.3918,
+      "source": "reddit:OpenAI",
+      "title": "GPT-6 Astra solves Portal, Baba Is You and other puzzles",
+      "url": "https://www.reddit.com/r/OpenAI/comments/1wfxlrl/gpt6_astra_solves_portal_baba_is_you_and_other/",
+      "score": 117,
+      "comments": 40,
+      "summary": "Do you know a puzzle game that is still too hard for GPT-6 Astra?",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T08:26:16Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/OpenAI top (score=117, comments=40)"
+    },
+    {
+      "heat": 6.364,
+      "source": "reddit:LocalLLaMA",
+      "title": "Talk me out of buying a 3rd Spark",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfefc4/talk_me_out_of_buying_a_3rd_spark/",
+      "score": 74,
+      "comments": 77,
+      "summary": "Does anyone think the gurus on the DGX Spark forum are going to figure out how to magically fit DeepSeek 4.1 Flash on a 2x cluster, or is it only possible on 3 or 4 Sparks?",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T17:47:36Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=74, comments=77)"
+    },
+    {
+      "heat": 6.3435,
+      "source": "reddit:LocalLLaMA",
+      "title": "Another Qwen3.8-27b Appreciation Post",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfsvgy/another_qwen3827b_appreciation_post/",
+      "score": 61,
+      "comments": 70,
+      "summary": "I know I know, it's great, we know. I've been working on tweaking inference engines for a week now and it's been one shotting most of my vague prompts without any issues. It will even write tests and validate the changes without me asking. It's actually nuts. Last time I did som…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T04:01:18Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=61, comments=70)"
+    },
+    {
+      "heat": 6.3244,
+      "source": "reddit:LocalLLaMA",
+      "title": "llama: add Maple 20B-A1B ternary MoE architecture (CPU) by AlexGabbia · Pull Request #27000 · ggml-org/llama.cpp",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wg1o5b/llama_add_maple_20ba1b_ternary_moe_architecture/",
+      "score": 103,
       "comments": 34,
+      "summary": "20B-A1B model is coming, good for low VRAM people? [https://huggingface.co/deepgrove/maple-preview](https://huggingface.co/deepgrove/maple-preview)",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T12:11:18Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=103, comments=34)"
+    },
+    {
+      "heat": 6.2706,
+      "source": "reddit:LocalLLaMA",
+      "title": "Aurora1.0-150M Releases!",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfg0sb/aurora10150m_releases/",
+      "score": 134,
+      "comments": 36,
+      "summary": "The first generation of our 150M model has just been released Its performance is similar to that of GPT2-Small The benchmarks: PIQA: 62.24% Hellaswag: 32.20% Arc-Easy: 44.91% Arc-Challenge: 25.00% Arithmark 3.0: 33.90% CapitalBench: 36.55% It was trained on 7B tokens, using an R…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T18:46:19Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/LocalLLaMA top (score=134, comments=36)"
+    },
+    {
+      "heat": 6.2657,
+      "source": "reddit:artificial",
+      "title": "I don't know where to go anymore. No AI community will accept me.",
+      "url": "https://www.reddit.com/r/artificial/comments/1wfkhby/i_dont_know_where_to_go_anymore_no_ai_community/",
+      "score": 28,
+      "comments": 86,
+      "summary": "I'm pro AI. But I am also worried about a lot of things, like what the government wants to do with AI, Flock, certain things that AI can do, etc. I'm also worried about the slow down and pause that everyone wants to do, and how strictly they want to regulate and limit it for eve…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-13T21:36:21Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/artificial top (score=28, comments=86)"
+    },
+    {
+      "heat": 6.2294,
+      "source": "reddit:artificial",
+      "title": "All this AI doomerism & world ending talk is unhealthy & dangerous for people’s mental health. “The world will end in 6-12 months”, then people won’t save & start acting more recklessly. What’s the point of thinking long-term if the world will be over in 1 year? It’s bad for people’s lives & psyche",
+      "url": "https://www.reddit.com/r/artificial/comments/1wfzo0t/all_this_ai_doomerism_world_ending_talk_is/",
+      "score": 39,
+      "comments": 61,
+      "summary": "Rather than trying to assume or guess if it’s true or not; that’s irrelevant. The fact is all this talk massively exacerbates people’s fears and anxieties. Anxiety is fight or flight. All the uncertainty, unpredictability and unknown is very bad especially for younger people. “W…",
+      "summary_en": null,
+      "summary_zh": null,
+      "title_zh": null,
+      "published_at": "2026-09-14T10:29:45Z",
+      "sources": [
+        "reddit"
+      ],
+      "reason": "reddit r/artificial top (score=39, comments=61)"
+    },
+    {
+      "heat": 6.2188,
+      "source": "reddit:OpenAI",
+      "title": "China's Xi Jinping proposes BRICS 'open-source AI zone'",
+      "url": "https://www.reddit.com/r/OpenAI/comments/1wg1kux/chinas_xi_jinping_proposes_brics_opensource_ai/",
+      "score": 112,
+      "comments": 21,
       "summary": null,
       "summary_en": null,
       "summary_zh": null,
       "title_zh": null,
-      "published_at": "2026-09-10T12:27:25Z",
+      "published_at": "2026-09-14T12:06:53Z",
       "sources": [
-        "hn"
+        "reddit"
       ],
-      "reason": "hn score>=100 comments>=20 (score=246, comments=34)"
+      "reason": "reddit r/OpenAI top (score=112, comments=21)"
     },
     {
-      "heat": 6.6805,
-      "source": "hn",
-      "title": "EuroBirdPortal – Live bird movements across Europe",
-      "url": "https://www.eurobirdportal.org/ebp/en/",
-      "score": 115,
-      "comments": 41,
-      "summary": null,
+      "heat": 5.9179,
+      "source": "reddit:LocalLLaMA",
+      "title": "Dear 24G owners, try VLLM you might be able to run  Qwen3.8 27B INT4, 144K FP8 KV on RTX 3090 with better speed. (TLDR VLLM AOT)",
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1wfdtm7/dear_24g_owners_try_vllm_you_might_be_able_to_run/",
+      "score": 82,
+      "comments": 32,
+      "summary": "**VLLM Benchmark:** **Prefill, Prompt processing** \\- avg, 871.93 tok/s (3 hours constant running xhigh) \\- 10K prompt, 1000.26 tok/s (16 runs) \\- 90K prompt, 743,59 tok/s (16 runs) **Decode, tok gen** \\- avg, 38.39 tok/s (3 hours constant running xhigh) \\- 10K, 42.3 tok/s (16 r…",
       "summary_en": null,
       "summary_zh": null,
       "title_zh": null,
-      "published_at": "2026-09-14T08:25:47Z",
+      "published_at": "2026-09-13T17:25:05Z",
       "sources": [
-        "hn"
+        "reddit"
       ],
-      "reason": "hn score>=100 comments>=20 (score=115, comments=41)"
-    },
-    {
-      "heat": 5.5896,
-      "source": "google_news:ai_zh",
-      "title": "外交部：散播人工智能威胁叙事不符合任何一方利益 - 新华网",
-      "url": "https://www.news.cn/world/20260914/794c7232cc3346bfac9f16f109692606/c.html",
-      "score": 100,
-      "comments": 0,
-      "summary": "外交部：散播人工智能威胁叙事不符合任何一方利益 新华网",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T07:37:52Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=1"
-    },
-    {
-      "heat": 5.5814,
-      "source": "google_news:ai_en",
-      "title": "Mutual Empowerment Of Artificial Intelligence And Metasurfaces: Intelligent Nanophotonics And Optical Intelligence | Newswise - Newswise",
-      "url": "https://www.newswise.com/articles/mutual-empowerment-of-artificial-intelligence-and-metasurfaces-intelligent-nanophotonics-and-optical-intelligence",
-      "score": 90,
-      "comments": 0,
-      "summary": "Mutual Empowerment Of Artificial Intelligence And Metasurfaces: Intelligent Nanophotonics And Optical Intelligence | Newswise Newswise",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T11:35:00Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=2"
-    },
-    {
-      "heat": 5.5814,
-      "source": "google_news:ai_en",
-      "title": "The turbulent AI era is here. The choices we make now are critical. - Gates Notes",
-      "url": "https://www.gatesnotes.com/a-turbulent-ai-era-and-critical-choices-to-make",
-      "score": 100,
-      "comments": 0,
-      "summary": "The turbulent AI era is here. The choices we make now are critical. Gates Notes",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T07:14:45Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=1"
-    },
-    {
-      "heat": 5.5197,
-      "source": "google_news:ai_zh",
-      "title": "【图解】《“人工智能+交通运输”应用安全指引》-政策解读 - mot.gov.cn",
-      "url": "https://www.mot.gov.cn/gongkai/zcjd/202609/t20260914_4224278.html",
-      "score": 90,
-      "comments": 0,
-      "summary": "【图解】《“人工智能+交通运输”应用安全指引》-政策解读 mot.gov.cn",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T09:09:00Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=2"
-    },
-    {
-      "heat": 5.4899,
-      "source": "google_news:ai_en",
-      "title": "AI research to improve K-12 STEM learning gets funding boost - The University of North Carolina at Chapel Hill",
-      "url": "https://www.unc.edu/posts/2026/09/14/ai-research-to-improve-k-12-stem-learning-gets-funding-boost/",
-      "score": 80,
-      "comments": 0,
-      "summary": "AI research to improve K-12 STEM learning gets funding boost The University of North Carolina at Chapel Hill",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T12:28:29Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=3"
-    },
-    {
-      "heat": 5.3871,
-      "source": "google_news:ai_zh",
-      "title": "“闽港科创面对面”AI与智慧医疗专场发布38项最新成果和技术需求 - 中国科技网",
-      "url": "https://www.stdaily.com/web/gdxw/2026-09/14/content_580578.html",
-      "score": 80,
-      "comments": 0,
-      "summary": "“闽港科创面对面”AI与智慧医疗专场发布38项最新成果和技术需求 中国科技网",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T08:27:01Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=3"
-    },
-    {
-      "heat": 5.3186,
-      "source": "google_news:ai_zh",
-      "title": "全球首个人工智能+脑机接口标准中国首发 - 新华网客户端",
-      "url": "https://app.xinhuanet.com/news/article.html?articleId=2026091432c17989ec36468e9dc918c6314ef7cc",
-      "score": 70,
-      "comments": 0,
-      "summary": "全球首个人工智能+脑机接口标准中国首发 新华网客户端",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T11:02:09Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=4"
-    },
-    {
-      "heat": 5.2943,
-      "source": "google_news:ai_en",
-      "title": "Artificial Intelligence Will Not Replace Appraisers - Appraisal Buzz",
-      "url": "https://appraisalbuzz.com/ai-will-not-replace-appraisers/",
-      "score": 70,
-      "comments": 0,
-      "summary": "Artificial Intelligence Will Not Replace Appraisers Appraisal Buzz",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T10:05:13Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=4"
-    },
-    {
-      "heat": 5.1831,
-      "source": "google_news:ai_en",
-      "title": "Germany says halting AI development not viable, calls for US, China involvement - Reuters",
-      "url": "https://www.reuters.com/legal/litigation/germany-says-halting-ai-development-not-viable-calls-us-china-involvement-2026-09-14/",
-      "score": 60,
-      "comments": 0,
-      "summary": "Germany says halting AI development not viable, calls for US, China involvement Reuters",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T11:38:39Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=5"
-    },
-    {
-      "heat": 5.1255,
-      "source": "google_news:ai_zh",
-      "title": "2026年上海党外专家服务日浦东新区助力人工智能产业高质量发展专场活动在AI小镇举办 - 上海市人民政府",
-      "url": "https://segg.sh.gov.cn/pdfpt/gzdt/20260914/9e4ef150cad54d62b0dc0528d613930a.html",
-      "score": 60,
-      "comments": 0,
-      "summary": "2026年上海党外专家服务日浦东新区助力人工智能产业高质量发展专场活动在AI小镇举办 上海市人民政府",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T09:23:33Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=5"
-    },
-    {
-      "heat": 5.02,
-      "source": "google_news:ai_en",
-      "title": "This Could Be the Most Underrated Artificial Intelligence Stock to Buy Right Now - The Motley Fool",
-      "url": "https://www.fool.com/investing/2026/09/14/this-could-be-the-most-underrated-artificial-intelligence-stock-to-buy-right-now/",
-      "score": 50,
-      "comments": 0,
-      "summary": "This Could Be the Most Underrated Artificial Intelligence Stock to Buy Right Now The Motley Fool",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T12:13:08Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=6"
-    },
-    {
-      "heat": 4.8657,
-      "source": "google_news:ai_zh",
-      "title": "湖北发布2026人工智能企业生态图谱 - 湖北省经济和信息化厅",
-      "url": "http://jxt.hubei.gov.cn/bmdt/rdjj/202609/t20260914_6012724.shtml",
-      "score": 50,
-      "comments": 0,
-      "summary": "湖北发布2026人工智能企业生态图谱 湖北省经济和信息化厅",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T05:38:29Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=6"
-    },
-    {
-      "heat": 4.7699,
-      "source": "google_news:ai_en",
-      "title": "AI giants, investors clash over calls to slow down artificial intelligence development - Fox News",
-      "url": "https://www.foxnews.com/video/6405031502112",
-      "score": 40,
-      "comments": 0,
-      "summary": "AI giants, investors clash over calls to slow down artificial intelligence development Fox News",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T11:03:01Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=7"
-    },
-    {
-      "heat": 4.5731,
-      "source": "google_news:ai_zh",
-      "title": "勇闯智能经济新赛道 提供人工智能新服务 一群很“新”的服务商吸睛又吸金 - 北京市人民政府门户网站",
-      "url": "https://www.beijing.gov.cn/fuwu/lqfw/gggs/202609/t20260914_4862339.html",
-      "score": 40,
-      "comments": 0,
-      "summary": "勇闯智能经济新赛道 提供人工智能新服务 一群很“新”的服务商吸睛又吸金 北京市人民政府门户网站",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T01:17:00Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=7"
-    },
-    {
-      "heat": 4.5017,
-      "source": "google_news:ai_zh",
-      "title": "法国报纸摘要 - 人工智能：中国提议为金砖国家建立“开源”区 - RFI",
-      "url": "https://www.rfi.fr/cn/%E4%B8%93%E6%A0%8F%E6%A3%80%E7%B4%A2/%E6%B3%95%E5%9B%BD%E6%8A%A5%E7%BA%B8%E6%91%98%E8%A6%81/20260914-%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD-%E4%B8%AD%E5%9B%BD%E6%8F%90%E8%AE%AE%E4%B8%BA%E9%87%91%E7%A0%96%E5%9B%BD%E5%AE%B6%E5%BB%BA%E7%AB%8B-%E5%BC%80%E6%BA%90-%E5%8C%BA",
-      "score": 30,
-      "comments": 0,
-      "summary": "法国报纸摘要 - 人工智能：中国提议为金砖国家建立“开源”区 RFI",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T11:28:46Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=8"
-    },
-    {
-      "heat": 4.4929,
-      "source": "google_news:ai_en",
-      "title": "Virtus Artificial Intelligence & Technology Opportunities Fund's Dividend Analysis - finance.yahoo.com",
-      "url": "https://finance.yahoo.com/markets/stocks/articles/virtus-artificial-intelligence-technology-opportunities-110856241.html",
-      "score": 30,
-      "comments": 0,
-      "summary": "Virtus Artificial Intelligence & Technology Opportunities Fund's Dividend Analysis finance.yahoo.com",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T11:08:56Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=8"
-    },
-    {
-      "heat": 4.0777,
-      "source": "google_news:ai_en",
-      "title": "Beijing hits back at Anthropic CEO's call to curb China's AI development - NPR",
-      "url": "https://www.npr.org/2026/09/14/nx-s1-5968456/china-hits-back-ai-development",
-      "score": 20,
-      "comments": 0,
-      "summary": "Beijing hits back at Anthropic CEO's call to curb China's AI development NPR",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T10:09:08Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=9"
-    },
-    {
-      "heat": 4.0202,
-      "source": "google_news:ai_zh",
-      "title": "外交部：散播人工智能威胁叙事不符合任何一方利益 - thepaper.cn",
-      "url": "https://www.thepaper.cn/newsDetail_forward_34066545",
-      "score": 20,
-      "comments": 0,
-      "summary": "外交部：散播人工智能威胁叙事不符合任何一方利益 thepaper.cn",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T07:41:00Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=9"
-    },
-    {
-      "heat": 3.443,
-      "source": "google_news:ai_en",
-      "title": "Trump says he would agree to ‘guardrails’ for artificial intelligence - Washington Times",
-      "url": "https://www.washingtontimes.com/news/2026/sep/13/trump-says-would-agree-guardrails-artificial-intelligence/",
-      "score": 10,
-      "comments": 0,
-      "summary": "Trump says he would agree to ‘guardrails’ for artificial intelligence Washington Times",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T10:37:20Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_en rank=10"
-    },
-    {
-      "heat": 3.4306,
-      "source": "google_news:ai_zh",
-      "title": "外交部：散播人工智能威胁叙事不符合任何一方利益 - qzwb.com",
-      "url": "https://www.qzwb.com/gb/content/2026-09/14/content_9252123.htm",
-      "score": 10,
-      "comments": 0,
-      "summary": "外交部：散播人工智能威胁叙事不符合任何一方利益 qzwb.com",
-      "summary_en": null,
-      "summary_zh": null,
-      "title_zh": null,
-      "published_at": "2026-09-14T10:08:00Z",
-      "sources": [
-        "google_news"
-      ],
-      "reason": "google_news ai_zh rank=10"
+      "reason": "reddit r/LocalLLaMA top (score=82, comments=32)"
     }
   ]
 }
