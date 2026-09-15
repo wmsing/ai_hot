@@ -73,15 +73,9 @@ python -m src.deep_summarize "${ARGS[@]}" \
   && git add content/digests content/audio && git commit -m "content: adhd summarize" && git push
 ```
 
-### 今日热搜（CLI）
+### Admin 一键发布
 
-```bash
-python -m src.hot_topics_probe --top 30 --save          # 拉榜
-python -m src.deep_summarize --hot-topics --llm qwen    # ADHD 中+英（CLI 无分语种）
-python -m src.site_build                                # 本地预览
-```
-
-快照：`content/hot_topics/latest.json`。`config.yaml` → `hot_topics.deep_summarize: true` 时 `site_build` 可自动精写（`deep_summarize_top_n: 0` = 全部）。
+Admin 顶栏 **一键发布**：拉取 digest → 标题/摘要翻译 → ADHD → mp3 → `public/` 重建（不含 git push）。归档后按 **URL** 强制 en/zh 成对（`src/digest_pair.py`）。
 
 ### 其他常用
 
@@ -104,7 +98,7 @@ git add content/digests && git commit -m "content: archive digest YYYY-MM-DD" &&
 
 **Cloudflare（当前）：** Workers + `wrangler.toml`。Build：`pip install -e . && python -m src.site_build --content-only`；Deploy：`npx wrangler deploy`。详见仓库内 wrangler / Actions 配置。
 
-定时：GitHub Actions `digest-schedule.yml`，港时 **07:00 / 12:00 / 21:00**（需 Secret `OPENROUTER_API_KEY`）。
+**自动化（已关闭）：** 原 `digest-schedule.yml` 定时拉取与 `deploy-cloudflare.yml` 的 push 部署均已停用；需 push 本仓库 workflow 变更后 GitHub 侧才生效。
 
 ## 配置
 

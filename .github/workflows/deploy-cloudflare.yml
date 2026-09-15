@@ -1,18 +1,7 @@
 name: Deploy Cloudflare Worker
 
+# 项目已停更：push 自动部署已关闭，仅手动 workflow_dispatch。
 on:
-  push:
-    branches: [main]
-    paths:
-      - "content/**"
-      - "src/site_build.py"
-      - "src/site_parse.py"
-      - "src/publish.py"
-      - "src/models.py"
-      - "src/config.py"
-      - "config.yaml"
-      - "wrangler.toml"
-      - ".github/workflows/deploy-cloudflare.yml"
   workflow_dispatch:
 
 concurrency:
